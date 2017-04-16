@@ -1410,6 +1410,7 @@ static int mpeg_decode_slice(MpegEncContext *s, int mb_y,
     const int lowres      = s->avctx->lowres;
     const int field_pic   = s->picture_structure != PICT_FRAME;
     int ret;
+    int read_8_more = 0;
 
     s->resync_mb_x =
     s->resync_mb_y = -1;
@@ -1417,6 +1418,7 @@ static int mpeg_decode_slice(MpegEncContext *s, int mb_y,
     av_assert0(mb_y < s->mb_height);
 
     init_get_bits(&s->gb, *buf, buf_size * 8);
+    s->gb.pb = s->opb;
     if (s->codec_id != AV_CODEC_ID_MPEG1VIDEO && s->mb_height > 2800/16)
         skip_bits(&s->gb, 3);
 
@@ -1572,6 +1574,7 @@ static int mpeg_decode_slice(MpegEncContext *s, int mb_y,
 
                 if (left >= 32 && !is_d10) {
                     GetBitContext gb = s->gb;
+                    gb.pb = NULL;
                     align_get_bits(&gb);
                     if (show_bits(&gb, 24) == 0x060E2B) {
                         av_log(avctx, AV_LOG_DEBUG, "Invalid MXF data found in video stream\n");
@@ -1613,8 +1616,11 @@ static int mpeg_decode_slice(MpegEncContext *s, int mb_y,
             /* read increment again */
             s->mb_skip_run = 0;
             for (;;) {
-                int code = get_vlc2(&s->gb, ff_mbincr_vlc.table,
-                                    MBINCR_VLC_BITS, 2);
+                int code;
+                if ( show_bits(&s->gb, 8) == 0x00 )
+                    goto end_code;
+                code = get_vlc2(&s->gb, ff_mbincr_vlc.table,
+                                MBINCR_VLC_BITS, 2);
                 if (code < 0) {
                     av_log(s->avctx, AV_LOG_ERROR, "mb incr damaged\n");
                     return AVERROR_INVALIDDATA;
@@ -1623,10 +1629,13 @@ static int mpeg_decode_slice(MpegEncContext *s, int mb_y,
                     if (code == 33) {
                         s->mb_skip_run += 33;
                     } else if (code == 35) {
-                        if (s->mb_skip_run != 0 || show_bits(&s->gb, 15) != 0) {
+end_code:
+                        if (s->mb_skip_run != 0 || show_bits(&s->gb, 23) != 0) {
                             av_log(s->avctx, AV_LOG_ERROR, "slice mismatch\n");
+                            get_bits(&s->gb, 8);
                             return AVERROR_INVALIDDATA;
                         }
+                        read_8_more = 1;
                         goto eos; /* end of slice */
                     }
                     /* otherwise, stuffing, nothing to do */
@@ -1669,6 +1678,13 @@ static int mpeg_decode_slice(MpegEncContext *s, int mb_y,
         }
     }
 eos: // end of slice
+    if ( read_8_more && s->gb.pb != NULL )
+    {
+        avpriv_align_put_bits(s->gb.pb);
+        s->gb.pb = NULL;
+        get_bits(&s->gb, 8);
+        s->gb.pb = s->opb;
+    }
     if (get_bits_left(&s->gb) < 0) {
         av_log(s, AV_LOG_ERROR, "overread %d\n", -get_bits_left(&s->gb));
         return AVERROR_INVALIDDATA;
@@ -2119,7 +2135,16 @@ static int decode_chunks(AVCodecContext *avctx, AVFrame *picture,
     for (;;) {
         /* find next start code */
         uint32_t start_code = -1;
+        const uint8_t *orig_buf_ptr = buf_ptr;
         buf_ptr = avpriv_find_start_code(buf_ptr, buf_end, &start_code);
+        if ( s2->opb != NULL && start_code < 0x200 )
+        {
+            if ( put_bits_count(s2->opb) & 0x07 )
+                orig_buf_ptr++;
+            flush_put_bits(s2->opb);
+            while ( orig_buf_ptr != buf_ptr )
+                put_bits(s2->opb, 8, *orig_buf_ptr++);
+        }
         if (start_code > 0x1ff) {
             if (!skip_frame) {
                 if (HAVE_THREADS &&
@@ -2452,7 +2477,8 @@ static int mpeg_decode_frame(AVCodecContext *avctx, void *data,
 
             *got_output = 1;
         }
-        return buf_size;
+        ret = buf_size;
+        goto the_end;
     }
 
     if (s2->avctx->flags & AV_CODEC_FLAG_TRUNCATED) {
@@ -2461,7 +2487,10 @@ static int mpeg_decode_frame(AVCodecContext *avctx, void *data,
 
         if (ff_combine_frame(&s2->parse_context, next,
                              (const uint8_t **) &buf, &buf_size) < 0)
-            return buf_size;
+        {
+            ret = buf_size;
+            goto the_end;
+        }
     }
 
     s2->codec_tag = avpriv_toupper4(avctx->codec_tag);
@@ -2487,6 +2516,23 @@ static int mpeg_decode_frame(AVCodecContext *avctx, void *data,
         }
     }
 
+    if ( s2->opb == NULL )
+    {
+        int pkt_size = 1;
+        pkt_size *= 1920 / 16; // just guessing 1920x1080
+        pkt_size *= 1080 / 16; // memory is cheap
+        pkt_size *= (MAX_MB_BYTES + 100);
+        pkt_size += 10000;
+        s2->opkt = av_packet_alloc();
+        ret = ff_alloc_packet2(avctx, s2->opkt, pkt_size, 0);
+        if ( ret < 0 )
+            return ret;
+        s2->opb = av_malloc(sizeof(PutBitContext));
+        if ( s2->opb == NULL )
+            return AVERROR(ENOMEM);
+        init_put_bits(s2->opb, s2->opkt->data, pkt_size * 8);
+    }
+
     ret = decode_chunks(avctx, picture, got_output, buf, buf_size);
     if (ret<0 || *got_output) {
         s2->current_picture_ptr = NULL;
@@ -2501,6 +2547,17 @@ static int mpeg_decode_frame(AVCodecContext *avctx, void *data,
 
             s2->timecode_frame_start = -1;
         }
+    }
+
+the_end:
+    if ( s2->opb != NULL )
+    {
+        flush_put_bits(s2->opb);
+        avctx->cas9_out_size = (put_bits_count(s2->opb) + 7) >> 3;
+        avctx->cas9_out = av_malloc(avctx->cas9_out_size);
+        memcpy(avctx->cas9_out, s2->opkt->data, avctx->cas9_out_size);
+        av_freep(&s2->opb);
+        av_packet_free(&s2->opkt);
     }
 
     return ret;
@@ -2536,6 +2593,7 @@ AVCodec ff_mpeg1video_decoder = {
     .decode                = mpeg_decode_frame,
     .capabilities          = AV_CODEC_CAP_DRAW_HORIZ_BAND | AV_CODEC_CAP_DR1 |
                              AV_CODEC_CAP_TRUNCATED | AV_CODEC_CAP_DELAY |
+                             AV_CODEC_CAP_CAS9_BITSTREAM |
                              AV_CODEC_CAP_SLICE_THREADS,
     .caps_internal         = FF_CODEC_CAP_SKIP_FRAME_FILL_PARAM,
     .flush                 = flush,
@@ -2554,6 +2612,7 @@ AVCodec ff_mpeg2video_decoder = {
     .decode         = mpeg_decode_frame,
     .capabilities   = AV_CODEC_CAP_DRAW_HORIZ_BAND | AV_CODEC_CAP_DR1 |
                       AV_CODEC_CAP_TRUNCATED | AV_CODEC_CAP_DELAY |
+                      AV_CODEC_CAP_CAS9_BITSTREAM |
                       AV_CODEC_CAP_SLICE_THREADS,
     .caps_internal  = FF_CODEC_CAP_SKIP_FRAME_FILL_PARAM,
     .flush          = flush,
@@ -2573,6 +2632,7 @@ AVCodec ff_mpegvideo_decoder = {
     .decode         = mpeg_decode_frame,
     .capabilities   = AV_CODEC_CAP_DRAW_HORIZ_BAND | AV_CODEC_CAP_DR1 |
                       AV_CODEC_CAP_TRUNCATED | AV_CODEC_CAP_DELAY |
+                      AV_CODEC_CAP_CAS9_BITSTREAM |
                       AV_CODEC_CAP_SLICE_THREADS,
     .caps_internal  = FF_CODEC_CAP_SKIP_FRAME_FILL_PARAM,
     .flush          = flush,
