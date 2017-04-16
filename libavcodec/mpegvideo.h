@@ -55,6 +55,8 @@
 #include "thread.h"
 #include "videodsp.h"
 
+#include "cas9_xp.h"
+
 #include "libavutil/opt.h"
 #include "libavutil/timecode.h"
 
@@ -571,6 +573,10 @@ typedef struct MpegEncContext {
 
     int scenechange_threshold;
     int noise_reduction;
+
+    /* cas9 bitstream */
+    CAS9TransplicateContext cas9_xp;
+
 } MpegEncContext;
 
 /* mpegvideo_enc common options */
