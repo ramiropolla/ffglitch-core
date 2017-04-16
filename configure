@@ -3789,7 +3789,7 @@ for opt do
         ;;
         --disable-all)
             map 'eval unset \${$(toupper ${v%s})_LIST}' $COMPONENT_LIST
-            disable $LIBRARY_LIST $PROGRAM_LIST doc
+            disable $LIBRARY_LIST $EXTERNAL_LIBRARY_LIST $HWACCEL_LIBRARY_LIST $PROGRAM_LIST doc
             enable avutil
         ;;
         --enable-random|--disable-random)
