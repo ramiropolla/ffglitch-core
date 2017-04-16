@@ -565,6 +565,11 @@ typedef struct MpegEncContext {
 
     int scenechange_threshold;
     int noise_reduction;
+
+    /* cas9 bitstream */
+    AVPacket *opkt;
+    PutBitContext *opb;
+
 } MpegEncContext;
 
 /* mpegvideo_enc common options */
