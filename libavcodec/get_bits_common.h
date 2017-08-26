@@ -9,11 +9,15 @@
 #include "mathops.h"
 #include "vlc.h"
 
+struct PutBitContext;
+typedef struct PutBitContext PutBitContext;
+
 typedef struct GetBitContext {
     const uint8_t *buffer, *buffer_end;
     int index;
     int size_in_bits;
     int size_in_bits_plus8;
+    PutBitContext *pb;
 } GetBitContext;
 
 #if defined LONG_BITSTREAM_READER

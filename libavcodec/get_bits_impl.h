@@ -57,6 +57,11 @@ int get_xbits(GetBitContext *s, int n)
     UPDATE_CACHE(re, s);
     cache = GET_CACHE(re, s);
     sign  = ~cache >> 31;
+    if ( s->pb != NULL )
+    {
+        int tmp = SHOW_UBITS(re, s, n);
+        put_bits(s->pb, n, tmp);
+    }
     LAST_SKIP_BITS(re, s, n);
     CLOSE_READER(re, s);
     return (NEG_USR32(sign ^ cache, n) ^ sign) - sign;
@@ -71,6 +76,11 @@ int get_xbits_le(GetBitContext *s, int n)
     UPDATE_CACHE_LE(re, s);
     cache = GET_CACHE(re, s);
     sign  = sign_extend(~cache, n) >> 31;
+    if ( s->pb != NULL )
+    {
+        int tmp = SHOW_UBITS_LE(re, s, n);
+        put_bits(s->pb, n, tmp);
+    }
     LAST_SKIP_BITS(re, s, n);
     CLOSE_READER(re, s);
     return (zero_extend(sign ^ cache, n) ^ sign) - sign;
@@ -82,7 +92,10 @@ int get_sbits(GetBitContext *s, int n)
     OPEN_READER(re, s);
     av_assert2(n>0 && n<=25);
     UPDATE_CACHE(re, s);
-    tmp = SHOW_SBITS(re, s, n);
+    tmp = SHOW_UBITS(re, s, n);
+    if ( s->pb != NULL )
+        put_bits(s->pb, n, tmp);
+    tmp = sign_extend(tmp, n);
     LAST_SKIP_BITS(re, s, n);
     CLOSE_READER(re, s);
     return tmp;
@@ -98,6 +111,8 @@ unsigned int get_bits(GetBitContext *s, int n)
     av_assert2(n>0 && n<=25);
     UPDATE_CACHE(re, s);
     tmp = SHOW_UBITS(re, s, n);
+    if ( s->pb != NULL )
+        put_bits(s->pb, n, tmp);
     LAST_SKIP_BITS(re, s, n);
     CLOSE_READER(re, s);
     av_assert2(tmp < UINT64_C(1) << n);
@@ -119,6 +134,8 @@ unsigned int get_bits_le(GetBitContext *s, int n)
     av_assert2(n>0 && n<=25);
     UPDATE_CACHE_LE(re, s);
     tmp = SHOW_UBITS_LE(re, s, n);
+    if ( s->pb != NULL )
+        put_bits(s->pb, n, tmp);
     LAST_SKIP_BITS(re, s, n);
     CLOSE_READER(re, s);
     return tmp;
@@ -251,6 +268,7 @@ static inline int init_get_bits_xe(GetBitContext *s, const uint8_t *buffer,
     s->size_in_bits_plus8 = bit_size + 8;
     s->buffer_end         = buffer + buffer_size;
     s->index              = 0;
+    s->pb                 = NULL;
 
     return ret;
 }
