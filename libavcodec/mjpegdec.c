@@ -47,6 +47,9 @@
 #include "tiff.h"
 #include "exif.h"
 #include "bytestream.h"
+#include "cas9.h"
+
+#include "mjpegenc_common.h"
 
 
 static int build_vlc(VLC *vlc, const uint8_t *bits_table,
@@ -2210,6 +2213,13 @@ int ff_mjpeg_decode_frame(AVCodecContext *avctx, void *data, int *got_frame,
     int ret = 0;
     int is16bit;
 
+    if ( (avctx->cas9_apply & (1 << CAS9_FEAT_LAST)) != 0 )
+    {
+        ret = cas9_transplicate_init(avctx, &s->cas9_xp, 0x100000);
+        if ( ret < 0 )
+            return ret;
+    }
+
     av_dict_free(&s->exif_metadata);
     av_freep(&s->stereo3d);
     s->adobe_transform = -1;
@@ -2220,6 +2230,8 @@ int ff_mjpeg_decode_frame(AVCodecContext *avctx, void *data, int *got_frame,
     buf_ptr = buf;
     buf_end = buf + buf_size;
     while (buf_ptr < buf_end) {
+        int start_escape;
+
         /* find start next marker */
         start_code = ff_mjpeg_find_marker(s, &buf_ptr, buf_end,
                                           &unescaped_buf_ptr,
@@ -2241,6 +2253,17 @@ int ff_mjpeg_decode_frame(AVCodecContext *avctx, void *data, int *got_frame,
         if (ret < 0) {
             av_log(avctx, AV_LOG_ERROR, "invalid buffer\n");
             goto fail;
+        }
+
+        if ( (avctx->cas9_apply & (1 << CAS9_FEAT_LAST)) != 0 )
+        {
+            PutBitContext *opb = cas9_transplicate_pb(&s->cas9_xp);
+            flush_put_bits(opb);
+            put_bits(opb, 8, 0xff);
+            put_bits(opb, 8, start_code);
+            flush_put_bits(opb);
+            start_escape = opb->buf_ptr - opb->buf;
+            s->gb.pb = opb;
         }
 
         s->start_code = start_code;
@@ -2431,6 +2454,11 @@ eoi_parser:
         }
 
 skip:
+        if ( (avctx->cas9_apply & (1 << CAS9_FEAT_LAST)) != 0 )
+        {
+            PutBitContext *opb = cas9_transplicate_pb(&s->cas9_xp);
+            ff_mjpeg_escape_FF(opb, start_escape);
+        }
         /* eof process start code */
         buf_ptr += (get_bits_count(&s->gb) + 7) / 8;
         av_log(avctx, AV_LOG_DEBUG,
@@ -2447,6 +2475,9 @@ fail:
     s->got_picture = 0;
     return ret;
 the_end:
+
+    if ( (avctx->cas9_apply & (1 << CAS9_FEAT_LAST)) != 0 )
+        cas9_transplicate_flush(avctx, &s->cas9_xp, avpkt);
 
     is16bit = av_pix_fmt_desc_get(s->avctx->pix_fmt)->comp[0].step > 1;
 
@@ -2705,6 +2736,8 @@ av_cold int ff_mjpeg_decode_end(AVCodecContext *avctx)
 
     av_freep(&s->hwaccel_picture_private);
 
+    cas9_transplicate_free(&s->cas9_xp);
+
     return 0;
 }
 
@@ -2740,7 +2773,7 @@ AVCodec ff_mjpeg_decoder = {
     .close          = ff_mjpeg_decode_end,
     .decode         = ff_mjpeg_decode_frame,
     .flush          = decode_flush,
-    .capabilities   = AV_CODEC_CAP_DR1,
+    .capabilities   = AV_CODEC_CAP_DR1 | AV_CODEC_CAP_CAS9_BITSTREAM,
     .max_lowres     = 3,
     .priv_class     = &mjpegdec_class,
     .caps_internal  = FF_CODEC_CAP_INIT_THREADSAFE |
