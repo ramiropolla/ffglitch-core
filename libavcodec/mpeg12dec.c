@@ -455,6 +455,43 @@ static inline int get_dmv(MpegEncContext *s)
         return 0;
 }
 
+static int
+cas9_qscale_get_mb(MpegEncContext *s)
+{
+    json_object *jdata = s->cas9_qscale_mb;
+    json_object *jmb_y = json_object_array_get_idx(jdata, s->mb_y);
+    json_object *jval = json_object_array_get_idx(jmb_y, s->mb_x);
+    return json_object_get_int(jval);
+}
+
+static int
+cas9_qscale_get_slice(MpegEncContext *s)
+{
+    // TODO FIXME
+    json_object *jdata = s->cas9_qscale_slice;
+    json_object *jqscale = json_object_array_get_idx(jdata, 0);
+    return json_object_get_int(jqscale);
+}
+
+static void
+cas9_qscale_set_mb(MpegEncContext *s, int val)
+{
+    json_object *jdata = s->cas9_qscale_mb;
+    json_object *jmb_y = json_object_array_get_idx(jdata, s->mb_y);
+    json_object *jval = json_object_new_int(val);
+    json_object_array_put_idx(jmb_y, s->mb_x, jval);
+    s->cas9_qscale_mb_count++;
+}
+
+static void
+cas9_qscale_set_slice(MpegEncContext *s, int val)
+{
+    json_object *jdata = s->cas9_qscale_slice;
+    json_object *jval = json_object_new_int(val);
+    json_object_array_put_idx(jdata, s->cas9_qscale_slice_count, jval);
+    s->cas9_qscale_slice_count++;
+}
+
 static inline int get_qscale(MpegEncContext *s)
 {
     int qscale = get_bits(&s->gb, 5);
@@ -462,6 +499,40 @@ static inline int get_qscale(MpegEncContext *s)
         return ff_mpeg2_non_linear_qscale[qscale];
     else
         return qscale << 1;
+}
+
+static int cas9_get_qscale(MpegEncContext *s, int is_mb)
+{
+    PutBitContext saved;
+    int qscale;
+
+    if ( (s->avctx->cas9_apply & (1 << CAS9_FEAT_QSCALE)) != 0 )
+        saved = *(s->opb);
+
+    qscale = get_qscale(s);
+
+    if ( (s->avctx->cas9_import & (1 << CAS9_FEAT_QSCALE)) != 0
+      && s->cas9_qscale != NULL ) // TODO
+    {
+        if ( is_mb )
+            qscale = cas9_qscale_get_mb(s) << 1;
+        else
+            qscale = cas9_qscale_get_slice(s) << 1;
+    }
+    if ( (s->avctx->cas9_apply & (1 << CAS9_FEAT_QSCALE)) != 0 )
+    {
+        put_bits(&saved, 5, qscale >> 1);
+        *(s->opb) = saved;
+    }
+    if ( (s->avctx->cas9_export & (1 << CAS9_FEAT_QSCALE)) != 0 )
+    {
+        if ( is_mb )
+            cas9_qscale_set_mb(s, qscale >> 1);
+        else
+            cas9_qscale_set_slice(s, qscale >> 1);
+    }
+
+    return qscale;
 }
 
 
@@ -557,7 +628,7 @@ static int mpeg_decode_mb(MpegEncContext *s, int16_t block[12][64])
             s->interlaced_dct = get_bits1(&s->gb);
 
         if (IS_QUANT(mb_type))
-            s->qscale = get_qscale(s);
+            s->qscale = cas9_get_qscale(s, 1);
 
         if (s->concealment_motion_vectors) {
             /* just parse them */
@@ -622,7 +693,7 @@ static int mpeg_decode_mb(MpegEncContext *s, int16_t block[12][64])
             }
 
             if (IS_QUANT(mb_type))
-                s->qscale = get_qscale(s);
+                s->qscale = cas9_get_qscale(s, 1);
 
             s->last_mv[0][0][0] = 0;
             s->last_mv[0][0][1] = 0;
@@ -643,7 +714,7 @@ static int mpeg_decode_mb(MpegEncContext *s, int16_t block[12][64])
             }
 
             if (IS_QUANT(mb_type))
-                s->qscale = get_qscale(s);
+                s->qscale = cas9_get_qscale(s, 1);
 
             /* motion vectors */
             s->mv_dir = (mb_type >> 13) & 3;
@@ -1382,6 +1453,15 @@ static void mpeg_decode_picture_coding_extension(Mpeg1Context *s1)
     s->frame_pred_frame_dct       = get_bits1(&s->gb);
     s->concealment_motion_vectors = get_bits1(&s->gb);
     s->q_scale_type               = get_bits1(&s->gb);
+    if ( s->q_scale_type
+      && ((s->avctx->cas9_import & (1 << CAS9_FEAT_QSCALE)) != 0
+       || (s->avctx->cas9_export & (1 << CAS9_FEAT_QSCALE)) != 0
+       || (s->avctx->cas9_apply  & (1 << CAS9_FEAT_QSCALE)) != 0) )
+    {
+        av_log(NULL, AV_LOG_ERROR,
+               "FFglitch doesn't support non-linear qscale yet.\n");
+        av_assert0(0);
+    }
     s->intra_vlc_format           = get_bits1(&s->gb);
     s->alternate_scan             = get_bits1(&s->gb);
     s->repeat_first_field         = get_bits1(&s->gb);
@@ -1550,6 +1630,41 @@ cas9_mvline_to_json_string(
     return printbuf_strappend(pb, "]");
 }
 
+static int
+cas9_intline_to_json_string(
+        json_object *jso,
+        struct printbuf *pb,
+        int level,
+        int flags)
+{
+    size_t length = json_object_array_length(jso);
+
+    printbuf_strappend(pb, "[");
+
+    for ( size_t i = 0; i < length; i++ )
+    {
+        json_object *jval = json_object_array_get_idx(jso, i);
+
+        if ( i != 0 )
+            printbuf_strappend(pb, ",");
+        printbuf_strappend(pb, " ");
+
+        if ( jval == NULL )
+        {
+            printbuf_strappend(pb, "null");
+        }
+        else
+        {
+            char sbuf[21];
+            snprintf(sbuf, sizeof(sbuf), "% 4d", json_object_get_int(jval));
+            printbuf_memappend(pb, sbuf, strlen(sbuf));
+        }
+    }
+
+    printbuf_strappend(pb, " ");
+    return printbuf_strappend(pb, "]");
+}
+
 static json_object *cas9_new_mb(
         MpegEncContext *s,
         int (*func)(
@@ -1577,6 +1692,11 @@ static json_object *cas9_new_mb(
 static json_object *cas9_new_mv(MpegEncContext *s)
 {
     return cas9_new_mb(s, cas9_mvline_to_json_string);
+}
+
+static json_object *cas9_new_qscale(MpegEncContext *s)
+{
+    return cas9_new_mb(s, cas9_intline_to_json_string);
 }
 
 #define DECODE_SLICE_ERROR -1
@@ -1610,7 +1730,36 @@ static int mpeg_decode_slice(MpegEncContext *s, int mb_y,
     ff_mpeg1_clean_buffers(s);
     s->interlaced_dct = 0;
 
-    s->qscale = get_qscale(s);
+    if ( (s->avctx->cas9_export & (1 << CAS9_FEAT_QSCALE)) != 0
+      && s->cas9_qscale == NULL )
+    {
+        // {
+        //  "slice": [ ]
+        //  "mb":    [ ] # line
+        //           [ ] # column
+        //           null or qscale
+        // }
+
+        json_object *jframe = json_object_new_object();
+
+        s->cas9_qscale_slice = json_object_new_array();
+        json_object_set_serializer(s->cas9_qscale_slice, cas9_intline_to_json_string, NULL, NULL);
+        s->cas9_qscale_slice_count = 0;
+        json_object_object_add(jframe, "slice", s->cas9_qscale_slice);
+
+        s->cas9_qscale_mb = cas9_new_qscale(s);
+        s->cas9_qscale_mb_count = 0;
+        json_object_object_add(jframe, "mb", s->cas9_qscale_mb);
+
+        s->cas9_qscale = jframe;
+    }
+    else if ( (s->avctx->cas9_import & (1 << CAS9_FEAT_QSCALE)) != 0 )
+    {
+        json_object_object_get_ex(s->cas9_qscale, "slice", &s->cas9_qscale_slice);
+        json_object_object_get_ex(s->cas9_qscale, "mb", &s->cas9_qscale_mb);
+    }
+
+    s->qscale = cas9_get_qscale(s, 0);
 
     if (s->qscale == 0) {
         av_log(s->avctx, AV_LOG_ERROR, "qscale == 0\n");
@@ -2709,6 +2858,8 @@ static int mpeg_decode_frame(AVCodecContext *avctx, void *data,
 
     if ( (avctx->cas9_import & (1 << CAS9_FEAT_MV)) != 0 )
         s2->cas9_mv = avpkt->cas9_sd[CAS9_FEAT_MV];
+    if ( (avctx->cas9_import & (1 << CAS9_FEAT_QSCALE)) != 0 )
+        s2->cas9_qscale = avpkt->cas9_sd[CAS9_FEAT_QSCALE];
 
     if (buf_size == 0 || (buf_size == 4 && AV_RB32(buf) == SEQ_END_CODE)) {
         /* special case for last picture */
@@ -2807,6 +2958,13 @@ static int mpeg_decode_frame(AVCodecContext *avctx, void *data,
             picture->cas9_sd[CAS9_FEAT_MV] = s2->cas9_mv;
             s2->cas9_mv = NULL;
         }
+        if ( (s2->avctx->cas9_export & (1 << CAS9_FEAT_QSCALE)) != 0 )
+        {
+            if ( s2->cas9_qscale_mb_count == 0 )
+                json_object_object_del(s2->cas9_qscale, "mb");
+            picture->cas9_sd[CAS9_FEAT_QSCALE] = s2->cas9_qscale;
+            s2->cas9_qscale = NULL;
+        }
     }
 
     return ret;
@@ -2848,7 +3006,8 @@ AVCodec ff_mpeg1video_decoder = {
     .flush                 = flush,
     .max_lowres            = 3,
     .update_thread_context = ONLY_IF_THREADS_ENABLED(mpeg_decode_update_thread_context),
-    .cas9_features         = (1 << CAS9_FEAT_MV),
+    .cas9_features         = (1 << CAS9_FEAT_MV)
+                           | (1 << CAS9_FEAT_QSCALE),
 };
 
 AVCodec ff_mpeg2video_decoder = {
@@ -2868,7 +3027,8 @@ AVCodec ff_mpeg2video_decoder = {
     .flush          = flush,
     .max_lowres     = 3,
     .profiles       = NULL_IF_CONFIG_SMALL(ff_mpeg2_video_profiles),
-    .cas9_features  = (1 << CAS9_FEAT_MV),
+    .cas9_features  = (1 << CAS9_FEAT_MV)
+                    | (1 << CAS9_FEAT_QSCALE),
 };
 
 //legacy decoder
@@ -2888,7 +3048,8 @@ AVCodec ff_mpegvideo_decoder = {
     .caps_internal  = FF_CODEC_CAP_SKIP_FRAME_FILL_PARAM,
     .flush          = flush,
     .max_lowres     = 3,
-    .cas9_features  = (1 << CAS9_FEAT_MV),
+    .cas9_features  = (1 << CAS9_FEAT_MV)
+                    | (1 << CAS9_FEAT_QSCALE),
 };
 
 #if FF_API_XVMC
