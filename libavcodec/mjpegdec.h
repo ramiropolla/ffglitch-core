@@ -135,6 +135,10 @@ typedef struct MJpegDecodeContext {
     int *iccdatalens;
     int iccnum;
     int iccread;
+
+    /* cas9 bitstream */
+    AVPacket *opkt;
+    PutBitContext *opb;
 } MJpegDecodeContext;
 
 int ff_mjpeg_decode_init(AVCodecContext *avctx);
