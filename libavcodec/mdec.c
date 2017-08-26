@@ -79,11 +79,9 @@ static inline int mdec_decode_block_intra(MDECContext *a, int16_t *block, int n)
 
     i = 0;
     {
-        OPEN_READER(re, &a->gb);
         /* now quantify & encode AC coefficients */
         for (;;) {
-            UPDATE_CACHE(re, &a->gb);
-            GET_RL_VLC(level, run, re, &a->gb, rl->rl_vlc[0], TEX_VLC_BITS, 2, 0);
+            get_rl_vlc2(&level, &run, &a->gb, rl->rl_vlc[0], TEX_VLC_BITS, 2, 0);
 
             if (level == 127) {
                 break;
@@ -96,13 +94,12 @@ static inline int mdec_decode_block_intra(MDECContext *a, int16_t *block, int n)
                 }
                 j     = scantable[i];
                 level = (level * qscale * quant_matrix[j]) >> 3;
-                level = (level ^ SHOW_SBITS(re, &a->gb, 1)) - SHOW_SBITS(re, &a->gb, 1);
-                LAST_SKIP_BITS(re, &a->gb, 1);
+                if ( get_bits1(&a->gb) )
+                    level = -level;
             } else {
                 /* escape */
-                run = SHOW_UBITS(re, &a->gb, 6)+1; LAST_SKIP_BITS(re, &a->gb, 6);
-                UPDATE_CACHE(re, &a->gb);
-                level = SHOW_SBITS(re, &a->gb, 10); SKIP_BITS(re, &a->gb, 10);
+                run = get_bits(&a->gb, 6)+1;
+                level = get_sbits(&a->gb, 10);
                 i += run;
                 if (i > 63) {
                     av_log(a->avctx, AV_LOG_ERROR,
@@ -123,7 +120,6 @@ static inline int mdec_decode_block_intra(MDECContext *a, int16_t *block, int n)
 
             block[j] = level;
         }
-        CLOSE_READER(re, &a->gb);
     }
     a->block_last_index[n] = i;
     return 0;

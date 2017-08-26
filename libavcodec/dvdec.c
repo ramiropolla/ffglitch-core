@@ -202,15 +202,13 @@ static av_cold int dvvideo_decode_init(AVCodecContext *avctx)
 /* decode AC coefficients */
 static void dv_decode_ac(GetBitContext *gb, BlockInfo *mb, int16_t *block)
 {
+#if 0
     int last_index = gb->size_in_bits;
     const uint8_t  *scan_table   = mb->scan_table;
     const uint32_t *factor_table = mb->factor_table;
     int pos                      = mb->pos;
     int partial_bit_count        = mb->partial_bit_count;
     int level, run, vlc_len, index;
-
-    OPEN_READER_NOSIZE(re, gb);
-    UPDATE_CACHE(re, gb);
 
     /* if we must parse a partial VLC, we do it here */
     if (partial_bit_count > 0) {
@@ -223,7 +221,7 @@ static void dv_decode_ac(GetBitContext *gb, BlockInfo *mb, int16_t *block)
     /* get the AC coefficients until last_index is reached */
     for (;;) {
         ff_dlog(NULL, "%2d: bits=%04"PRIx32" index=%u\n",
-                pos, SHOW_UBITS(re, gb, 16), re_index);
+                pos, show_bits(gb, 16), re_index);
         /* our own optimized GET_RL_VLC */
         index   = NEG_USR32(re_cache, TEX_VLC_BITS);
         vlc_len = ff_dv_rl_vlc[index].len;
@@ -253,11 +251,12 @@ static void dv_decode_ac(GetBitContext *gb, BlockInfo *mb, int16_t *block)
         level = (level * factor_table[pos] + (1 << (dv_iweight_bits - 1))) >>
                 dv_iweight_bits;
         block[scan_table[pos]] = level;
-
-        UPDATE_CACHE(re, gb);
     }
-    CLOSE_READER(re, gb);
     mb->pos = pos;
+#else
+    // TODO use GetBitContext
+    av_assert0(0);
+#endif
 }
 
 static inline void bit_copy(PutBitContext *pb, GetBitContext *gb)
