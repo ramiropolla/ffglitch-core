@@ -1658,6 +1658,7 @@ PROGRAM_LIST="
     ffprobe
     ffserver
     ffmpeg
+    ffglitch
 "
 
 SUBSYSTEM_LIST="
@@ -6006,6 +6007,8 @@ enabled openssl           && { use_pkg_config openssl openssl/ssl.h OPENSSL_init
                                check_lib openssl openssl/ssl.h SSL_library_init -lssl -lcrypto -lws2_32 -lgdi32 ||
                                die "ERROR: openssl not found"; }
 enabled qtkit_indev      && { check_header_objcc QTKit/QTKit.h || disable qtkit_indev; }
+
+enabled ffglitch         && require_pkg_config json-c json.h json_object_new_object
 
 if enabled gcrypt; then
     GCRYPT_CONFIG="${cross_prefix}libgcrypt-config"

@@ -387,6 +387,8 @@ const char *av_packet_side_data_name(enum AVPacketSideDataType type)
     case AV_PKT_DATA_MASTERING_DISPLAY_METADATA: return "Mastering display metadata";
     case AV_PKT_DATA_CONTENT_LIGHT_LEVEL:        return "Content light level metadata";
     case AV_PKT_DATA_SPHERICAL:                  return "Spherical Mapping";
+
+    /* cas9 */
     }
     return NULL;
 }
@@ -610,6 +612,7 @@ FF_ENABLE_DEPRECATION_WARNINGS
         }
         memcpy(dst_data, src_data, size);
     }
+    memcpy(dst->cas9_sd, src->cas9_sd, sizeof(dst->cas9_sd));
 
     return 0;
 }

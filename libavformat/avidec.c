@@ -39,6 +39,8 @@
 #include "libavcodec/exif.h"
 #include "libavcodec/internal.h"
 
+#include "cas9.h"
+
 typedef struct AVIStream {
     int64_t frame_offset;   /* current frame (video) or byte (audio) counter
                              * (used to compute the pts) */
@@ -114,6 +116,7 @@ static const AVMetadataConv avi_metadata_conv[] = {
     { 0 },
 };
 
+static int avi_read_idx1(AVFormatContext *s, int size);
 static int avi_load_index(AVFormatContext *s);
 static int guess_ni_flag(AVFormatContext *s);
 
@@ -158,6 +161,7 @@ static int get_riff(AVFormatContext *s, AVIOContext *pb)
 
 static int read_odml_index(AVFormatContext *s, int frame_num)
 {
+    CAS9OutputContext *c9 = s->c9;
     AVIContext *avi     = s->priv_data;
     AVIOContext *pb     = s->pb;
     int longs_per_entry = avio_rl16(pb);
@@ -211,10 +215,18 @@ static int read_odml_index(AVFormatContext *s, int frame_num)
 
     for (i = 0; i < entries_in_use; i++) {
         if (index_type) {
+            int64_t pos_in_file = avio_tell(pb);
+
             int64_t pos = avio_rl32(pb) + base - 8;
+            int64_t orig_pos = pos;
             int len     = avio_rl32(pb);
+            int64_t orig_len = len;
             int key     = len >= 0;
             len &= 0x7FFFFFFF;
+
+            cas9_output_fixup(c9, CAS9_FIXUP_OFFSET, pos_in_file, orig_pos, pos, 0);
+            cas9_output_fixup(c9, CAS9_FIXUP_SIZE, pos_in_file + 4, orig_len, pos, len);
+            cas9_output_fixup(c9, CAS9_FIXUP_SIZE, pos + 4, orig_len, pos + 8, len);
 
             av_log(s, AV_LOG_TRACE, "pos:%"PRId64", len:%X\n", pos, len);
 
@@ -465,6 +477,7 @@ static int calculate_bitrate(AVFormatContext *s)
 
 static int avi_read_header(AVFormatContext *s)
 {
+    CAS9OutputContext *c9 = s->c9;
     AVIContext *avi = s->priv_data;
     AVIOContext *pb = s->pb;
     unsigned int tag, tag1, handler;
@@ -497,10 +510,15 @@ static int avi_read_header(AVFormatContext *s)
     codec_type   = -1;
     frame_period = 0;
     for (;;) {
+        int64_t pos_in_file;
+
         if (avio_feof(pb))
             goto fail;
         tag  = avio_rl32(pb);
+        pos_in_file = avio_tell(pb);
         size = avio_rl32(pb);
+
+        cas9_output_fixup(c9, CAS9_FIXUP_SIZE, pos_in_file, size, pos_in_file + 4, size);
 
         print_tag("tag", tag, size);
 
@@ -943,10 +961,7 @@ FF_ENABLE_DEPRECATION_WARNINGS
             break;
         case MKTAG('i', 'n', 'd', 'x'):
             pos = avio_tell(pb);
-            if ((pb->seekable & AVIO_SEEKABLE_NORMAL) && !(s->flags & AVFMT_FLAG_IGNIDX) &&
-                avi->use_odml &&
-                read_odml_index(s, 0) < 0 &&
-                (s->error_recognition & AV_EF_EXPLODE))
+            if ( read_odml_index(s, 0) < 0 )
                 goto fail;
             avio_seek(pb, pos + size, SEEK_SET);
             break;
@@ -998,11 +1013,15 @@ FF_ENABLE_DEPRECATION_WARNINGS
                 avi->movi_end  = avi->fsize;
                 goto end_of_header;
             }
-        /* Do not fail for very large idx1 tags */
-        case MKTAG('i', 'd', 'x', '1'):
             /* skip tag */
             size += (size & 1);
             avio_skip(pb, size);
+            break;
+        case MKTAG('i', 'd', 'x', '1'):
+            pos = avio_tell(pb);
+            if ( avi_read_idx1(s, size) < 0 )
+                goto fail;
+            avio_seek(pb, pos + size, SEEK_SET);
             break;
         }
     }
@@ -1542,6 +1561,7 @@ resync:
  * for each stream. */
 static int avi_read_idx1(AVFormatContext *s, int size)
 {
+    CAS9OutputContext *c9 = s->c9;
     AVIContext *avi = s->priv_data;
     AVIOContext *pb = s->pb;
     int nb_index_entries, i;
@@ -1572,6 +1592,9 @@ static int avi_read_idx1(AVFormatContext *s, int size)
 
     /* Read the entries and sort them in each stream component. */
     for (i = 0; i < nb_index_entries; i++) {
+        int64_t pos_in_file = avio_tell(pb);
+        uint32_t orig_pos;
+
         if (avio_feof(pb))
             return -1;
 
@@ -1599,7 +1622,12 @@ static int avi_read_idx1(AVFormatContext *s, int size)
                 data_offset  = first_packet_pos - pos;
             first_packet = 0;
         }
+        orig_pos = pos;
         pos += data_offset;
+
+        cas9_output_fixup(c9, CAS9_FIXUP_OFFSET, pos_in_file + 8, orig_pos, pos, 0);
+        cas9_output_fixup(c9, CAS9_FIXUP_SIZE, pos_in_file + 12, len, pos, len);
+        cas9_output_fixup(c9, CAS9_FIXUP_SIZE, pos + 4, len, pos + 8, len);
 
         av_log(s, AV_LOG_TRACE, "%d cum_len=%"PRId64"\n", len, ast->cum_len);
 
@@ -1938,5 +1966,6 @@ AVInputFormat ff_avi_demuxer = {
     .read_packet    = avi_read_packet,
     .read_close     = avi_read_close,
     .read_seek      = avi_read_seek,
+    .flags          = AVFMT_CAS9_BITSTREAM,
     .priv_class = &demuxer_class,
 };
