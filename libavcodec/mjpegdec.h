@@ -38,6 +38,7 @@
 #include "get_bits.h"
 #include "hpeldsp.h"
 #include "idctdsp.h"
+#include "cas9_xp.h"
 
 #undef near /* This file uses struct member 'near' which in windows.h is defined as empty. */
 
@@ -137,6 +138,9 @@ typedef struct MJpegDecodeContext {
     int *iccdatalens;
     int iccnum;
     int iccread;
+
+    /* cas9 bitstream */
+    CAS9TransplicateContext cas9_xp;
 } MJpegDecodeContext;
 
 int ff_mjpeg_decode_init(AVCodecContext *avctx);
