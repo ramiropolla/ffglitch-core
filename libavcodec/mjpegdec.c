@@ -47,6 +47,8 @@
 #include "exif.h"
 #include "bytestream.h"
 
+#include "mjpegenc_common.h"
+
 
 static int build_vlc(VLC *vlc, const uint8_t *bits_table,
                      const uint8_t *val_table, int nb_codes,
@@ -2156,6 +2158,23 @@ int ff_mjpeg_decode_frame(AVCodecContext *avctx, void *data, int *got_frame,
     int ret = 0;
     int is16bit;
 
+    if ( s->opb == NULL )
+    {
+        int pkt_size = 1;
+        pkt_size *= 1920/16; // some width
+        pkt_size *= 1080/16; // some height
+        pkt_size *= (MAX_MB_BYTES + 100);
+        pkt_size += 10000;
+        s->opkt = av_packet_alloc();
+        ret = ff_alloc_packet2(avctx, s->opkt, pkt_size, 0);
+        if ( ret < 0 )
+            return ret;
+        s->opb = av_malloc(sizeof(PutBitContext));
+        if ( s->opb == NULL )
+            return AVERROR(ENOMEM);
+        init_put_bits(s->opb, s->opkt->data, pkt_size * 8);
+    }
+
     av_dict_free(&s->exif_metadata);
     av_freep(&s->stereo3d);
     s->adobe_transform = -1;
@@ -2166,6 +2185,8 @@ int ff_mjpeg_decode_frame(AVCodecContext *avctx, void *data, int *got_frame,
     buf_ptr = buf;
     buf_end = buf + buf_size;
     while (buf_ptr < buf_end) {
+        int start_escape;
+
         /* find start next marker */
         start_code = ff_mjpeg_find_marker(s, &buf_ptr, buf_end,
                                           &unescaped_buf_ptr,
@@ -2187,6 +2208,16 @@ int ff_mjpeg_decode_frame(AVCodecContext *avctx, void *data, int *got_frame,
         if (ret < 0) {
             av_log(avctx, AV_LOG_ERROR, "invalid buffer\n");
             goto fail;
+        }
+
+        if ( s->opb != NULL )
+        {
+            flush_put_bits(s->opb);
+            put_bits(s->opb, 8, 0xff);
+            put_bits(s->opb, 8, start_code);
+            flush_put_bits(s->opb);
+            start_escape = s->opb->buf_ptr - s->opb->buf;
+            s->gb.pb = s->opb;
         }
 
         s->start_code = start_code;
@@ -2357,6 +2388,8 @@ eoi_parser:
         }
 
 skip:
+        if ( s->opb != NULL )
+            ff_mjpeg_escape_FF(s->opb, start_escape);
         /* eof process start code */
         buf_ptr += (get_bits_count(&s->gb) + 7) / 8;
         av_log(avctx, AV_LOG_DEBUG,
@@ -2373,6 +2406,16 @@ fail:
     s->got_picture = 0;
     return ret;
 the_end:
+
+    if ( s->opb != NULL )
+    {
+        flush_put_bits(s->opb);
+        avctx->cas9_out_size = (put_bits_count(s->opb) + 7) >> 3;
+        avctx->cas9_out = av_malloc(avctx->cas9_out_size);
+        memcpy(avctx->cas9_out, s->opkt->data, avctx->cas9_out_size);
+        av_freep(&s->opb);
+        av_packet_free(&s->opkt);
+    }
 
     is16bit = av_pix_fmt_desc_get(s->avctx->pix_fmt)->comp[0].step > 1;
 
@@ -2655,7 +2698,7 @@ AVCodec ff_mjpeg_decoder = {
     .close          = ff_mjpeg_decode_end,
     .decode         = ff_mjpeg_decode_frame,
     .flush          = decode_flush,
-    .capabilities   = AV_CODEC_CAP_DR1,
+    .capabilities   = AV_CODEC_CAP_DR1 | AV_CODEC_CAP_CAS9_BITSTREAM,
     .max_lowres     = 3,
     .priv_class     = &mjpegdec_class,
     .caps_internal  = FF_CODEC_CAP_INIT_THREADSAFE |
