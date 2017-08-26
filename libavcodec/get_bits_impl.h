@@ -40,11 +40,7 @@ int get_bits_count(const GetBitContext *s)
  */
 void skip_bits_long(GetBitContext *s, int n)
 {
-#if UNCHECKED_BITSTREAM_READER
-    s->index += n;
-#else
-    s->index += av_clip(n, -s->index, s->size_in_bits_plus8 - s->index);
-#endif
+    get_bits_long(s, n);
 }
 
 /**
@@ -61,6 +57,11 @@ int get_xbits(GetBitContext *s, int n)
     UPDATE_CACHE(re, s);
     cache = GET_CACHE(re, s);
     sign  = ~cache >> 31;
+    if ( s->pb != NULL )
+    {
+        int tmp = SHOW_UBITS(re, s, n);
+        put_bits(s->pb, n, tmp);
+    }
     LAST_SKIP_BITS(re, s, n);
     CLOSE_READER(re, s);
     return (NEG_USR32(sign ^ cache, n) ^ sign) - sign;
@@ -75,6 +76,11 @@ int get_xbits_le(GetBitContext *s, int n)
     UPDATE_CACHE_LE(re, s);
     cache = GET_CACHE(re, s);
     sign  = sign_extend(~cache, n) >> 31;
+    if ( s->pb != NULL )
+    {
+        int tmp = SHOW_UBITS_LE(re, s, n);
+        put_bits(s->pb, n, tmp);
+    }
     LAST_SKIP_BITS(re, s, n);
     CLOSE_READER(re, s);
     return (zero_extend(sign ^ cache, n) ^ sign) - sign;
@@ -86,7 +92,10 @@ int get_sbits(GetBitContext *s, int n)
     OPEN_READER(re, s);
     av_assert2(n>0 && n<=25);
     UPDATE_CACHE(re, s);
-    tmp = SHOW_SBITS(re, s, n);
+    tmp = SHOW_UBITS(re, s, n);
+    if ( s->pb != NULL )
+        put_bits(s->pb, n, tmp);
+    tmp = sign_extend(tmp, n);
     LAST_SKIP_BITS(re, s, n);
     CLOSE_READER(re, s);
     return tmp;
@@ -102,6 +111,8 @@ unsigned int get_bits(GetBitContext *s, int n)
     av_assert2(n>0 && n<=25);
     UPDATE_CACHE(re, s);
     tmp = SHOW_UBITS(re, s, n);
+    if ( s->pb != NULL )
+        put_bits(s->pb, n, tmp);
     LAST_SKIP_BITS(re, s, n);
     CLOSE_READER(re, s);
     return tmp;
@@ -122,6 +133,8 @@ unsigned int get_bits_le(GetBitContext *s, int n)
     av_assert2(n>0 && n<=25);
     UPDATE_CACHE_LE(re, s);
     tmp = SHOW_UBITS_LE(re, s, n);
+    if ( s->pb != NULL )
+        put_bits(s->pb, n, tmp);
     LAST_SKIP_BITS(re, s, n);
     CLOSE_READER(re, s);
     return tmp;
@@ -142,29 +155,12 @@ unsigned int show_bits(GetBitContext *s, int n)
 
 void skip_bits(GetBitContext *s, int n)
 {
-    OPEN_READER(re, s);
-    LAST_SKIP_BITS(re, s, n);
-    CLOSE_READER(re, s);
+    get_bits(s, n);
 }
 
 unsigned int get_bits1(GetBitContext *s)
 {
-    unsigned int index = s->index;
-    uint8_t result     = s->buffer[index >> 3];
-#ifdef BITSTREAM_READER_LE
-    result >>= index & 7;
-    result  &= 1;
-#else
-    result <<= index & 7;
-    result >>= 8 - 1;
-#endif
-#if !UNCHECKED_BITSTREAM_READER
-    if (s->index < s->size_in_bits_plus8)
-#endif
-        index++;
-    s->index = index;
-
-    return result;
+    return get_bits(s, 1);
 }
 
 unsigned int show_bits1(GetBitContext *s)
@@ -277,6 +273,7 @@ int init_get_bits(GetBitContext *s, const uint8_t *buffer, int bit_size)
     s->size_in_bits_plus8 = bit_size + 8;
     s->buffer_end         = buffer + buffer_size;
     s->index              = 0;
+    s->pb                 = NULL;
 
     return ret;
 }

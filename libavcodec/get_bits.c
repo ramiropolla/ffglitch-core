@@ -4,6 +4,7 @@
 #define UNCHECKED_BITSTREAM_READER 0
 
 #include "get_bits_common.h"
+#include "put_bits.h"
 
 #define GB_PREFIX gb_be_
 // #define BITSTREAM_READER_LE
