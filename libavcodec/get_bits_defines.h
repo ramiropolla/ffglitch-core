@@ -189,24 +189,37 @@
         n     = table[index][1];                                \
                                                                 \
         if (max_depth > 1 && n < 0) {                           \
+            unsigned int index2;                                \
+            if ( (gb)->pb != NULL )                             \
+                put_bits((gb)->pb, bits, index);                \
             LAST_SKIP_BITS(name, gb, bits);                     \
             UPDATE_CACHE(name, gb);                             \
                                                                 \
             nb_bits = -n;                                       \
                                                                 \
-            index = SHOW_UBITS(name, gb, nb_bits) + code;       \
+            index2 = SHOW_UBITS(name, gb, nb_bits);             \
+            index = index2 + code;                              \
             code  = table[index][0];                            \
             n     = table[index][1];                            \
             if (max_depth > 2 && n < 0) {                       \
+                if ( (gb)->pb != NULL )                         \
+                    put_bits((gb)->pb, nb_bits, index2);        \
                 LAST_SKIP_BITS(name, gb, nb_bits);              \
                 UPDATE_CACHE(name, gb);                         \
                                                                 \
                 nb_bits = -n;                                   \
                                                                 \
-                index = SHOW_UBITS(name, gb, nb_bits) + code;   \
+                index2 = SHOW_UBITS(name, gb, nb_bits);         \
+                index = index2 + code;                          \
                 code  = table[index][0];                        \
                 n     = table[index][1];                        \
             }                                                   \
+            if ( (gb)->pb != NULL )                             \
+                put_bits((gb)->pb, n, index2 >> (nb_bits - n)); \
+        }                                                       \
+        else if ( (gb)->pb != NULL )                            \
+        {                                                       \
+            put_bits((gb)->pb, n, index >> (bits - n));         \
         }                                                       \
         SKIP_BITS(name, gb, n);                                 \
     } while (0)
@@ -222,6 +235,9 @@
         n     = table[index].len;                               \
                                                                 \
         if (max_depth > 1 && n < 0) {                           \
+            unsigned int index2;                                \
+            if ( (gb)->pb != NULL )                             \
+                put_bits((gb)->pb, bits, index);                \
             SKIP_BITS(name, gb, bits);                          \
             if (need_update) {                                  \
                 UPDATE_CACHE(name, gb);                         \
@@ -229,20 +245,30 @@
                                                                 \
             nb_bits = -n;                                       \
                                                                 \
-            index = SHOW_UBITS(name, gb, nb_bits) + level;      \
+            index2 = SHOW_UBITS(name, gb, nb_bits);             \
+            index = index2 + level;                             \
             level = table[index].level;                         \
             n     = table[index].len;                           \
             if (max_depth > 2 && n < 0) {                       \
+                if ( (gb)->pb != NULL )                         \
+                    put_bits((gb)->pb, nb_bits, index2);        \
                 LAST_SKIP_BITS(name, gb, nb_bits);              \
                 if (need_update) {                              \
                     UPDATE_CACHE(name, gb);                     \
                 }                                               \
                 nb_bits = -n;                                   \
                                                                 \
-                index = SHOW_UBITS(name, gb, nb_bits) + level;  \
+                index2 = SHOW_UBITS(name, gb, nb_bits);         \
+                index = index2 + level;                         \
                 level = table[index].level;                     \
                 n     = table[index].len;                       \
             }                                                   \
+            if ( (gb)->pb != NULL )                             \
+                put_bits((gb)->pb, n, index2 >> (nb_bits -n));  \
+        }                                                       \
+        else if ( (gb)->pb != NULL )                            \
+        {                                                       \
+            put_bits((gb)->pb, n, index >> (bits - n));         \
         }                                                       \
         run = table[index].run;                                 \
         SKIP_BITS(name, gb, n);                                 \
