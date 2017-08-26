@@ -28,6 +28,7 @@
 #ifndef AVCODEC_MPEGVIDEO_H
 #define AVCODEC_MPEGVIDEO_H
 
+#include <json.h>
 #include <float.h>
 
 #include "avcodec.h"
@@ -569,6 +570,18 @@ typedef struct MpegEncContext {
     /* cas9 bitstream */
     AVPacket *opkt;
     PutBitContext *opb;
+
+    /* cas9 mv */
+    json_object *cas9_mv;
+    json_object *cas9_mv_forward;
+    json_object *cas9_mv_backward;
+    size_t cas9_mv_forward_count;
+    size_t cas9_mv_backward_count;
+    json_object *cas9_qscale;
+    json_object *cas9_qscale_slice;
+    size_t cas9_qscale_slice_count;
+    json_object *cas9_qscale_mb;
+    size_t cas9_qscale_mb_count;
 
 } MpegEncContext;
 
