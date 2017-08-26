@@ -128,6 +128,94 @@ static int mpeg_decode_motion(MpegEncContext *s, int fcode, int pred)
     return sign_extend(val, 5 + shift);
 }
 
+typedef struct
+{
+    json_object *forward;
+    json_object *backward;
+    size_t forward_count;
+    size_t backward_count;
+} mv_ctx;
+
+static int
+cas9_mv_get(
+        MpegEncContext *s,
+        int direction,
+        int j,
+        int x_or_y)
+{
+    AVFrame *f = s->current_picture_ptr->f;
+    json_object *jframe = f->cas9_sd[CAS9_FEAT_MV];
+    mv_ctx *ctx = json_object_get_userdata(jframe);
+    json_object *jdata = (direction == 0)
+                       ? ctx->forward
+                       : ctx->backward;
+    json_object *jmb_y = json_object_array_get_idx(jdata, s->mb_y);
+    json_object *jmb_x = json_object_array_get_idx(jmb_y, s->mb_x);
+    json_object *jval = json_object_array_get_idx(jmb_x, x_or_y);
+    return json_object_get_int(jval);
+}
+
+static void
+cas9_mv_set(
+        MpegEncContext *s,
+        int direction,
+        int j,
+        int x_or_y,
+        int val)
+{
+    AVFrame *f = s->current_picture_ptr->f;
+    json_object *jframe = f->cas9_sd[CAS9_FEAT_MV];
+    mv_ctx *ctx = json_object_get_userdata(jframe);
+    json_object *jdata = (direction == 0)
+                       ? ctx->forward
+                       : ctx->backward;
+    json_object *jmb_y = json_object_array_get_idx(jdata, s->mb_y);
+    json_object *jmb_x = json_object_array_get_idx(jmb_y, s->mb_x);
+    json_object *jval = json_object_new_int(val);
+    if ( jmb_x == NULL )
+    {
+        jmb_x = json_object_new_array();
+        json_object_array_put_idx(jmb_y, s->mb_x, jmb_x);
+    }
+    if ( direction == 0 )
+        ctx->forward_count++;
+    else
+        ctx->backward_count++;
+    json_object_array_put_idx(jmb_x, x_or_y, jval);
+}
+
+static int cas9_decode_mpegmv(
+        MpegEncContext *s,
+        int fcode,
+        int pred,
+        int direction,  // 0 = forward 1 = backward
+        int j,          // depend on type
+        int x_or_y)     // 0 = x, 1 = y
+{
+    int code;
+
+    if ( (s->avctx->cas9_apply & (1 << CAS9_FEAT_MV)) != 0 )
+        s->pb = *(s->opb);
+
+    code = mpeg_decode_motion(s, fcode, pred);
+    if ( code == 0xffff )
+        return code;
+
+    if ( (s->avctx->cas9_import & (1 << CAS9_FEAT_MV)) != 0 )
+    {
+        code = cas9_mv_get(s, direction, j, x_or_y);
+    }
+    if ( (s->avctx->cas9_apply & (1 << CAS9_FEAT_MV)) != 0 )
+    {
+        ff_mpeg1_encode_motion(s, code - pred, fcode);
+        *(s->opb) = s->pb;
+    }
+    if ( (s->avctx->cas9_export & (1 << CAS9_FEAT_MV)) != 0 )
+        cas9_mv_set(s, direction, j, x_or_y, code);
+
+    return code;
+}
+
 #define MAX_INDEX (64 - 1)
 #define check_scantable_index(ctx, x)                                         \
     do {                                                                      \
@@ -491,12 +579,14 @@ static int mpeg_decode_mb(MpegEncContext *s, int16_t block[12][64])
 
             s->mv[0][0][0]      =
             s->last_mv[0][0][0] =
-            s->last_mv[0][1][0] = mpeg_decode_motion(s, s->mpeg_f_code[0][0],
-                                                     s->last_mv[0][0][0]);
+            s->last_mv[0][1][0] = cas9_decode_mpegmv(s, s->mpeg_f_code[0][0],
+                                                     s->last_mv[0][0][0],
+                                                     0, 0, 0);
             s->mv[0][0][1]      =
             s->last_mv[0][0][1] =
-            s->last_mv[0][1][1] = mpeg_decode_motion(s, s->mpeg_f_code[0][1],
-                                                     s->last_mv[0][0][1]);
+            s->last_mv[0][1][1] = cas9_decode_mpegmv(s, s->mpeg_f_code[0][1],
+                                                     s->last_mv[0][0][1],
+                                                     0, 0, 1);
 
             check_marker(s->avctx, &s->gb, "after concealment_motion_vectors");
         } else {
@@ -582,13 +672,15 @@ static int mpeg_decode_mb(MpegEncContext *s, int16_t block[12][64])
                             s->mv[i][0][0]      =
                             s->last_mv[i][0][0] =
                             s->last_mv[i][1][0] =
-                                mpeg_decode_motion(s, s->mpeg_f_code[i][0],
-                                                   s->last_mv[i][0][0]);
+                                cas9_decode_mpegmv(s, s->mpeg_f_code[i][0],
+                                                   s->last_mv[i][0][0],
+                                                   i, 0, 0);
                             s->mv[i][0][1]      =
                             s->last_mv[i][0][1] =
                             s->last_mv[i][1][1] =
-                                mpeg_decode_motion(s, s->mpeg_f_code[i][1],
-                                                   s->last_mv[i][0][1]);
+                                cas9_decode_mpegmv(s, s->mpeg_f_code[i][1],
+                                                   s->last_mv[i][0][1],
+                                                   i, 0, 1);
                             /* full_pel: only for MPEG-1 */
                             if (s->full_pel[i]) {
                                 s->mv[i][0][0] *= 2;
@@ -605,8 +697,9 @@ static int mpeg_decode_mb(MpegEncContext *s, int16_t block[12][64])
                             for (j = 0; j < 2; j++) {
                                 s->field_select[i][j] = get_bits1(&s->gb);
                                 for (k = 0; k < 2; k++) {
-                                    val = mpeg_decode_motion(s, s->mpeg_f_code[i][k],
-                                                             s->last_mv[i][j][k]);
+                                    val = cas9_decode_mpegmv(s, s->mpeg_f_code[i][k],
+                                                             s->last_mv[i][j][k],
+                                                             i, j, k);
                                     s->last_mv[i][j][k] = val;
                                     s->mv[i][j][k]      = val;
                                 }
@@ -623,13 +716,15 @@ static int mpeg_decode_mb(MpegEncContext *s, int16_t block[12][64])
                         if (USES_LIST(mb_type, i)) {
                             for (j = 0; j < 2; j++) {
                                 s->field_select[i][j] = get_bits1(&s->gb);
-                                val = mpeg_decode_motion(s, s->mpeg_f_code[i][0],
-                                                         s->last_mv[i][j][0]);
+                                val = cas9_decode_mpegmv(s, s->mpeg_f_code[i][0],
+                                                         s->last_mv[i][j][0],
+                                                         i, j, 0);
                                 s->last_mv[i][j][0] = val;
                                 s->mv[i][j][0]      = val;
                                 ff_tlog(s->avctx, "fmx=%d\n", val);
-                                val = mpeg_decode_motion(s, s->mpeg_f_code[i][1],
-                                                         s->last_mv[i][j][1] >> 1);
+                                val = cas9_decode_mpegmv(s, s->mpeg_f_code[i][1],
+                                                         s->last_mv[i][j][1] >> 1,
+                                                         i, j, 1);
                                 s->last_mv[i][j][1] = 2 * val;
                                 s->mv[i][j][1]      = val;
                                 ff_tlog(s->avctx, "fmy=%d\n", val);
@@ -643,8 +738,9 @@ static int mpeg_decode_mb(MpegEncContext *s, int16_t block[12][64])
                         if (USES_LIST(mb_type, i)) {
                             s->field_select[i][0] = get_bits1(&s->gb);
                             for (k = 0; k < 2; k++) {
-                                val = mpeg_decode_motion(s, s->mpeg_f_code[i][k],
-                                                         s->last_mv[i][0][k]);
+                                val = cas9_decode_mpegmv(s, s->mpeg_f_code[i][k],
+                                                         s->last_mv[i][0][k],
+                                                         i, 0, k);
                                 s->last_mv[i][0][k] = val;
                                 s->last_mv[i][1][k] = val;
                                 s->mv[i][0][k]      = val;
@@ -664,13 +760,15 @@ static int mpeg_decode_mb(MpegEncContext *s, int16_t block[12][64])
                         int dmx, dmy, mx, my, m;
                         const int my_shift = s->picture_structure == PICT_FRAME;
 
-                        mx = mpeg_decode_motion(s, s->mpeg_f_code[i][0],
-                                                s->last_mv[i][0][0]);
+                        mx = cas9_decode_mpegmv(s, s->mpeg_f_code[i][0],
+                                                s->last_mv[i][0][0],
+                                                i, 0, 0);
                         s->last_mv[i][0][0] = mx;
                         s->last_mv[i][1][0] = mx;
                         dmx = get_dmv(s);
-                        my  = mpeg_decode_motion(s, s->mpeg_f_code[i][1],
-                                                 s->last_mv[i][0][1] >> my_shift);
+                        my  = cas9_decode_mpegmv(s, s->mpeg_f_code[i][1],
+                                                 s->last_mv[i][0][1] >> my_shift,
+                                                 i, 0, 0);
                         dmy = get_dmv(s);
 
 
@@ -787,6 +885,8 @@ static av_cold int mpeg_decode_init(AVCodecContext *avctx)
     ff_mpv_idct_init(s2);
     ff_mpeg12_common_init(&s->mpeg_enc_ctx);
     ff_mpeg12_init_vlcs();
+
+    ff_mpeg1_encode_init(s2);
 
     s2->chroma_format              = 1;
     s->mpeg_enc_ctx_allocated      = 0;
@@ -1320,11 +1420,61 @@ cas9_mpeg12_export_init(MpegEncContext *s)
 
         f->cas9_sd[CAS9_FEAT_INFO] = jframe;
     }
+
+    if ( (s->avctx->cas9_export & (1 << CAS9_FEAT_MV)) != 0 )
+    {
+        // {
+        //  "forward":  [ ] # line
+        //              [ ] # column
+        //              null or [ mv_x, mv_y ]
+        //  "backward": [ ] # line
+        //              [ ] # column
+        //              null or [ mv_x, mv_y ]
+        // }
+
+        json_object *jframe = json_object_new_object();
+        mv_ctx *ctx = av_mallocz(sizeof(mv_ctx));
+        json_object_set_userdata(jframe, ctx, cas9_free_userdata);
+
+        if ( s->pict_type != AV_PICTURE_TYPE_I )
+        {
+            ctx->forward = cas9_jblock_new(s->mb_width, s->mb_height,
+                                           cas9_int2_line_to_json_string,
+                                           (void *) 3);
+            ctx->backward = cas9_jblock_new(s->mb_width, s->mb_height,
+                                            cas9_int2_line_to_json_string,
+                                            (void *) 3);
+
+            json_object_object_add(jframe, "forward", ctx->forward);
+            ctx->forward_count = 0;
+            json_object_object_add(jframe, "backward", ctx->backward);
+            ctx->backward_count = 0;
+        }
+
+        f->cas9_sd[CAS9_FEAT_MV] = jframe;
+    }
+    else if ( (s->avctx->cas9_import & (1 << CAS9_FEAT_MV)) != 0 )
+    {
+        json_object *jframe = f->cas9_sd[CAS9_FEAT_MV];
+        mv_ctx *ctx = av_mallocz(sizeof(mv_ctx));
+        json_object_set_userdata(jframe, ctx, cas9_free_userdata);
+        json_object_object_get_ex(jframe, "forward", &ctx->forward);
+        json_object_object_get_ex(jframe, "backward", &ctx->backward);
+    }
 }
 
 static void
 cas9_mpeg12_export_cleanup(MpegEncContext *s, AVFrame *f)
 {
+    if ( (s->avctx->cas9_export & (1 << CAS9_FEAT_MV)) != 0 )
+    {
+        json_object *jframe = f->cas9_sd[CAS9_FEAT_MV];
+        mv_ctx *ctx = json_object_get_userdata(jframe);
+        if ( ctx->forward_count == 0 )
+            json_object_object_del(jframe, "forward");
+        if ( ctx->backward_count == 0 )
+            json_object_object_del(jframe, "backward");
+    }
 }
 
 static int mpeg_field_start(MpegEncContext *s, const uint8_t *buf, int buf_size)
@@ -2639,6 +2789,7 @@ AVCodec ff_mpeg1video_decoder = {
     .max_lowres            = 3,
     .update_thread_context = ONLY_IF_THREADS_ENABLED(mpeg_decode_update_thread_context),
     .cas9_features         = (1 << CAS9_FEAT_INFO)
+                           | (1 << CAS9_FEAT_MV)
 };
 
 AVCodec ff_mpeg2video_decoder = {
@@ -2659,6 +2810,7 @@ AVCodec ff_mpeg2video_decoder = {
     .max_lowres     = 3,
     .profiles       = NULL_IF_CONFIG_SMALL(ff_mpeg2_video_profiles),
     .cas9_features  = (1 << CAS9_FEAT_INFO)
+                    | (1 << CAS9_FEAT_MV)
 };
 
 //legacy decoder
@@ -2679,4 +2831,5 @@ AVCodec ff_mpegvideo_decoder = {
     .flush          = flush,
     .max_lowres     = 3,
     .cas9_features  = (1 << CAS9_FEAT_INFO)
+                    | (1 << CAS9_FEAT_MV)
 };
