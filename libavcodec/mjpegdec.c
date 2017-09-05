@@ -30,9 +30,13 @@
  * MJPEG decoder.
  */
 
+#include <json.h>
+
 #include "libavutil/imgutils.h"
 #include "libavutil/avassert.h"
 #include "libavutil/opt.h"
+#include "libavutil/cas9.h"
+#include "libavutil/cas9_json.h"
 #include "avcodec.h"
 #include "blockdsp.h"
 #include "copy_block.h"
@@ -50,18 +54,46 @@
 #include "mjpegenc_common.h"
 
 
-static int build_vlc(VLC *vlc, const uint8_t *bits_table,
+static int build_vlc(MJpegDecodeContext *s, int class, int index,
+                     const uint8_t *bits_table,
                      const uint8_t *val_table, int nb_codes,
                      int use_static, int is_ac)
 {
+    VLC *vlc = &s->vlcs[class][index];
     uint8_t huff_size[256] = { 0 };
     uint16_t huff_code[256];
     uint16_t huff_sym[256];
+    int k;
     int i;
 
     av_assert0(nb_codes <= 256);
 
-    ff_mjpeg_build_huffman_codes(huff_size, huff_code, bits_table, val_table);
+    k = ff_mjpeg_build_huffman_codes(huff_size, huff_code, bits_table, val_table);
+
+    if ( class == 0 && index == 0 )
+    {
+        memcpy(s->m.huff_size_dc_luminance, huff_size, sizeof(s->m.huff_size_dc_luminance));
+        memcpy(s->m.huff_code_dc_luminance, huff_code, sizeof(s->m.huff_code_dc_luminance));
+        s->huff_max_dc_luminance = (1 << k) - 1;
+    }
+    if ( class == 0 && index == 1 )
+    {
+        memcpy(s->m.huff_size_dc_chrominance, huff_size, sizeof(s->m.huff_size_dc_chrominance));
+        memcpy(s->m.huff_code_dc_chrominance, huff_code, sizeof(s->m.huff_code_dc_chrominance));
+        s->huff_max_dc_chrominance = (1 << k) - 1;
+    }
+    if ( class == 1 && index == 0 )
+    {
+        memcpy(s->m.huff_size_ac_luminance, huff_size, sizeof(s->m.huff_size_ac_luminance));
+        memcpy(s->m.huff_code_ac_luminance, huff_code, sizeof(s->m.huff_code_ac_luminance));
+        s->huff_max_ac_luminance = (1 << k) - 1;
+    }
+    if ( class == 1 && index == 1 )
+    {
+        memcpy(s->m.huff_size_ac_chrominance, huff_size, sizeof(s->m.huff_size_ac_chrominance));
+        memcpy(s->m.huff_code_ac_chrominance, huff_code, sizeof(s->m.huff_code_ac_chrominance));
+        s->huff_max_ac_chrominance = (1 << k) - 1;
+    }
 
     for (i = 0; i < 256; i++)
         huff_sym[i] = i + 16 * is_ac;
@@ -77,27 +109,27 @@ static int build_basic_mjpeg_vlc(MJpegDecodeContext *s)
 {
     int ret;
 
-    if ((ret = build_vlc(&s->vlcs[0][0], avpriv_mjpeg_bits_dc_luminance,
+    if ((ret = build_vlc(s, 0, 0, avpriv_mjpeg_bits_dc_luminance,
                          avpriv_mjpeg_val_dc, 12, 0, 0)) < 0)
         return ret;
 
-    if ((ret = build_vlc(&s->vlcs[0][1], avpriv_mjpeg_bits_dc_chrominance,
+    if ((ret = build_vlc(s, 0, 1, avpriv_mjpeg_bits_dc_chrominance,
                          avpriv_mjpeg_val_dc, 12, 0, 0)) < 0)
         return ret;
 
-    if ((ret = build_vlc(&s->vlcs[1][0], avpriv_mjpeg_bits_ac_luminance,
+    if ((ret = build_vlc(s, 1, 0, avpriv_mjpeg_bits_ac_luminance,
                          avpriv_mjpeg_val_ac_luminance, 251, 0, 1)) < 0)
         return ret;
 
-    if ((ret = build_vlc(&s->vlcs[1][1], avpriv_mjpeg_bits_ac_chrominance,
+    if ((ret = build_vlc(s, 1, 1, avpriv_mjpeg_bits_ac_chrominance,
                          avpriv_mjpeg_val_ac_chrominance, 251, 0, 1)) < 0)
         return ret;
 
-    if ((ret = build_vlc(&s->vlcs[2][0], avpriv_mjpeg_bits_ac_luminance,
+    if ((ret = build_vlc(s, 2, 0, avpriv_mjpeg_bits_ac_luminance,
                          avpriv_mjpeg_val_ac_luminance, 251, 0, 0)) < 0)
         return ret;
 
-    if ((ret = build_vlc(&s->vlcs[2][1], avpriv_mjpeg_bits_ac_chrominance,
+    if ((ret = build_vlc(s, 2, 1, avpriv_mjpeg_bits_ac_chrominance,
                          avpriv_mjpeg_val_ac_chrominance, 251, 0, 0)) < 0)
         return ret;
 
@@ -271,13 +303,13 @@ int ff_mjpeg_decode_dht(MJpegDecodeContext *s)
         ff_free_vlc(&s->vlcs[class][index]);
         av_log(s->avctx, AV_LOG_DEBUG, "class=%d index=%d nb_codes=%d\n",
                class, index, code_max + 1);
-        if ((ret = build_vlc(&s->vlcs[class][index], bits_table, val_table,
+        if ((ret = build_vlc(s, class, index, bits_table, val_table,
                              code_max + 1, 0, class > 0)) < 0)
             return ret;
 
         if (class > 0) {
             ff_free_vlc(&s->vlcs[2][index]);
-            if ((ret = build_vlc(&s->vlcs[2][index], bits_table, val_table,
+            if ((ret = build_vlc(s, 2, index, bits_table, val_table,
                                  code_max + 1, 0, 0)) < 0)
                 return ret;
         }
@@ -688,6 +720,71 @@ unk_pixfmt:
     return 0;
 }
 
+static json_object *
+cas9_dct_select(
+        MJpegDecodeContext *s,
+        int component,
+        int mb_y,
+        int *pmb_x,
+        int block)
+{
+    int mb_x = *pmb_x;
+    json_object *jdata;
+    json_object *jplane;
+
+    mb_y *= s->v_scount[component];
+    mb_x *= s->h_scount[component];
+
+    mb_y += block / s->h_scount[component];
+    mb_x += block % s->h_scount[component];
+
+    *pmb_x = mb_x;
+
+    jdata = s->cas9_dct_cur;
+    jplane = json_object_array_get_idx(jdata, component);
+
+    return json_object_array_get_idx(jplane, mb_y);
+}
+
+static int
+cas9_dct_get(
+        MJpegDecodeContext *s,
+        int component,
+        int mb_y,
+        int mb_x,
+        int block,
+        int i)
+{
+    json_object *jline = cas9_dct_select(s, component, mb_y, &mb_x, block);
+    json_object *jmb = json_object_array_get_idx(jline, mb_x);
+    json_object *jval = jmb;
+    jval = json_object_array_get_idx(jmb, i);
+    return json_object_get_int(jval);
+}
+
+static void
+cas9_dct_set(
+        MJpegDecodeContext *s,
+        int component,
+        int mb_y,
+        int mb_x,
+        int block,
+        int i,
+        int code)
+{
+    json_object *jline = cas9_dct_select(s, component, mb_y, &mb_x, block);
+    json_object *jval = json_object_new_int(code);
+    json_object *jmb = json_object_array_get_idx(jline, mb_x);
+    if ( jmb == NULL )
+    {
+        jmb = json_object_new_array();
+        json_object_array_put_idx(jline, mb_x, jmb);
+        json_object_set_serializer(jmb, cas9_int_line_to_json_string,
+                                    (void *) "% 5d", NULL);
+    }
+    json_object_array_put_idx(jmb, i, jval);
+}
+
 static inline int mjpeg_decode_dc(MJpegDecodeContext *s, int dc_index)
 {
     int code;
@@ -706,9 +803,17 @@ static inline int mjpeg_decode_dc(MJpegDecodeContext *s, int dc_index)
 
 /* decode block and dequantize */
 static int decode_block(MJpegDecodeContext *s, int16_t *block, int component,
+                        int mb_y, int mb_x, int blockn,
                         int dc_index, int ac_index, uint16_t *quant_matrix)
 {
+    int16_t qblock[64];
     int code, i, j, level, val;
+    PutBitContext saved;
+    int last_index = 0;
+
+    memset(qblock, 0, sizeof(qblock));
+    if ( (s->avctx->cas9_apply & (1 << CAS9_FEAT_Q_DCT)) != 0 )
+        saved = *(s->opb);
 
     /* DC coef */
     val = mjpeg_decode_dc(s, dc_index);
@@ -716,6 +821,13 @@ static int decode_block(MJpegDecodeContext *s, int16_t *block, int component,
         av_log(s->avctx, AV_LOG_ERROR, "error dc\n");
         return AVERROR_INVALIDDATA;
     }
+    if ( (s->avctx->cas9_import & (1 << CAS9_FEAT_Q_DCT)) != 0 )
+        val = cas9_dct_get(s, component, mb_y, mb_x, blockn, 0);
+    else if ( (s->avctx->cas9_export & (1 << CAS9_FEAT_Q_DCT)) != 0 )
+        cas9_dct_set(s, component, mb_y, mb_x, blockn, 0, val);
+    qblock[0] = val;
+    if ( val != 0 )
+        last_index = 1;
     val = val * quant_matrix[0] + s->last_dc[component];
     val = av_clip_int16(val);
     s->last_dc[component] = val;
@@ -729,15 +841,41 @@ static int decode_block(MJpegDecodeContext *s, int16_t *block, int component,
             code &= 0xf;
         if (code) {
             level = get_xbits(&s->gb, code);
-
             if (i > 63) {
                 av_log(s->avctx, AV_LOG_ERROR, "error count: %d\n", i);
                 return AVERROR_INVALIDDATA;
             }
+            if ( (s->avctx->cas9_export & (1 << CAS9_FEAT_Q_DCT)) != 0 )
+                cas9_dct_set(s, component, mb_y, mb_x, blockn, i, level);
             j        = s->scantable.permutated[i];
             block[j] = level * quant_matrix[i];
+            qblock[j] = level;
         }
     } while (i < 63);
+
+    if ( (s->avctx->cas9_import & (1 << CAS9_FEAT_Q_DCT)) != 0 )
+    {
+        for ( i = 1; i < 64; i++ )
+        {
+            level = cas9_dct_get(s, component, mb_y, mb_x, blockn, i);
+            j        = s->scantable.permutated[i];
+            block[j] = level * quant_matrix[i];
+            qblock[j] = level;
+            if ( block[j] != 0 )
+                last_index = i;
+        }
+    }
+
+    if ( (s->avctx->cas9_apply & (1 << CAS9_FEAT_Q_DCT)) != 0 )
+    {
+        int last_dc[MAX_COMPONENTS] = { 0 };
+        int block_last_index[5];
+        int n = (ac_index == 0) ? 0 : 4;
+        block_last_index[n] = last_index;
+        ff_mjpeg_encode_block(&saved, &s->m, &s->scantable, last_dc,
+                              block_last_index, qblock, n);
+        *(s->opb) = saved;
+    }
 
     return 0;
 }
@@ -1244,6 +1382,106 @@ static void shift_output(MJpegDecodeContext *s, uint8_t *ptr, int linesize)
     }
 }
 
+static json_object *
+cas9_dct_scan_new(MJpegDecodeContext *s)
+{
+    // {
+    //  "data": [ ] # plane
+    //          [ ] # line
+    //          [ ] # column
+    //          [ ] # coeffs
+    //  "luma_max": int
+    //  "chroma_max": int
+    // }
+
+    json_object *jscan = json_object_new_object();
+
+    json_object *jdata = json_object_new_array();
+    json_object *jluma_max = json_object_new_int(s->huff_max_dc_luminance);
+    json_object *jchroma_max = json_object_new_int(s->huff_max_dc_chrominance);
+
+    json_object_array_put_idx(jdata, s->nb_components-1, NULL);
+    for ( size_t component = 0; component < s->nb_components; component++ )
+    {
+        json_object *jlines;
+        size_t height;
+        size_t width;
+
+        height = s->mb_height * s->v_scount[component];
+        width = s->mb_width * s->h_scount[component];
+
+        jlines = json_object_new_array();
+        json_object_array_put_idx(jlines, height-1, NULL);
+        for ( size_t line = 0; line < height; line++ )
+        {
+            json_object *jcolumns = json_object_new_array();
+            json_object_array_put_idx(jcolumns, width-1, NULL);
+            json_object_array_put_idx(jlines, line, jcolumns);
+        }
+        json_object_array_put_idx(jdata, component, jlines);
+    }
+
+    json_object_object_add(jscan, "data", jdata);
+    json_object_object_add(jscan, "dc_luma_max", jluma_max);
+    json_object_object_add(jscan, "dc_chroma_max", jchroma_max);
+    jluma_max = json_object_new_int(s->huff_max_ac_luminance);
+    jchroma_max = json_object_new_int(s->huff_max_ac_chrominance);
+    json_object_object_add(jscan, "ac_luma_max", jluma_max);
+    json_object_object_add(jscan, "ac_chroma_max", jchroma_max);
+
+    return jscan;
+}
+
+static void
+cas9_dct_export_scan_baseline(MJpegDecodeContext *s)
+{
+    // baseline:
+    // - (single scan)
+
+    json_object *jdct = cas9_dct_scan_new(s);
+    s->cas9_dct = jdct;
+    json_object_object_get_ex(jdct, "data", &s->cas9_dct_cur);
+}
+
+static void
+cas9_dct_export_scan_progressive(MJpegDecodeContext *s)
+{
+    // progressive:
+    // - scans[]
+
+    json_object *jscans;
+    json_object *jscan;
+
+    if ( s->cas9_dct == NULL )
+    {
+        s->cas9_dct = json_object_new_object();
+        json_object_object_add(s->cas9_dct, "scans", json_object_new_array());
+    }
+
+    json_object_object_get_ex(s->cas9_dct, "scans", &jscans);
+    jscan = cas9_dct_scan_new(s);
+    json_object_array_put_idx(jscans, s->cur_scan-1, jscan);
+
+    json_object_object_get_ex(jscan, "data", &s->cas9_dct_cur);
+}
+
+static void
+cas9_dct_import_scan_baseline(MJpegDecodeContext *s)
+{
+    json_object_object_get_ex(s->cas9_dct, "data", &s->cas9_dct_cur);
+}
+
+static void
+cas9_dct_import_scan_progressive(MJpegDecodeContext *s)
+{
+    json_object *jscans;
+    json_object *jscan;
+
+    json_object_object_get_ex(s->cas9_dct, "scans", &jscans);
+    jscan = json_object_array_get_idx(jscans, s->cur_scan-1);
+    json_object_object_get_ex(jscan, "data", &s->cas9_dct_cur);
+}
+
 static int mjpeg_decode_scan(MJpegDecodeContext *s, int nb_components, int Ah,
                              int Al, const uint8_t *mb_bitmask,
                              int mb_bitmask_size,
@@ -1270,6 +1508,23 @@ static int mjpeg_decode_scan(MJpegDecodeContext *s, int nb_components, int Ah,
                                      &chroma_v_shift);
     chroma_width  = AV_CEIL_RSHIFT(s->width,  chroma_h_shift);
     chroma_height = AV_CEIL_RSHIFT(s->height, chroma_v_shift);
+
+    s->chroma_h_shift = chroma_h_shift;
+    s->chroma_v_shift = chroma_v_shift;
+    if ( (s->avctx->cas9_export & (1 << CAS9_FEAT_Q_DCT)) != 0 )
+    {
+        if ( !s->progressive )
+            cas9_dct_export_scan_baseline(s);
+        else
+            cas9_dct_export_scan_progressive(s);
+    }
+    else if ( (s->avctx->cas9_import & (1 << CAS9_FEAT_Q_DCT)) != 0 )
+    {
+        if ( !s->progressive )
+            cas9_dct_import_scan_baseline(s);
+        else
+            cas9_dct_import_scan_progressive(s);
+    }
 
     for (i = 0; i < nb_components; i++) {
         int c   = s->comp_index[i];
@@ -1320,7 +1575,7 @@ static int mjpeg_decode_scan(MJpegDecodeContext *s, int nb_components, int Ah,
 
                         } else {
                             s->bdsp.clear_block(s->block);
-                            if (decode_block(s, s->block, i,
+                            if (decode_block(s, s->block, i, mb_y, mb_x, j,
                                              s->dc_index[i], s->ac_index[i],
                                              s->quant_matrixes[s->quant_sindex[i]]) < 0) {
                                 av_log(s->avctx, AV_LOG_ERROR,
@@ -2158,6 +2413,9 @@ int ff_mjpeg_decode_frame(AVCodecContext *avctx, void *data, int *got_frame,
     int ret = 0;
     int is16bit;
 
+    if ( (avctx->cas9_import & (1 << CAS9_FEAT_Q_DCT)) != 0 )
+        s->cas9_dct = avpkt->cas9_sd[CAS9_FEAT_Q_DCT];
+
     if ( s->opb == NULL )
     {
         int pkt_size = 1;
@@ -2340,6 +2598,12 @@ eoi_parser:
                 return ret;
             *got_frame = 1;
             s->got_picture = 0;
+
+            if ( (s->avctx->cas9_export & (1 << CAS9_FEAT_Q_DCT)) != 0 )
+            {
+                frame->cas9_sd[CAS9_FEAT_Q_DCT] = s->cas9_dct;
+                s->cas9_dct = NULL;
+            }
 
             if (!s->lossless) {
                 int qp = FFMAX3(s->qscale[0],
@@ -2703,6 +2967,7 @@ AVCodec ff_mjpeg_decoder = {
     .priv_class     = &mjpegdec_class,
     .caps_internal  = FF_CODEC_CAP_INIT_THREADSAFE |
                       FF_CODEC_CAP_SKIP_FRAME_FILL_PARAM,
+    .cas9_features  = (1 << CAS9_FEAT_Q_DCT)
 };
 #endif
 #if CONFIG_THP_DECODER

@@ -29,6 +29,8 @@
 #ifndef AVCODEC_MJPEGDEC_H
 #define AVCODEC_MJPEGDEC_H
 
+#include <json.h>
+
 #include "libavutil/log.h"
 #include "libavutil/pixdesc.h"
 #include "libavutil/stereo3d.h"
@@ -38,6 +40,7 @@
 #include "get_bits.h"
 #include "hpeldsp.h"
 #include "idctdsp.h"
+#include "mjpegenc_common.h"
 
 #define MAX_COMPONENTS 4
 
@@ -139,6 +142,19 @@ typedef struct MJpegDecodeContext {
     /* cas9 bitstream */
     AVPacket *opkt;
     PutBitContext *opb;
+
+    /* cas9 dct/dc */
+    json_object *cas9_dct;
+    json_object *cas9_dct_cur;
+
+    MJpegContext m;
+    int huff_max_dc_luminance;
+    int huff_max_dc_chrominance;
+    int huff_max_ac_luminance;
+    int huff_max_ac_chrominance;
+    int chroma_h_shift;
+    int chroma_v_shift;
+
 } MJpegDecodeContext;
 
 int ff_mjpeg_decode_init(AVCodecContext *avctx);
