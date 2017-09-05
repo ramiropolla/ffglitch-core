@@ -38,6 +38,7 @@
 #include "get_bits.h"
 #include "hpeldsp.h"
 #include "idctdsp.h"
+#include "mjpegenc_common.h"
 
 #define MAX_COMPONENTS 4
 
@@ -142,6 +143,15 @@ typedef struct MJpegDecodeContext {
 
     /* cas9 sidedata (for importing) */
     void *cas9_sd[32]; // should be at least [CAS9_FEAT_LAST]
+
+    /* cas9 dct/dc */
+    MJpegContext m;
+    int huff_max_dc_luminance;
+    int huff_max_dc_chrominance;
+    int huff_max_ac_luminance;
+    int huff_max_ac_chrominance;
+    int chroma_h_shift;
+    int chroma_v_shift;
 } MJpegDecodeContext;
 
 int ff_mjpeg_decode_init(AVCodecContext *avctx);
