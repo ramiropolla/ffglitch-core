@@ -1,3 +1,4 @@
 
 CAS9 support for codec 'MJPEG (Motion JPEG)':
 	[info      ]: info
+	[q_dct     ]: quantized DCT coefficients
