@@ -220,6 +220,7 @@ av_cold int ff_mjpeg_decode_init(AVCodecContext *avctx)
 int ff_mjpeg_decode_dqt(MJpegDecodeContext *s)
 {
     int len, index, i;
+    json_object *jdata;
 
     len = get_bits(&s->gb, 16) - 2;
 
@@ -228,7 +229,28 @@ int ff_mjpeg_decode_dqt(MJpegDecodeContext *s)
         return AVERROR_INVALIDDATA;
     }
 
+    if ( (s->avctx->cas9_export & (1 << CAS9_FEAT_DQT)) != 0 )
+    {
+        // {
+        //  "data": [ ] # plane
+        //          [ ] # dqt
+        // }
+        AVFrame *f = s->picture_ptr;
+        json_object *jframe = json_object_new_object();
+        jdata = json_object_new_array();
+        json_object_object_add(jframe, "data", jdata);
+        f->cas9_sd[CAS9_FEAT_DQT] = jframe;
+    }
+    else if ( (s->avctx->cas9_import & (1 << CAS9_FEAT_DQT)) != 0 )
+    {
+        AVFrame *f = s->picture_ptr;
+        json_object *jframe = f->cas9_sd[CAS9_FEAT_DQT];
+        json_object_object_get_ex(jframe, "data", &jdata);
+    }
+
     while (len >= 65) {
+        PutBitContext *saved;
+        json_object *cas9_dqt_cur;
         int pr = get_bits(&s->gb, 4);
         if (pr > 1) {
             av_log(s->avctx, AV_LOG_ERROR, "dqt: invalid precision\n");
@@ -238,14 +260,49 @@ int ff_mjpeg_decode_dqt(MJpegDecodeContext *s)
         if (index >= 4)
             return -1;
         av_log(s->avctx, AV_LOG_DEBUG, "index=%d\n", index);
+
+        if ( (s->avctx->cas9_export & (1 << CAS9_FEAT_DQT)) != 0 )
+        {
+            cas9_dqt_cur = json_object_new_array();
+            json_object_array_put_idx(jdata, index, cas9_dqt_cur);
+        }
+        else if ( (s->avctx->cas9_import & (1 << CAS9_FEAT_DQT)) != 0 )
+        {
+            cas9_dqt_cur = json_object_array_get_idx(jdata, index);
+        }
+
+        if ( (s->avctx->cas9_apply & (1 << CAS9_FEAT_DQT)) != 0 )
+            saved = cas9_transplicate_save(&s->cas9_xp);
+
         /* read quant table */
         for (i = 0; i < 64; i++) {
-            s->quant_matrixes[index][i] = get_bits(&s->gb, pr ? 16 : 8);
+            int code = get_bits(&s->gb, pr ? 16 : 8);
+
+            if ( (s->avctx->cas9_import & (1 << CAS9_FEAT_DQT)) != 0 )
+            {
+                json_object *jval = json_object_array_get_idx(cas9_dqt_cur, i);
+                code = json_object_get_int(jval);
+            }
+            if ( (s->avctx->cas9_apply & (1 << CAS9_FEAT_DQT)) != 0 )
+            {
+                put_bits(saved, pr ? 16 : 8, code);
+            }
+            if ( (s->avctx->cas9_export & (1 << CAS9_FEAT_DQT)) != 0 )
+            {
+                json_object *jval = json_object_new_int(code);
+                json_object_array_put_idx(cas9_dqt_cur, i, jval);
+            }
+
+            s->quant_matrixes[index][i] = code;
+
             if (s->quant_matrixes[index][i] == 0) {
                 av_log(s->avctx, AV_LOG_ERROR, "dqt: 0 quant value\n");
                 return AVERROR_INVALIDDATA;
             }
         }
+
+        if ( (s->avctx->cas9_apply & (1 << CAS9_FEAT_DQT)) != 0 )
+            cas9_transplicate_restore(&s->cas9_xp, saved);
 
         // XXX FIXME fine-tune, and perhaps add dc too
         s->qscale[index] = FFMAX(s->quant_matrixes[index][1],
@@ -3144,6 +3201,7 @@ AVCodec ff_mjpeg_decoder = {
     .cas9_features  = (1 << CAS9_FEAT_INFO)
                     | (1 << CAS9_FEAT_Q_DCT)
                     | (1 << CAS9_FEAT_Q_DC)
+                    | (1 << CAS9_FEAT_DQT)
 };
 #endif
 #if CONFIG_THP_DECODER
