@@ -155,6 +155,8 @@ typedef struct MJpegDecodeContext {
     int chroma_h_shift;
     int chroma_v_shift;
 
+    /* cas9 dqt */
+    json_object *cas9_dqt;
 } MJpegDecodeContext;
 
 int ff_mjpeg_decode_init(AVCodecContext *avctx);
