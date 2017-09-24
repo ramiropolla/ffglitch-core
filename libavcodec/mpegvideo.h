@@ -567,6 +567,9 @@ typedef struct MpegEncContext {
     AVPacket *opkt;
     PutBitContext *opb;
 
+    /* cas9 sidedata (for importing) */
+    void *cas9_sd[32]; // should be at least [CAS9_FEAT_LAST]
+
 } MpegEncContext;
 
 /* mpegvideo_enc common options */
