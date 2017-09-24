@@ -722,6 +722,14 @@ unk_pixfmt:
     return 0;
 }
 
+static enum CAS9Feature
+i_dc_or_dct(MJpegDecodeContext *s)
+{
+    return (s->avctx->cas9_import & (1 << CAS9_FEAT_Q_DCT)) != 0
+         ? CAS9_FEAT_Q_DCT
+         : CAS9_FEAT_Q_DC;
+}
+
 static int
 cas9_dct_get(
         MJpegDecodeContext *s,
@@ -731,14 +739,24 @@ cas9_dct_get(
         int block,
         int i)
 {
+    enum CAS9Feature feature = i_dc_or_dct(s);
     AVFrame *f = s->picture_ptr;
-    json_object *jframe = f->cas9_sd[CAS9_FEAT_Q_DCT];
+    json_object *jframe = f->cas9_sd[feature];
     json_object *jso = s->progressive
                      ? json_object_get_userdata(jframe)
                      : jframe;
     json_object *jval = cas9_jmb_get(jso, component, mb_y, mb_x, block);
-    jval = json_object_array_get_idx(jval, i);
+    if ( feature == CAS9_FEAT_Q_DCT )
+        jval = json_object_array_get_idx(jval, i);
     return json_object_get_int(jval);
+}
+
+static enum CAS9Feature
+e_dc_or_dct(MJpegDecodeContext *s)
+{
+    return (s->avctx->cas9_export & (1 << CAS9_FEAT_Q_DCT)) != 0
+         ? CAS9_FEAT_Q_DCT
+         : CAS9_FEAT_Q_DC;
 }
 
 static void
@@ -751,21 +769,29 @@ cas9_dct_set(
         int i,
         int code)
 {
+    enum CAS9Feature feature = e_dc_or_dct(s);
     AVFrame *f = s->picture_ptr;
-    json_object *jframe = f->cas9_sd[CAS9_FEAT_Q_DCT];
+    json_object *jframe = f->cas9_sd[feature];
     json_object *jso = s->progressive
                      ? json_object_get_userdata(jframe)
                      : jframe;
     json_object *jval = json_object_new_int(code);
-    json_object *jmb = json_object_array_get_idx(jso, mb_x);
-    if ( jmb == NULL )
+    if ( feature == CAS9_FEAT_Q_DCT )
     {
-        jmb = json_object_new_array();
-        json_object_array_put_idx(jso, mb_x, jmb);
-        json_object_set_serializer(jmb, cas9_int_line_to_json_string,
-                                    (void *) "% 5d", NULL);
+        json_object *jmb = cas9_jmb_get(jso, component, mb_y, mb_x, block);
+        if ( jmb == NULL )
+        {
+            jmb = json_object_new_array();
+            json_object_set_serializer(jmb, cas9_int_line_to_json_string,
+                                       (void *) 5, NULL);
+            cas9_jmb_set(jso, component, mb_y, mb_x, block, jmb);
+        }
+        json_object_array_put_idx(jmb, i, jval);
     }
-    json_object_array_put_idx(jmb, i, jval);
+    else
+    {
+        cas9_jmb_set(jso, component, mb_y, mb_x, block, jval);
+    }
 }
 
 static void
@@ -776,8 +802,9 @@ cas9_dct_zero_fill(
         int mb_x,
         int block)
 {
+    enum CAS9Feature feature = e_dc_or_dct(s);
     AVFrame *f = s->picture_ptr;
-    json_object *jframe = f->cas9_sd[CAS9_FEAT_Q_DCT];
+    json_object *jframe = f->cas9_sd[feature];
     json_object *jso = s->progressive
                      ? json_object_get_userdata(jframe)
                      : jframe;
@@ -785,9 +812,20 @@ cas9_dct_zero_fill(
     cas9_json_array_zero_fill(jarr, 64);
 }
 
-static inline int mjpeg_decode_dc(MJpegDecodeContext *s, int dc_index)
+static inline int mjpeg_decode_dc(
+        MJpegDecodeContext *s,
+        int dc_index,
+        int component,
+        int mb_y,
+        int mb_x,
+        int block)
 {
+    PutBitContext saved;
     int code;
+
+    if ( (s->avctx->cas9_apply & (1 << CAS9_FEAT_Q_DC)) != 0 )
+        saved = *(s->opb);
+
     code = get_vlc2(&s->gb, s->vlcs[0][dc_index].table, 9, 2);
     if (code < 0 || code > 16) {
         av_log(s->avctx, AV_LOG_WARNING,
@@ -798,6 +836,20 @@ static inline int mjpeg_decode_dc(MJpegDecodeContext *s, int dc_index)
 
     if (code)
         code = get_xbits(&s->gb, code);
+
+    if ( (s->avctx->cas9_import & (1 << CAS9_FEAT_Q_DC)) != 0 )
+        code = cas9_dct_get(s, component, mb_y, mb_x, block, 0);
+    if ( (s->avctx->cas9_apply & (1 << CAS9_FEAT_Q_DC)) != 0 )
+    {
+        if ( dc_index == 0 )
+            ff_mjpeg_encode_dc(&saved, code, s->m.huff_size_dc_luminance, s->m.huff_code_dc_luminance);
+        else
+            ff_mjpeg_encode_dc(&saved, code, s->m.huff_size_dc_chrominance, s->m.huff_code_dc_chrominance);
+        *(s->opb) = saved;
+    }
+    if ( (s->avctx->cas9_export & (1 << CAS9_FEAT_Q_DC)) != 0 )
+        cas9_dct_set(s, component, mb_y, mb_x, block, 0, code);
+
     return code;
 }
 
@@ -816,7 +868,7 @@ static int decode_block(MJpegDecodeContext *s, int16_t *block, int component,
         saved = *(s->opb);
 
     /* DC coef */
-    val = mjpeg_decode_dc(s, dc_index);
+    val = mjpeg_decode_dc(s, dc_index, component, mb_y, mb_x, blockn);
     if (val == 0xfffff) {
         av_log(s->avctx, AV_LOG_ERROR, "error dc\n");
         return AVERROR_INVALIDDATA;
@@ -885,12 +937,12 @@ static int decode_block(MJpegDecodeContext *s, int16_t *block, int component,
 }
 
 static int decode_dc_progressive(MJpegDecodeContext *s, int16_t *block,
-                                 int component, int dc_index,
+                                 int component, int mb_y, int mb_x, int nblock, int dc_index,
                                  uint16_t *quant_matrix, int Al)
 {
-    unsigned val;
+    int val;
     s->bdsp.clear_block(block);
-    val = mjpeg_decode_dc(s, dc_index);
+    val = mjpeg_decode_dc(s, dc_index, component, mb_y, mb_x, nblock);
     if (val == 0xfffff) {
         av_log(s->avctx, AV_LOG_ERROR, "error dc\n");
         return AVERROR_INVALIDDATA;
@@ -1134,7 +1186,7 @@ static int ljpeg_decode_rgb_scan(MJpegDecodeContext *s, int nb_components, int p
 
                 PREDICT(pred, topleft[i], top[i], left[i], modified_predictor);
 
-                dc = mjpeg_decode_dc(s, s->dc_index[i]);
+                dc = mjpeg_decode_dc(s, s->dc_index[i], i, mb_y, mb_x, 0);
                 if(dc == 0xFFFFF)
                     return -1;
 
@@ -1246,7 +1298,7 @@ static int ljpeg_decode_yuv_scan(MJpegDecodeContext *s, int predictor,
                     for(j=0; j<n; j++) {
                         int pred, dc;
 
-                        dc = mjpeg_decode_dc(s, s->dc_index[i]);
+                        dc = mjpeg_decode_dc(s, s->dc_index[i], i, mb_y, mb_x, j);
                         if(dc == 0xFFFFF)
                             return -1;
                         if (   h * mb_x + x >= s->width
@@ -1317,7 +1369,7 @@ static int ljpeg_decode_yuv_scan(MJpegDecodeContext *s, int predictor,
                     for (j = 0; j < n; j++) {
                         int pred;
 
-                        dc = mjpeg_decode_dc(s, s->dc_index[i]);
+                        dc = mjpeg_decode_dc(s, s->dc_index[i], i, mb_y, mb_x, j);
                         if(dc == 0xFFFFF)
                             return -1;
                         if (   h * mb_x + x >= s->width
@@ -1401,17 +1453,30 @@ cas9_dct_scan_new(MJpegDecodeContext *s)
     void *ud = NULL;
     json_object *jscan;
 
+    if ( (s->avctx->cas9_export & (1 << CAS9_FEAT_Q_DC)) != 0 )
+    {
+        line_func = cas9_int_line_to_json_string;
+        ud = (void *) 5;
+    }
     jscan = cas9_jmb_new(s->mb_width, s->mb_height,
                          s->nb_components,
                          s->v_scount, s->h_scount,
                          line_func, ud);
 
-    json_object_object_add(jscan, "dc_luma_max", jluma_max);
-    json_object_object_add(jscan, "dc_chroma_max", jchroma_max);
-    jluma_max = json_object_new_int(s->huff_max_ac_luminance);
-    jchroma_max = json_object_new_int(s->huff_max_ac_chrominance);
-    json_object_object_add(jscan, "ac_luma_max", jluma_max);
-    json_object_object_add(jscan, "ac_chroma_max", jchroma_max);
+    if ( (s->avctx->cas9_export & (1 << CAS9_FEAT_Q_DC)) != 0 )
+    {
+        json_object_object_add(jscan, "luma_max", jluma_max);
+        json_object_object_add(jscan, "chroma_max", jchroma_max);
+    }
+    else
+    {
+        json_object_object_add(jscan, "dc_luma_max", jluma_max);
+        json_object_object_add(jscan, "dc_chroma_max", jchroma_max);
+        jluma_max = json_object_new_int(s->huff_max_ac_luminance);
+        jchroma_max = json_object_new_int(s->huff_max_ac_chrominance);
+        json_object_object_add(jscan, "ac_luma_max", jluma_max);
+        json_object_object_add(jscan, "ac_chroma_max", jchroma_max);
+    }
 
     return jscan;
 }
@@ -1422,9 +1487,10 @@ cas9_dct_export_scan_baseline(MJpegDecodeContext *s)
     // baseline:
     // - (single scan)
 
+    enum CAS9Feature feature = e_dc_or_dct(s);
     AVFrame *f = s->picture_ptr;
     json_object *jframe = cas9_dct_scan_new(s);
-    f->cas9_sd[CAS9_FEAT_Q_DCT] = jframe;
+    f->cas9_sd[feature] = jframe;
 }
 
 static void
@@ -1433,18 +1499,19 @@ cas9_dct_export_scan_progressive(MJpegDecodeContext *s)
     // progressive:
     // - scans[]
 
+    enum CAS9Feature feature = e_dc_or_dct(s);
     AVFrame *f = s->picture_ptr;
     json_object *jscans;
     json_object *jscan;
     json_object *jframe;
 
-    jframe = f->cas9_sd[CAS9_FEAT_Q_DCT];
+    jframe = f->cas9_sd[feature];
     if ( jframe == NULL )
     {
         jframe = json_object_new_object();
         jscans = json_object_new_array();
         json_object_object_add(jframe, "scans", jscans);
-        f->cas9_sd[CAS9_FEAT_Q_DCT] = jframe;
+        f->cas9_sd[feature] = jframe;
     }
     else
     {
@@ -1459,16 +1526,18 @@ cas9_dct_export_scan_progressive(MJpegDecodeContext *s)
 static void
 cas9_dct_import_scan_baseline(MJpegDecodeContext *s)
 {
+    enum CAS9Feature feature = i_dc_or_dct(s);
     AVFrame *f = s->picture_ptr;
-    json_object *jframe = f->cas9_sd[CAS9_FEAT_Q_DCT];
+    json_object *jframe = f->cas9_sd[feature];
     cas9_jmb_set_context(jframe, s->v_scount, s->h_scount);
 }
 
 static void
 cas9_dct_import_scan_progressive(MJpegDecodeContext *s)
 {
+    enum CAS9Feature feature = i_dc_or_dct(s);
     AVFrame *f = s->picture_ptr;
-    json_object *jframe = f->cas9_sd[CAS9_FEAT_Q_DCT];
+    json_object *jframe = f->cas9_sd[feature];
     json_object *jscans;
     json_object *jscan;
 
@@ -1507,14 +1576,16 @@ static int mjpeg_decode_scan(MJpegDecodeContext *s, int nb_components, int Ah,
 
     s->chroma_h_shift = chroma_h_shift;
     s->chroma_v_shift = chroma_v_shift;
-    if ( (s->avctx->cas9_export & (1 << CAS9_FEAT_Q_DCT)) != 0 )
+    if ( (s->avctx->cas9_export & (1 << CAS9_FEAT_Q_DCT)) != 0
+      || (s->avctx->cas9_export & (1 << CAS9_FEAT_Q_DC)) != 0 )
     {
         if ( !s->progressive )
             cas9_dct_export_scan_baseline(s);
         else
             cas9_dct_export_scan_progressive(s);
     }
-    else if ( (s->avctx->cas9_import & (1 << CAS9_FEAT_Q_DCT)) != 0 )
+    else if ( (s->avctx->cas9_import & (1 << CAS9_FEAT_Q_DCT)) != 0
+           || (s->avctx->cas9_import & (1 << CAS9_FEAT_Q_DC)) != 0 )
     {
         if ( !s->progressive )
             cas9_dct_import_scan_baseline(s);
@@ -1589,9 +1660,39 @@ static int mjpeg_decode_scan(MJpegDecodeContext *s, int nb_components, int Ah,
                                          (h * mb_x + x);
                         int16_t *block = s->blocks[c][block_idx];
                         if (Ah)
-                            block[0] += get_bits1(&s->gb) *
+                        {
+                            PutBitContext saved;
+                            int code;
+
+                            if ( (s->avctx->cas9_apply & (1 << CAS9_FEAT_Q_DCT)) != 0
+                              || (s->avctx->cas9_apply & (1 << CAS9_FEAT_Q_DC)) != 0 )
+                            {
+                                saved = *(s->opb);
+                            }
+
+                            code = get_bits1(&s->gb);
+
+                            if ( (s->avctx->cas9_import & (1 << CAS9_FEAT_Q_DCT)) != 0
+                              || (s->avctx->cas9_import & (1 << CAS9_FEAT_Q_DC)) != 0 )
+                            {
+                                code = (cas9_dct_get(s, i, mb_y, mb_x, j, 0) == 0) ? 0 : 1;
+                            }
+                            if ( (s->avctx->cas9_apply & (1 << CAS9_FEAT_Q_DCT)) != 0
+                              || (s->avctx->cas9_apply & (1 << CAS9_FEAT_Q_DC)) != 0 )
+                            {
+                                put_bits(&saved, 1, code);
+                                *(s->opb) = saved;
+                            }
+                            if ( (s->avctx->cas9_export & (1 << CAS9_FEAT_Q_DCT)) != 0
+                              || (s->avctx->cas9_export & (1 << CAS9_FEAT_Q_DC)) != 0 )
+                            {
+                                cas9_dct_set(s, i, mb_y, mb_x, j, 0, code);
+                            }
+
+                            block[0] += code *
                                         s->quant_matrixes[s->quant_sindex[i]][0] << Al;
-                        else if (decode_dc_progressive(s, block, i, s->dc_index[i],
+                        }
+                        else if (decode_dc_progressive(s, block, i, mb_y, mb_x, j, s->dc_index[i],
                                                        s->quant_matrixes[s->quant_sindex[i]],
                                                        Al) < 0) {
                             av_log(s->avctx, AV_LOG_ERROR,
@@ -2959,6 +3060,7 @@ AVCodec ff_mjpeg_decoder = {
                       FF_CODEC_CAP_SKIP_FRAME_FILL_PARAM,
     .cas9_features  = (1 << CAS9_FEAT_INFO)
                     | (1 << CAS9_FEAT_Q_DCT)
+                    | (1 << CAS9_FEAT_Q_DC)
 };
 #endif
 #if CONFIG_THP_DECODER
