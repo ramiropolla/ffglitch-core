@@ -139,6 +139,9 @@ typedef struct MJpegDecodeContext {
     /* cas9 bitstream */
     AVPacket *opkt;
     PutBitContext *opb;
+
+    /* cas9 sidedata (for importing) */
+    void *cas9_sd[32]; // should be at least [CAS9_FEAT_LAST]
 } MJpegDecodeContext;
 
 int ff_mjpeg_decode_init(AVCodecContext *avctx);
