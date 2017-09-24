@@ -48,6 +48,7 @@
 #include "exif.h"
 #include "bytestream.h"
 #include "cas9.h"
+#include "cas9_json.h"
 
 #include "mjpegenc_common.h"
 
@@ -299,6 +300,7 @@ int ff_mjpeg_decode_sof(MJpegDecodeContext *s)
     unsigned pix_fmt_id;
     int h_count[MAX_COMPONENTS] = { 0 };
     int v_count[MAX_COMPONENTS] = { 0 };
+    void *cas9_sd[CAS9_FEAT_LAST] = { 0 };
 
     s->cur_scan = 0;
     memset(s->upscale_h, 0, sizeof(s->upscale_h));
@@ -677,7 +679,10 @@ unk_pixfmt:
         return 0;
     }
 
+    // FIXME cas9_sd shouldn't have to be saved here
+    memcpy(cas9_sd, s->picture_ptr->cas9_sd, sizeof(cas9_sd));
     av_frame_unref(s->picture_ptr);
+    memcpy(s->picture_ptr->cas9_sd, cas9_sd, sizeof(cas9_sd));
     if (ff_get_buffer(s->avctx, s->picture_ptr, AV_GET_BUFFER_FLAG_REF) < 0)
         return -1;
     s->picture_ptr->pict_type = AV_PICTURE_TYPE_I;
@@ -2204,6 +2209,7 @@ int ff_mjpeg_decode_frame(AVCodecContext *avctx, void *data, int *got_frame,
     const uint8_t *buf = avpkt->data;
     int buf_size       = avpkt->size;
     MJpegDecodeContext *s = avctx->priv_data;
+    AVFrame *picture = s->picture_ptr;
     const uint8_t *buf_end, *buf_ptr;
     const uint8_t *unescaped_buf_ptr;
     int hshift, vshift;
@@ -2212,6 +2218,8 @@ int ff_mjpeg_decode_frame(AVCodecContext *avctx, void *data, int *got_frame,
     int i, index;
     int ret = 0;
     int is16bit;
+
+    memcpy(picture->cas9_sd, avpkt->cas9_sd, sizeof(picture->cas9_sd));
 
     if ( (avctx->cas9_apply & (1 << CAS9_FEAT_LAST)) != 0 )
     {
@@ -2787,6 +2795,7 @@ AVCodec ff_mjpeg_decoder = {
 #endif
                         NULL
                     },
+    .cas9_features  = (1 << CAS9_FEAT_INFO)
 };
 #endif
 #if CONFIG_THP_DECODER
