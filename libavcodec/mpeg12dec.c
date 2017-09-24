@@ -25,6 +25,9 @@
  * MPEG-1/2 decoder
  */
 
+#include <json.h>
+#include <printbuf.h>
+
 #define UNCHECKED_BITSTREAM_READER 1
 #include <inttypes.h>
 
@@ -32,6 +35,8 @@
 #include "libavutil/imgutils.h"
 #include "libavutil/internal.h"
 #include "libavutil/stereo3d.h"
+#include "libavutil/cas9.h"
+#include "libavutil/cas9_json.h"
 
 #include "avcodec.h"
 #include "bytestream.h"
@@ -1295,6 +1300,33 @@ static void mpeg_decode_picture_coding_extension(Mpeg1Context *s1)
     ff_dlog(s->avctx, "progressive_frame=%d\n", s->progressive_frame);
 }
 
+static void
+cas9_mpeg12_export_init(MpegEncContext *s)
+{
+    AVFrame *f = s->current_picture_ptr->f;
+
+    memcpy(f->cas9_sd, s->cas9_sd, sizeof(f->cas9_sd));
+
+    if ( (s->avctx->cas9_export & (1 << CAS9_FEAT_INFO)) != 0 )
+    {
+        json_object *jframe = json_object_new_object();
+
+        json_object *jpict_type = json_object_new_string(
+                   s->pict_type == AV_PICTURE_TYPE_I ? "I" :
+                  (s->pict_type == AV_PICTURE_TYPE_P ? "P" :
+                  (s->pict_type == AV_PICTURE_TYPE_B ? "B" : "S")));
+
+        json_object_object_add(jframe, "pict_type", jpict_type);
+
+        f->cas9_sd[CAS9_FEAT_INFO] = jframe;
+    }
+}
+
+static void
+cas9_mpeg12_export_cleanup(MpegEncContext *s, AVFrame *f)
+{
+}
+
 static int mpeg_field_start(MpegEncContext *s, const uint8_t *buf, int buf_size)
 {
     AVCodecContext *avctx = s->avctx;
@@ -1307,6 +1339,8 @@ static int mpeg_field_start(MpegEncContext *s, const uint8_t *buf, int buf_size)
 
         if ((ret = ff_mpv_frame_start(s, avctx)) < 0)
             return ret;
+
+        cas9_mpeg12_export_init(s);
 
         ff_mpeg_er_frame_start(s);
 
@@ -2466,6 +2500,8 @@ static int mpeg_decode_frame(AVCodecContext *avctx, void *data,
     AVFrame *picture = data;
     MpegEncContext *s2 = &s->mpeg_enc_ctx;
 
+    memcpy(s2->cas9_sd, avpkt->cas9_sd, sizeof(s2->cas9_sd));
+
     if (buf_size == 0 || (buf_size == 4 && AV_RB32(buf) == SEQ_END_CODE)) {
         /* special case for last picture */
         if (s2->low_delay == 0 && s2->next_picture_ptr) {
@@ -2560,6 +2596,9 @@ the_end:
         av_packet_free(&s2->opkt);
     }
 
+    if ( *got_output )
+        cas9_mpeg12_export_cleanup(s2, picture);
+
     return ret;
 }
 
@@ -2599,6 +2638,7 @@ AVCodec ff_mpeg1video_decoder = {
     .flush                 = flush,
     .max_lowres            = 3,
     .update_thread_context = ONLY_IF_THREADS_ENABLED(mpeg_decode_update_thread_context),
+    .cas9_features         = (1 << CAS9_FEAT_INFO)
 };
 
 AVCodec ff_mpeg2video_decoder = {
@@ -2618,6 +2658,7 @@ AVCodec ff_mpeg2video_decoder = {
     .flush          = flush,
     .max_lowres     = 3,
     .profiles       = NULL_IF_CONFIG_SMALL(ff_mpeg2_video_profiles),
+    .cas9_features  = (1 << CAS9_FEAT_INFO)
 };
 
 //legacy decoder
@@ -2637,4 +2678,5 @@ AVCodec ff_mpegvideo_decoder = {
     .caps_internal  = FF_CODEC_CAP_SKIP_FRAME_FILL_PARAM,
     .flush          = flush,
     .max_lowres     = 3,
+    .cas9_features  = (1 << CAS9_FEAT_INFO)
 };
