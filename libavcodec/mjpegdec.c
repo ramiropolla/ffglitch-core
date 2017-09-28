@@ -1113,7 +1113,7 @@ static int decode_block(MJpegDecodeContext *s, int16_t *block, int component,
         int block_last_index[5];
         int n = (ac_index == 0) ? 0 : 4;
         block_last_index[n] = last_index;
-        ff_mjpeg_encode_block(&saved, &s->m, &s->scantable, last_dc,
+        ff_mjpeg_encode_block(s, &saved, &s->m, &s->scantable, last_dc,
                               block_last_index, qblock, n);
         *(s->opb) = saved;
     }
