@@ -1770,6 +1770,7 @@ cas9_mpeg12_export_cleanup(MpegEncContext *s, AVFrame *f)
             json_object_object_del(jframe, "forward");
         if ( ctx->backward_count == 0 )
             json_object_object_del(jframe, "backward");
+        // TODO remove "mv" if both counts are 0
     }
 
     if ( (s->avctx->cas9_export & (1 << CAS9_FEAT_QSCALE)) != 0 )
