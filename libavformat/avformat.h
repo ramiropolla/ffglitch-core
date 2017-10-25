@@ -328,6 +328,8 @@ struct AVFormatContext;
 struct AVDeviceInfoList;
 struct AVDeviceCapabilitiesQuery;
 
+struct CAS9OutputContext;
+
 /**
  * @defgroup metadata_api Public Metadata API
  * @{
@@ -493,6 +495,9 @@ typedef struct AVProbeData {
                                         */
 
 #define AVFMT_SEEK_TO_PTS   0x4000000 /**< Seeking is based on PTS */
+
+/* cas9 */
+#define AVFMT_CAS9_BITSTREAM 0x08000000
 
 /**
  * @addtogroup lavf_encoding
@@ -1896,6 +1901,9 @@ typedef struct AVFormatContext {
      * - decoding: set by user
      */
     int max_streams;
+
+    /* cas9 */
+    struct CAS9OutputContext *c9;
 } AVFormatContext;
 
 /**
