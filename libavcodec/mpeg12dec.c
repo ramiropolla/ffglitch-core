@@ -194,7 +194,7 @@ static int cas9_decode_mpegmv(
     } while (0)
 
 static inline int mpeg1_decode_block_inter(MpegEncContext *s,
-                                           int16_t *block, int n)
+                                           int16_t *block, int16_t *qblock, int n)
 {
     int level, i, j, run;
     RLTable *rl                  = &ff_rl_mpeg1;
@@ -203,15 +203,21 @@ static inline int mpeg1_decode_block_inter(MpegEncContext *s,
     const int qscale             = s->qscale;
 
     {
+        int qlevel;
         i = -1;
         // special case for first coefficient, no need to add second VLC table
-        if ( show_bits1(&s->gb) ) {
+        qlevel = show_bits1(&s->gb);
+        if ( qlevel ) {
             skip_bits1(&s->gb);
             level = (3 * qscale * quant_matrix[0]) >> 5;
             level = (level - 1) | 1;
             if ( get_bits1(&s->gb) )
+            {
                 level = -level;
+                qlevel = -qlevel;
+            }
             block[0] = level;
+            qblock[0] = qlevel;
             i++;
             if ( show_bits(&s->gb, 2) == 2 )
                 goto end;
@@ -226,10 +232,14 @@ static inline int mpeg1_decode_block_inter(MpegEncContext *s,
                 if (i > MAX_INDEX)
                     break;
                 j = scantable[i];
+                qlevel = level;
                 level = ((level * 2 + 1) * qscale * quant_matrix[j]) >> 5;
                 level = (level - 1) | 1;
                 if ( get_bits1(&s->gb) )
+                {
                     level = -level;
+                    qlevel = -qlevel;
+                }
             } else {
                 /* escape */
                 run = get_bits(&s->gb, 6) + 1;
@@ -243,6 +253,7 @@ static inline int mpeg1_decode_block_inter(MpegEncContext *s,
                 if (i > MAX_INDEX)
                     break;
                 j = scantable[i];
+                qlevel = level;
                 if (level < 0) {
                     level = -level;
                     level = ((level * 2 + 1) * qscale * quant_matrix[j]) >> 5;
@@ -255,6 +266,7 @@ static inline int mpeg1_decode_block_inter(MpegEncContext *s,
             }
 
             block[j] = level;
+            qblock[j] = qlevel;
             if ( show_bits(&s->gb, 2) == 2 )
                 break;
         }
@@ -269,7 +281,7 @@ end:
 }
 
 static inline int mpeg2_decode_block_non_intra(MpegEncContext *s,
-                                               int16_t *block, int n)
+                                               int16_t *block, int16_t *qblock, int n)
 {
     int level, i, j, run;
     RLTable *rl = &ff_rl_mpeg1;
@@ -281,6 +293,8 @@ static inline int mpeg2_decode_block_non_intra(MpegEncContext *s,
     mismatch = 1;
 
     {
+        int qlevel;
+
         i = -1;
         if (n < 4)
             quant_matrix = s->inter_matrix;
@@ -288,12 +302,17 @@ static inline int mpeg2_decode_block_non_intra(MpegEncContext *s,
             quant_matrix = s->chroma_inter_matrix;
 
         // Special case for first coefficient, no need to add second VLC table.
-        if ( show_bits1(&s->gb) ) {
+        qlevel = show_bits1(&s->gb);
+        if ( qlevel ) {
             skip_bits1(&s->gb);
             level = (3 * qscale * quant_matrix[0]) >> 5;
             if ( get_bits1(&s->gb) )
+            {
                 level = -level;
+                qlevel = -qlevel;
+            }
             block[0]  = level;
+            qblock[0] = qlevel;
             mismatch ^= level;
             i++;
             if ( show_bits(&s->gb, 2) == 2 )
@@ -310,9 +329,13 @@ static inline int mpeg2_decode_block_non_intra(MpegEncContext *s,
                 if (i > MAX_INDEX)
                     break;
                 j = scantable[i];
+                qlevel = level;
                 level = ((level * 2 + 1) * qscale * quant_matrix[j]) >> 5;
                 if ( get_bits1(&s->gb) )
+                {
                     level = -level;
+                    qlevel = -qlevel;
+                }
             } else {
                 /* escape */
                 run = get_bits(&s->gb, 6) + 1;
@@ -322,6 +345,7 @@ static inline int mpeg2_decode_block_non_intra(MpegEncContext *s,
                 if (i > MAX_INDEX)
                     break;
                 j = scantable[i];
+                qlevel = level;
                 if (level < 0) {
                     level = ((-level * 2 + 1) * qscale * quant_matrix[j]) >> 5;
                     level = -level;
@@ -332,6 +356,7 @@ static inline int mpeg2_decode_block_non_intra(MpegEncContext *s,
 
             mismatch ^= level;
             block[j]  = level;
+            qblock[j] = qlevel;
             if ( show_bits(&s->gb, 2) == 2 )
                 break;
         }
@@ -347,7 +372,7 @@ end:
 }
 
 static inline int mpeg2_decode_block_intra(MpegEncContext *s,
-                                           int16_t *block, int n)
+                                           int16_t *block, int16_t *qblock, int n)
 {
     int level, dc, diff, i, j, run;
     int component;
@@ -371,6 +396,7 @@ static inline int mpeg2_decode_block_intra(MpegEncContext *s,
     dc  = s->last_dc[component];
     dc += diff;
     s->last_dc[component] = dc;
+    qblock[0] = dc;
     block[0] = dc * (1 << (3 - s->intra_dc_precision));
     ff_tlog(s->avctx, "dc=%d\n", block[0]);
     mismatch = block[0] ^ 1;
@@ -383,6 +409,7 @@ static inline int mpeg2_decode_block_intra(MpegEncContext *s,
     {
         /* now quantify & encode AC coefficients */
         for (;;) {
+            int qlevel;
             get_rl_vlc2(&level, &run, &s->gb, rl->rl_vlc[0],
                         TEX_VLC_BITS, 2, 0);
 
@@ -393,9 +420,13 @@ static inline int mpeg2_decode_block_intra(MpegEncContext *s,
                 if (i > MAX_INDEX)
                     break;
                 j = scantable[i];
+                qlevel = level;
                 level = (level * qscale * quant_matrix[j]) >> 4;
                 if ( get_bits1(&s->gb) )
+                {
                     level = -level;
+                    qlevel = -qlevel;
+                }
             } else {
                 /* escape */
                 run = get_bits(&s->gb, 6) + 1;
@@ -404,6 +435,7 @@ static inline int mpeg2_decode_block_intra(MpegEncContext *s,
                 if (i > MAX_INDEX)
                     break;
                 j = scantable[i];
+                qlevel = level;
                 if (level < 0) {
                     level = (-level * qscale * quant_matrix[j]) >> 4;
                     level = -level;
@@ -414,6 +446,7 @@ static inline int mpeg2_decode_block_intra(MpegEncContext *s,
 
             mismatch ^= level;
             block[j]  = level;
+            qblock[j] = qlevel;
         }
     }
     block[63] ^= mismatch & 1;
@@ -534,6 +567,92 @@ static int cas9_get_qscale(MpegEncContext *s, int is_mb)
     return qscale;
 }
 
+typedef struct {
+    int16_t qblock[64];
+    int last_dc[3];
+} cas9_mpeg12_block;
+
+static void cas9_mpeg12_init_block(
+        MpegEncContext *s,
+        cas9_mpeg12_block *ctx)
+{
+    memset(ctx->qblock, 0x00, sizeof(ctx->qblock));
+    if ( (s->avctx->cas9_apply & (1 << CAS9_FEAT_Q_DCT)) != 0 )
+    {
+        memcpy(ctx->last_dc, s->last_dc, sizeof(ctx->last_dc));
+        s->pb = *cas9_transplicate_save(&s->cas9_xp);
+    }
+}
+
+static void cas9_mpeg12_use_block(
+        MpegEncContext *s,
+        cas9_mpeg12_block *ctx,
+        int i)
+{
+    AVFrame *f = s->current_picture_ptr->f;
+    json_object *jframe = f->cas9_sd[CAS9_FEAT_Q_DCT];
+    int component = (i < 4) ? 0 : (1 + ((i - 4) & 1));
+    int blockn = (i < 4) ? i : ((i - 4) >> 1);
+    int j;
+
+    if ( (s->avctx->cas9_export & (1 << CAS9_FEAT_Q_DCT)) != 0 )
+    {
+        json_object *jso = json_object_new_array();
+
+        json_object_set_serializer(jso,
+                                   cas9_int_line_to_json_string,
+                                   (void *) 5, NULL);
+
+        json_object_array_put_idx(jso, 63, NULL);
+        for ( j = 0; j < 64; j++ )
+        {
+            int k = s->intra_scantable.permutated[j];
+            json_object *jval = json_object_new_int(ctx->qblock[k]);
+            json_object_array_put_idx(jso, j, jval);
+        }
+
+        cas9_jmb_set(jframe, component, s->mb_y, s->mb_x, blockn, jso);
+    }
+    else if ( (s->avctx->cas9_import & (1 << CAS9_FEAT_Q_DCT)) != 0 )
+    {
+        json_object *jso;
+
+        jso = cas9_jmb_get(jframe, component, s->mb_y, s->mb_x, blockn);
+        for ( j = 0; j < 64; j++ )
+        {
+            int k = s->intra_scantable.permutated[j];
+            json_object *jval = json_object_array_get_idx(jso, j);
+            ctx->qblock[k] = json_object_get_int(jval);
+        }
+        for ( j = 63; j > 0; j-- )
+            if ( ctx->qblock[s->intra_scantable.permutated[j]] )
+                break;
+        s->block_last_index[i] = j;
+
+        // Unquantize ctx->qblock into s->block[i]
+        memcpy(s->block[i], ctx->qblock, sizeof(s->block[i]));
+        if ( s->mb_intra )
+            s->dct_unquantize_intra(s, s->block[i], i, s->qscale >> 1);
+        else
+            s->dct_unquantize_inter(s, s->block[i], i, s->qscale >> 1);
+        if ( s->codec_id == AV_CODEC_ID_MPEG2VIDEO)
+        {
+            int mismatch = 1;
+            for ( j = 0; j < 64; j++ )
+                mismatch ^= s->block[i][j];
+            s->block[i][63] ^= (mismatch & 1);
+        }
+    }
+
+    if ( (s->avctx->cas9_apply & (1 << CAS9_FEAT_Q_DCT)) != 0 )
+    {
+        int last_dc[3];
+        memcpy(last_dc, s->last_dc, sizeof(last_dc));
+        memcpy(s->last_dc, ctx->last_dc, sizeof(s->last_dc));
+        cas9_mpeg1_encode_block(s, ctx->qblock, i);
+        cas9_transplicate_restore(&s->cas9_xp, &s->pb);
+    }
+}
 
 /* motion type (for MPEG-2) */
 #define MT_FIELD 1
@@ -672,20 +791,29 @@ static int mpeg_decode_mb(MpegEncContext *s, int16_t block[12][64])
 
         if (s->codec_id == AV_CODEC_ID_MPEG2VIDEO) {
             for (i = 0; i < mb_block_count; i++)
-                if ((ret = mpeg2_decode_block_intra(s, *s->pblocks[i], i)) < 0)
+            {
+                cas9_mpeg12_block bctx;
+                cas9_mpeg12_init_block(s, &bctx);
+                if ((ret = mpeg2_decode_block_intra(s, *s->pblocks[i], bctx.qblock, i)) < 0)
                     return ret;
+                cas9_mpeg12_use_block(s, &bctx, i);
+            }
         } else {
             for (i = 0; i < 6; i++) {
+                cas9_mpeg12_block bctx;
+                cas9_mpeg12_init_block(s, &bctx);
                 ret = ff_mpeg1_decode_block_intra(&s->gb,
                                                   s->intra_matrix,
                                                   s->intra_scantable.permutated,
                                                   s->last_dc, *s->pblocks[i],
+                                                  bctx.qblock,
                                                   i, s->qscale);
                 if (ret < 0) {
                     av_log(s->avctx, AV_LOG_ERROR, "ac-tex damaged at %d %d\n",
                            s->mb_x, s->mb_y);
                     return ret;
                 }
+                cas9_mpeg12_use_block(s, &bctx, i);
 
                 s->block_last_index[i] = ret;
             }
@@ -912,8 +1040,11 @@ static int mpeg_decode_mb(MpegEncContext *s, int16_t block[12][64])
 
                 for (i = 0; i < mb_block_count; i++) {
                     if (cbp & (1 << 11)) {
-                        if ((ret = mpeg2_decode_block_non_intra(s, *s->pblocks[i], i)) < 0)
+                        cas9_mpeg12_block bctx;
+                        cas9_mpeg12_init_block(s, &bctx);
+                        if ((ret = mpeg2_decode_block_non_intra(s, *s->pblocks[i], bctx.qblock, i)) < 0)
                             return ret;
+                        cas9_mpeg12_use_block(s, &bctx, i);
                     } else {
                         s->block_last_index[i] = -1;
                     }
@@ -922,8 +1053,11 @@ static int mpeg_decode_mb(MpegEncContext *s, int16_t block[12][64])
             } else {
                 for (i = 0; i < 6; i++) {
                     if (cbp & 32) {
-                        if ((ret = mpeg1_decode_block_inter(s, *s->pblocks[i], i)) < 0)
+                        cas9_mpeg12_block bctx;
+                        cas9_mpeg12_init_block(s, &bctx);
+                        if ((ret = mpeg1_decode_block_inter(s, *s->pblocks[i], bctx.qblock, i)) < 0)
                             return ret;
+                        cas9_mpeg12_use_block(s, &bctx, i);
                     } else {
                         s->block_last_index[i] = -1;
                     }
@@ -1557,6 +1691,36 @@ cas9_mpeg12_export_init(MpegEncContext *s)
         json_object_set_userdata(jframe, ctx, cas9_free_userdata);
         json_object_object_get_ex(jframe, "slice", &ctx->slice);
         json_object_object_get_ex(jframe, "mb", &ctx->mb);
+    }
+
+    if ( (s->avctx->cas9_export & (1 << CAS9_FEAT_Q_DCT)) != 0 )
+    {
+        json_object *jframe;
+        int nb_components = 3;
+        int h_count[3] = { 2, 1, 1 };
+        int v_count[3] = { 2, 1, 1 };
+
+        if ( !s->chroma_y_shift )
+            v_count[1] = v_count[2] = 2;
+
+        jframe = cas9_jmb_new(s->mb_width, s->mb_height,
+                              nb_components,
+                              v_count, h_count,
+                              NULL, NULL);
+
+        f->cas9_sd[CAS9_FEAT_Q_DCT] = jframe;
+    }
+    else if ( (s->avctx->cas9_import & (1 << CAS9_FEAT_Q_DCT)) != 0 )
+    {
+        json_object *jframe = f->cas9_sd[CAS9_FEAT_Q_DCT];
+        int nb_components = 3;
+        int h_count[3] = { 2, 1, 1 };
+        int v_count[3] = { 2, 1, 1 };
+
+        if ( !s->chroma_y_shift )
+            v_count[1] = v_count[2] = 2;
+
+        cas9_jmb_set_context(jframe, nb_components, v_count, h_count);
     }
 }
 
@@ -2941,6 +3105,7 @@ AVCodec ff_mpeg1video_decoder = {
     .cas9_features         = (1 << CAS9_FEAT_INFO)
                            | (1 << CAS9_FEAT_MV)
                            | (1 << CAS9_FEAT_QSCALE)
+                           | (1 << CAS9_FEAT_Q_DCT)
 };
 
 AVCodec ff_mpeg2video_decoder = {
@@ -2990,6 +3155,7 @@ AVCodec ff_mpeg2video_decoder = {
     .cas9_features  = (1 << CAS9_FEAT_INFO)
                     | (1 << CAS9_FEAT_MV)
                     | (1 << CAS9_FEAT_QSCALE)
+                    | (1 << CAS9_FEAT_Q_DCT)
 };
 
 //legacy decoder
@@ -3012,4 +3178,5 @@ AVCodec ff_mpegvideo_decoder = {
     .cas9_features  = (1 << CAS9_FEAT_INFO)
                     | (1 << CAS9_FEAT_MV)
                     | (1 << CAS9_FEAT_QSCALE)
+                    | (1 << CAS9_FEAT_Q_DCT)
 };

@@ -1,5 +1,6 @@
 
 CAS9 support for codec 'MPEG-2 video':
 	[info      ]: info
+	[q_dct     ]: quantized DCT coefficients
 	[mv        ]: motion vectors
 	[qscale    ]: quantization scale
