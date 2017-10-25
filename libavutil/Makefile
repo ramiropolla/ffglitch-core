@@ -76,6 +76,8 @@ HEADERS = adler32.h                                                     \
           version.h                                                     \
           xtea.h                                                        \
           tea.h                                                         \
+          cas9.h                                                        \
+          cas9_json.h                                                   \
 
 HEADERS-$(CONFIG_LZO)                   += lzo.h
 
@@ -155,6 +157,8 @@ OBJS = adler32.o                                                        \
        xga_font_data.o                                                  \
        xtea.o                                                           \
        tea.o                                                            \
+       cas9.o                                                           \
+       cas9_json.o                                                      \
 
 OBJS-$(!HAVE_ATOMICS_NATIVE)            += atomic.o                     \
 
