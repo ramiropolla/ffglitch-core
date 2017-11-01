@@ -3023,7 +3023,7 @@ static int mpeg_decode_frame(AVCodecContext *avctx, void *data,
         s2->opb = av_malloc(sizeof(PutBitContext));
         if ( s2->opb == NULL )
             return AVERROR(ENOMEM);
-        init_put_bits(s2->opb, s2->opkt->data, pkt_size * 8);
+        init_put_bits(s2->opb, s2->opkt->data, pkt_size);
     }
 
     ret = decode_chunks(avctx, picture, got_output, buf, buf_size);

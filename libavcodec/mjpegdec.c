@@ -2712,7 +2712,7 @@ int ff_mjpeg_decode_frame(AVCodecContext *avctx, void *data, int *got_frame,
         s->opb = av_malloc(sizeof(PutBitContext));
         if ( s->opb == NULL )
             return AVERROR(ENOMEM);
-        init_put_bits(s->opb, s->opkt->data, pkt_size * 8);
+        init_put_bits(s->opb, s->opkt->data, pkt_size);
     }
 
     av_dict_free(&s->exif_metadata);
