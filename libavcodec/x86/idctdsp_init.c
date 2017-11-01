@@ -65,6 +65,10 @@ av_cold void ff_idctdsp_init_x86(IDCTDSPContext *c, AVCodecContext *avctx,
 {
     int cpu_flags = av_get_cpu_flags();
 
+    /* Always use the C version for bitexact results. */
+    if ( (avctx->flags & AV_CODEC_FLAG_BITEXACT) != 0 )
+        return;
+
 #if ARCH_X86_32
     if (EXTERNAL_MMX(cpu_flags)) {
         if (!high_bit_depth &&
