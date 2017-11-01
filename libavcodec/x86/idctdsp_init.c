@@ -63,6 +63,10 @@ av_cold void ff_idctdsp_init_x86(IDCTDSPContext *c, AVCodecContext *avctx,
 {
     int cpu_flags = av_get_cpu_flags();
 
+    /* Always use the C version for bitexact results. */
+    if ( (avctx->flags & AV_CODEC_FLAG_BITEXACT) != 0 )
+        return;
+
     if (EXTERNAL_MMX(cpu_flags)) {
         c->put_signed_pixels_clamped = ff_put_signed_pixels_clamped_mmx;
         c->put_pixels_clamped        = ff_put_pixels_clamped_mmx;
