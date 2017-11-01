@@ -639,7 +639,8 @@ static void cas9_mpeg12_use_block(
         json_object_array_put_idx(jso, 63, NULL);
         for ( j = 0; j < 64; j++ )
         {
-            json_object *jval = json_object_new_int(ctx->qblock[j]);
+            int k = s->intra_scantable.permutated[j];
+            json_object *jval = json_object_new_int(ctx->qblock[k]);
             json_object_array_put_idx(jso, j, jval);
         }
 
@@ -652,8 +653,9 @@ static void cas9_mpeg12_use_block(
         jso = cas9_jmb_get(jframe, component, s->mb_y, s->mb_x, blockn);
         for ( j = 0; j < 64; j++ )
         {
+            int k = s->intra_scantable.permutated[j];
             json_object *jval = json_object_array_get_idx(jso, j);
-            ctx->qblock[j] = json_object_get_int(jval);
+            ctx->qblock[k] = json_object_get_int(jval);
         }
         for ( j = 63; j > 0; j-- )
             if ( ctx->qblock[s->intra_scantable.permutated[j]] )
