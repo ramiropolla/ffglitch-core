@@ -1,6 +1,7 @@
 LIBAVFORMAT_MAJOR {
     global:
         av*;
+        cas9*;
         #FIXME those are for ffserver
         ff_inet_aton;
         ff_socket_nonblock;
