@@ -1624,6 +1624,140 @@ static void mpeg_decode_picture_coding_extension(Mpeg1Context *s1)
     ff_dlog(s->avctx, "progressive_frame=%d\n", s->progressive_frame);
 }
 
+typedef struct
+{
+    json_object *jsizes;
+    json_object *jdatas;
+    GetBitContext saved;
+    PutBitContext pb;
+    uint8_t *data;
+    int idx;
+} mb_ctx;
+
+static void
+cas9_mb_export_init(MpegEncContext *s)
+{
+    AVFrame *f = s->current_picture_ptr->f;
+    json_object *jframe = f->cas9_sd[CAS9_FEAT_MB];
+    mb_ctx *ctx = json_object_get_userdata(jframe);
+    int size = (get_bits_left(&s->gb) + 7) >> 3; // in bytes
+
+    ctx->data = av_malloc(size);
+
+    init_put_bits(&ctx->pb, ctx->data, size);
+
+    s->gb.pb = &ctx->pb;
+}
+
+static char
+hexchar(uint8_t nibble)
+{
+    if ( nibble <= 9 )
+        return '0' + nibble;
+    return 'A' + nibble - 10;
+}
+
+static void
+cas9_mb_export_flush(MpegEncContext *s)
+{
+    AVFrame *f = s->current_picture_ptr->f;
+    json_object *jframe = f->cas9_sd[CAS9_FEAT_MB];
+    mb_ctx *ctx = json_object_get_userdata(jframe);
+    int size = put_bits_count(&ctx->pb); // in bits
+    int i;
+
+    json_object *jsize = json_object_new_int(size);
+    json_object *jdata;
+    char *str;
+
+    size = (size + 7) >> 3; // in bytes
+    str = av_malloc(size*2 + 1);
+    str[size*2] = '\0';
+
+    flush_put_bits(&ctx->pb);
+    for ( i = 0; i < size; i++ )
+    {
+        str[i*2+0] = hexchar(ctx->pb.buf[i] >> 4);
+        str[i*2+1] = hexchar(ctx->pb.buf[i] & 0x0F);
+    }
+
+    jdata = json_object_new_string(str);
+
+    json_object_array_put_idx(ctx->jsizes, ctx->idx, jsize);
+    json_object_array_put_idx(ctx->jdatas, ctx->idx, jdata);
+
+    av_free(ctx->data);
+    s->gb.pb = NULL;
+
+    ctx->idx++;
+}
+
+static int
+hexval(char c)
+{
+    if ( c >= '0' && c <= '9' )
+        return c - '0';
+    return c - 'A' + 10;
+}
+
+static void
+cas9_mb_import_init(MpegEncContext *s)
+{
+    AVFrame *f = s->current_picture_ptr->f;
+    json_object *jframe = f->cas9_sd[CAS9_FEAT_MB];
+    mb_ctx *ctx = json_object_get_userdata(jframe);
+
+    json_object *jdata = json_object_array_get_idx(ctx->jdatas, ctx->idx);
+    const char *str = json_object_get_string(jdata);
+    int size = strlen(str) / 2;
+    int i;
+
+    ctx->data = av_mallocz(size + 4);
+
+    for ( i = 0; i < size; i++ )
+    {
+        int c1 = hexval(str[i*2+0]);
+        int c2 = hexval(str[i*2+1]);
+        ctx->data[i] = (c1 << 4) | c2;
+    }
+
+    ctx->saved = s->gb;
+    init_get_bits(&s->gb, ctx->data, (size + 4) * 8);
+
+    if ( (s->avctx->cas9_apply & (1 << CAS9_FEAT_MB)) != 0 )
+        s->gb.pb = cas9_transplicate_pb(&s->cas9_xp);
+}
+
+static void
+cas9_mb_import_flush(MpegEncContext *s)
+{
+    AVFrame *f = s->current_picture_ptr->f;
+    json_object *jframe = f->cas9_sd[CAS9_FEAT_MB];
+    mb_ctx *ctx = json_object_get_userdata(jframe);
+
+    json_object *jsize = json_object_array_get_idx(ctx->jsizes, ctx->idx);
+    int size = json_object_get_int(jsize); // in bits
+
+    av_free(ctx->data);
+    s->gb = ctx->saved;
+
+    if ( (s->avctx->cas9_apply & (1 << CAS9_FEAT_MB)) != 0 )
+        s->gb.pb = NULL;
+
+    while ( size > 32 )
+    {
+        skip_bits_long(&s->gb, 32);
+        size -= 32;
+    }
+    if ( size > 0 )
+        skip_bits_long(&s->gb, size);
+
+    if ( (s->avctx->cas9_apply & (1 << CAS9_FEAT_MB)) != 0 )
+        s->gb.pb = cas9_transplicate_pb(&s->cas9_xp);
+
+    ctx->idx++;
+}
+
 static void
 cas9_mpeg12_export_init(MpegEncContext *s)
 {
@@ -1721,6 +1855,37 @@ cas9_mpeg12_export_init(MpegEncContext *s)
             v_count[1] = v_count[2] = 2;
 
         cas9_jmb_set_context(jframe, nb_components, v_count, h_count);
+    }
+
+    if ( (s->avctx->cas9_export & (1 << CAS9_FEAT_MB)) != 0 )
+    {
+        // {
+        //  "sizes": [ ] # MUST NOT CHANGE!
+        //  "data": [ ]
+        //  ]
+        // }
+
+        json_object *jframe = json_object_new_object();
+        mb_ctx *ctx = av_mallocz(sizeof(mb_ctx));
+        json_object_set_userdata(jframe, ctx, cas9_free_userdata);
+
+        ctx->jdatas = json_object_new_array();
+        json_object_object_add(jframe, "data", ctx->jdatas);
+        ctx->jsizes = json_object_new_array();
+        json_object_set_serializer(ctx->jsizes,
+                                   cas9_int_line_to_json_string,
+                                   (void *) -1, NULL);
+        json_object_object_add(jframe, "sizes", ctx->jsizes);
+
+        f->cas9_sd[CAS9_FEAT_MB] = jframe;
+    }
+    else if ( (s->avctx->cas9_import & (1 << CAS9_FEAT_MB)) != 0 )
+    {
+        json_object *jframe = f->cas9_sd[CAS9_FEAT_MB];
+        mb_ctx *ctx = av_mallocz(sizeof(mb_ctx));
+        json_object_set_userdata(jframe, ctx, cas9_free_userdata);
+        json_object_object_get_ex(jframe, "sizes", &ctx->jsizes);
+        json_object_object_get_ex(jframe, "data", &ctx->jdatas);
     }
 }
 
@@ -1954,7 +2119,19 @@ static int mpeg_decode_slice(MpegEncContext *s, int mb_y,
         if ((CONFIG_MPEG1_XVMC_HWACCEL || CONFIG_MPEG2_XVMC_HWACCEL) && s->pack_pblocks)
             ff_xvmc_init_block(s); // set s->block
 
-        if ((ret = mpeg_decode_mb(s, s->block)) < 0)
+        if ( (s->avctx->cas9_export & (1 << CAS9_FEAT_MB)) != 0 )
+            cas9_mb_export_init(s);
+        else if ( (s->avctx->cas9_import & (1 << CAS9_FEAT_MB)) != 0 )
+            cas9_mb_import_init(s);
+
+        ret = mpeg_decode_mb(s, s->block);
+
+        if ( (s->avctx->cas9_export & (1 << CAS9_FEAT_MB)) != 0 )
+            cas9_mb_export_flush(s);
+        else if ( (s->avctx->cas9_import & (1 << CAS9_FEAT_MB)) != 0 )
+            cas9_mb_import_flush(s);
+
+        if ( ret < 0 )
             return ret;
 
         // Note motion_val is normally NULL unless we want to extract the MVs.
@@ -3106,6 +3283,7 @@ AVCodec ff_mpeg1video_decoder = {
                            | (1 << CAS9_FEAT_MV)
                            | (1 << CAS9_FEAT_QSCALE)
                            | (1 << CAS9_FEAT_Q_DCT)
+                           | (1 << CAS9_FEAT_MB)
 };
 
 AVCodec ff_mpeg2video_decoder = {
@@ -3156,6 +3334,7 @@ AVCodec ff_mpeg2video_decoder = {
                     | (1 << CAS9_FEAT_MV)
                     | (1 << CAS9_FEAT_QSCALE)
                     | (1 << CAS9_FEAT_Q_DCT)
+                    | (1 << CAS9_FEAT_MB)
 };
 
 //legacy decoder
@@ -3179,4 +3358,5 @@ AVCodec ff_mpegvideo_decoder = {
                     | (1 << CAS9_FEAT_MV)
                     | (1 << CAS9_FEAT_QSCALE)
                     | (1 << CAS9_FEAT_Q_DCT)
+                    | (1 << CAS9_FEAT_MB)
 };
