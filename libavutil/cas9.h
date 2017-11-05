@@ -11,6 +11,7 @@ enum CAS9Feature {
     CAS9_FEAT_QSCALE,
     CAS9_FEAT_DQT,
     CAS9_FEAT_DHT,
+    CAS9_FEAT_MB,
 
     CAS9_FEAT_LAST
 };

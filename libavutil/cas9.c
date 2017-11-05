@@ -10,6 +10,7 @@ static const char *const feat_keys[] = {
     "qscale",
     "dqt",
     "dht",
+    "mb",
 };
 
 enum CAS9Feature cas9_str_to_feat(const char *str)
@@ -33,6 +34,7 @@ static const char *const feat_desc[] = {
     "quantization scale",
     "quantization table",
     "huffman table",
+    "macroblock",
 };
 
 const char *cas9_feat_desc(enum CAS9Feature feat)
@@ -42,7 +44,12 @@ const char *cas9_feat_desc(enum CAS9Feature feat)
 
 int cas9_default_feat(enum CAS9Feature feat)
 {
-    if ( feat == CAS9_FEAT_Q_DCT )
-        return 0;
-    return 1;
+    switch ( feat )
+    {
+        case CAS9_FEAT_Q_DCT:
+        case CAS9_FEAT_MB:
+            return 0;
+        default:
+            return 1;
+    }
 }
