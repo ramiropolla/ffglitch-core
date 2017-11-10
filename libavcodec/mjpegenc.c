@@ -278,7 +278,9 @@ void ff_mjpeg_encode_block(
                 av_log(ctx, AV_LOG_ERROR,
                        "FFglitch tried to write a huffman code not "
                        "available in huffman table. The output file "
-                       "will be corrupted.\n");
+                       "will be corrupted.\n"
+                       "Try encoding the original file again with "
+                       "-huffman default.\n");
 
             put_bits(pb, huff_size_ac[code], huff_code_ac[code]);
 
