@@ -2929,7 +2929,7 @@ eoi_parser:
         }
 
 skip:
-        if ( s->opb != NULL )
+        if ( (avctx->cas9_apply & (1 << CAS9_FEAT_LAST)) != 0 )
             ff_mjpeg_escape_FF(s->opb, start_escape);
         /* eof process start code */
         buf_ptr += (get_bits_count(&s->gb) + 7) / 8;
