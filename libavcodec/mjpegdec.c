@@ -2751,7 +2751,7 @@ int ff_mjpeg_decode_frame(AVCodecContext *avctx, void *data, int *got_frame,
             goto fail;
         }
 
-        if ( s->opb != NULL )
+        if ( (avctx->cas9_apply & (1 << CAS9_FEAT_LAST)) != 0 )
         {
             flush_put_bits(s->opb);
             put_bits(s->opb, 8, 0xff);
