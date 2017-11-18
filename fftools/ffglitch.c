@@ -260,7 +260,7 @@ static int processing_needed(void)
     return 0;
 }
 
-static int open_decoders(void)
+static int open_decoders(CAS9OutputContext *c9)
 {
     int fret = -1;
 
@@ -305,6 +305,10 @@ static int open_decoders(void)
                 }
             }
         }
+        /* enable bitstream transplication */
+        if ( c9 != NULL )
+            dctx->cas9_apply |= (1 << CAS9_FEAT_LAST);
+
         ret = avcodec_open2(dctx, decoder, &opts);
         av_dict_free(&opts);
         if ( ret < 0 )
@@ -591,7 +595,7 @@ int main(int argc, char *argv[])
     {
         /* open all possible decoders */
         /* TODO allow selecting streams */
-        ret = open_decoders();
+        ret = open_decoders(c9);
         if ( ret < 0 )
         {
             av_log(NULL, AV_LOG_FATAL, "Error opening decoders.\n");

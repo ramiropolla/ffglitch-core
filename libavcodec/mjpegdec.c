@@ -2698,7 +2698,8 @@ int ff_mjpeg_decode_frame(AVCodecContext *avctx, void *data, int *got_frame,
 
     memcpy(picture->cas9_sd, avpkt->cas9_sd, sizeof(picture->cas9_sd));
 
-    if ( s->opb == NULL )
+    if ( s->opb == NULL
+      && (avctx->cas9_apply & (1 << CAS9_FEAT_LAST)) != 0 )
     {
         int pkt_size = 1;
         pkt_size *= 1920/16; // some width
@@ -2947,7 +2948,8 @@ fail:
     return ret;
 the_end:
 
-    if ( s->opb != NULL )
+    if ( s->opb != NULL
+      && (avctx->cas9_apply & (1 << CAS9_FEAT_LAST)) != 0 )
     {
         flush_put_bits(s->opb);
         avctx->cas9_out_size = (put_bits_count(s->opb) + 7) >> 3;

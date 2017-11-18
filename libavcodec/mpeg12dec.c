@@ -3186,7 +3186,8 @@ static int mpeg_decode_frame(AVCodecContext *avctx, void *data,
         }
     }
 
-    if ( s2->opb == NULL )
+    if ( s2->opb == NULL
+      && (avctx->cas9_apply & (1 << CAS9_FEAT_LAST)) != 0 )
     {
         int pkt_size = 1;
         pkt_size *= 1920 / 16; // just guessing 1920x1080
@@ -3220,7 +3221,8 @@ static int mpeg_decode_frame(AVCodecContext *avctx, void *data,
     }
 
 the_end:
-    if ( s2->opb != NULL )
+    if ( s2->opb != NULL
+      && (avctx->cas9_apply & (1 << CAS9_FEAT_LAST)) != 0 )
     {
         flush_put_bits(s2->opb);
         avctx->cas9_out_size = (put_bits_count(s2->opb) + 7) >> 3;
