@@ -247,7 +247,7 @@ int ff_mjpeg_decode_dqt(MJpegDecodeContext *s)
     }
 
     while (len >= 65) {
-        PutBitContext saved;
+        PutBitContext *saved;
         json_object *cas9_dqt_cur;
         int pr = get_bits(&s->gb, 4);
         if (pr > 1) {
@@ -270,7 +270,7 @@ int ff_mjpeg_decode_dqt(MJpegDecodeContext *s)
         }
 
         if ( (s->avctx->cas9_apply & (1 << CAS9_FEAT_DQT)) != 0 )
-            saved = *(s->opb);
+            saved = cas9_transplicate_save(&s->cas9_xp);
 
         /* read quant table */
         for (i = 0; i < 64; i++) {
@@ -283,7 +283,7 @@ int ff_mjpeg_decode_dqt(MJpegDecodeContext *s)
             }
             if ( (s->avctx->cas9_apply & (1 << CAS9_FEAT_DQT)) != 0 )
             {
-                put_bits(&saved, pr ? 16 : 8, code);
+                put_bits(saved, pr ? 16 : 8, code);
             }
             if ( (s->avctx->cas9_export & (1 << CAS9_FEAT_DQT)) != 0 )
             {
@@ -300,7 +300,7 @@ int ff_mjpeg_decode_dqt(MJpegDecodeContext *s)
         }
 
         if ( (s->avctx->cas9_apply & (1 << CAS9_FEAT_DQT)) != 0 )
-            *(s->opb) = saved;
+            cas9_transplicate_restore(&s->cas9_xp);
 
         // XXX FIXME fine-tune, and perhaps add dc too
         s->qscale[index] = FFMAX(s->quant_matrixes[index][1],
@@ -319,12 +319,12 @@ int ff_mjpeg_decode_dht(MJpegDecodeContext *s)
     uint8_t bits_table[17];
     uint8_t val_table[256];
     int ret = 0;
-    PutBitContext saved;
+    PutBitContext *saved;
     json_object *jtables;
     int table_count = 0;
 
     if ( (s->avctx->cas9_apply & (1 << CAS9_FEAT_DHT)) != 0 )
-        saved = *(s->opb);
+        saved = cas9_transplicate_save(&s->cas9_xp);
 
     len = get_bits(&s->gb, 16) - 2;
 
@@ -372,7 +372,7 @@ int ff_mjpeg_decode_dht(MJpegDecodeContext *s)
         table_count = 0;
     }
     if ( (s->avctx->cas9_apply & (1 << CAS9_FEAT_DHT)) != 0 )
-        put_bits(&saved, 16, len + 2);
+        put_bits(saved, 16, len + 2);
 
     if (8*len > get_bits_left(&s->gb)) {
         av_log(s->avctx, AV_LOG_ERROR, "dht: len %d is too large\n", len);
@@ -421,8 +421,8 @@ int ff_mjpeg_decode_dht(MJpegDecodeContext *s)
 
         if ( (s->avctx->cas9_apply & (1 << CAS9_FEAT_DHT)) != 0 )
         {
-            put_bits(&saved, 4, class);
-            put_bits(&saved, 4, index);
+            put_bits(saved, 4, class);
+            put_bits(saved, 4, index);
         }
 
         n = 0;
@@ -431,7 +431,7 @@ int ff_mjpeg_decode_dht(MJpegDecodeContext *s)
             if ( (s->avctx->cas9_import & (1 << CAS9_FEAT_DHT)) != 0 )
                 v = bits_table[i];
             if ( (s->avctx->cas9_apply & (1 << CAS9_FEAT_DHT)) != 0 )
-                put_bits(&saved, 8, v);
+                put_bits(saved, 8, v);
             bits_table[i] = v;
             n += bits_table[i];
         }
@@ -445,7 +445,7 @@ int ff_mjpeg_decode_dht(MJpegDecodeContext *s)
             if ( (s->avctx->cas9_import & (1 << CAS9_FEAT_DHT)) != 0 )
                 v = val_table[i];
             if ( (s->avctx->cas9_apply & (1 << CAS9_FEAT_DHT)) != 0 )
-                put_bits(&saved, 8, v);
+                put_bits(saved, 8, v);
             if (v > code_max)
                 code_max = v;
             val_table[i] = v;
@@ -495,7 +495,7 @@ int ff_mjpeg_decode_dht(MJpegDecodeContext *s)
     }
 
     if ( (s->avctx->cas9_apply & (1 << CAS9_FEAT_DHT)) != 0 )
-        *(s->opb) = saved;
+        cas9_transplicate_restore(&s->cas9_xp);
 
     return 0;
 }
@@ -1005,11 +1005,11 @@ static inline int mjpeg_decode_dc(
         int mb_x,
         int block)
 {
-    PutBitContext saved;
+    PutBitContext *saved;
     int code;
 
     if ( (s->avctx->cas9_apply & (1 << CAS9_FEAT_Q_DC)) != 0 )
-        saved = *(s->opb);
+        saved = cas9_transplicate_save(&s->cas9_xp);
 
     code = get_vlc2(&s->gb, s->vlcs[0][dc_index].table, 9, 2);
     if (code < 0 || code > 16) {
@@ -1027,10 +1027,10 @@ static inline int mjpeg_decode_dc(
     if ( (s->avctx->cas9_apply & (1 << CAS9_FEAT_Q_DC)) != 0 )
     {
         if ( dc_index == 0 )
-            ff_mjpeg_encode_dc(&saved, code, s->m.huff_size_dc_luminance, s->m.huff_code_dc_luminance);
+            ff_mjpeg_encode_dc(saved, code, s->m.huff_size_dc_luminance, s->m.huff_code_dc_luminance);
         else
-            ff_mjpeg_encode_dc(&saved, code, s->m.huff_size_dc_chrominance, s->m.huff_code_dc_chrominance);
-        *(s->opb) = saved;
+            ff_mjpeg_encode_dc(saved, code, s->m.huff_size_dc_chrominance, s->m.huff_code_dc_chrominance);
+        cas9_transplicate_restore(&s->cas9_xp);
     }
     if ( (s->avctx->cas9_export & (1 << CAS9_FEAT_Q_DC)) != 0 )
         cas9_dct_set(s, component, mb_y, mb_x, block, 0, code);
@@ -1045,12 +1045,12 @@ static int decode_block(MJpegDecodeContext *s, int16_t *block, int component,
 {
     int16_t qblock[64];
     int code, i, j, level, val;
-    PutBitContext saved;
+    PutBitContext *saved;
     int last_index = 0;
 
     memset(qblock, 0, sizeof(qblock));
     if ( (s->avctx->cas9_apply & (1 << CAS9_FEAT_Q_DCT)) != 0 )
-        saved = *(s->opb);
+        saved = cas9_transplicate_save(&s->cas9_xp);
 
     /* DC coef */
     val = mjpeg_decode_dc(s, dc_index, component, mb_y, mb_x, blockn);
@@ -1113,9 +1113,9 @@ static int decode_block(MJpegDecodeContext *s, int16_t *block, int component,
         int block_last_index[5];
         int n = (ac_index == 0) ? 0 : 4;
         block_last_index[n] = last_index;
-        ff_mjpeg_encode_block(s, &saved, &s->m, &s->scantable, last_dc,
+        ff_mjpeg_encode_block(s, saved, &s->m, &s->scantable, last_dc,
                               block_last_index, qblock, n);
-        *(s->opb) = saved;
+        cas9_transplicate_restore(&s->cas9_xp);
     }
 
     return 0;
@@ -1846,13 +1846,13 @@ static int mjpeg_decode_scan(MJpegDecodeContext *s, int nb_components, int Ah,
                         int16_t *block = s->blocks[c][block_idx];
                         if (Ah)
                         {
-                            PutBitContext saved;
+                            PutBitContext *saved;
                             int code;
 
                             if ( (s->avctx->cas9_apply & (1 << CAS9_FEAT_Q_DCT)) != 0
                               || (s->avctx->cas9_apply & (1 << CAS9_FEAT_Q_DC)) != 0 )
                             {
-                                saved = *(s->opb);
+                                saved = cas9_transplicate_save(&s->cas9_xp);
                             }
 
                             code = get_bits1(&s->gb);
@@ -1865,8 +1865,8 @@ static int mjpeg_decode_scan(MJpegDecodeContext *s, int nb_components, int Ah,
                             if ( (s->avctx->cas9_apply & (1 << CAS9_FEAT_Q_DCT)) != 0
                               || (s->avctx->cas9_apply & (1 << CAS9_FEAT_Q_DC)) != 0 )
                             {
-                                put_bits(&saved, 1, code);
-                                *(s->opb) = saved;
+                                put_bits(saved, 1, code);
+                                cas9_transplicate_restore(&s->cas9_xp);
                             }
                             if ( (s->avctx->cas9_export & (1 << CAS9_FEAT_Q_DCT)) != 0
                               || (s->avctx->cas9_export & (1 << CAS9_FEAT_Q_DC)) != 0 )
@@ -2698,22 +2698,11 @@ int ff_mjpeg_decode_frame(AVCodecContext *avctx, void *data, int *got_frame,
 
     memcpy(picture->cas9_sd, avpkt->cas9_sd, sizeof(picture->cas9_sd));
 
-    if ( s->opb == NULL
-      && (avctx->cas9_apply & (1 << CAS9_FEAT_LAST)) != 0 )
+    if ( (avctx->cas9_apply & (1 << CAS9_FEAT_LAST)) != 0 )
     {
-        int pkt_size = 1;
-        pkt_size *= 1920/16; // some width
-        pkt_size *= 1080/16; // some height
-        pkt_size *= (MAX_MB_BYTES + 100);
-        pkt_size += 10000;
-        s->opkt = av_packet_alloc();
-        ret = ff_alloc_packet2(avctx, s->opkt, pkt_size, 0);
+        ret = cas9_transplicate_init(avctx, &s->cas9_xp, 0x100000);
         if ( ret < 0 )
             return ret;
-        s->opb = av_malloc(sizeof(PutBitContext));
-        if ( s->opb == NULL )
-            return AVERROR(ENOMEM);
-        init_put_bits(s->opb, s->opkt->data, pkt_size);
     }
 
     av_dict_free(&s->exif_metadata);
@@ -2753,12 +2742,13 @@ int ff_mjpeg_decode_frame(AVCodecContext *avctx, void *data, int *got_frame,
 
         if ( (avctx->cas9_apply & (1 << CAS9_FEAT_LAST)) != 0 )
         {
-            flush_put_bits(s->opb);
-            put_bits(s->opb, 8, 0xff);
-            put_bits(s->opb, 8, start_code);
-            flush_put_bits(s->opb);
-            start_escape = s->opb->buf_ptr - s->opb->buf;
-            s->gb.pb = s->opb;
+            PutBitContext *opb = cas9_transplicate_pb(&s->cas9_xp);
+            flush_put_bits(opb);
+            put_bits(opb, 8, 0xff);
+            put_bits(opb, 8, start_code);
+            flush_put_bits(opb);
+            start_escape = opb->buf_ptr - opb->buf;
+            s->gb.pb = opb;
         }
 
         s->start_code = start_code;
@@ -2930,7 +2920,10 @@ eoi_parser:
 
 skip:
         if ( (avctx->cas9_apply & (1 << CAS9_FEAT_LAST)) != 0 )
-            ff_mjpeg_escape_FF(s->opb, start_escape);
+        {
+            PutBitContext *opb = cas9_transplicate_pb(&s->cas9_xp);
+            ff_mjpeg_escape_FF(opb, start_escape);
+        }
         /* eof process start code */
         buf_ptr += (get_bits_count(&s->gb) + 7) / 8;
         av_log(avctx, AV_LOG_DEBUG,
@@ -2948,16 +2941,8 @@ fail:
     return ret;
 the_end:
 
-    if ( s->opb != NULL
-      && (avctx->cas9_apply & (1 << CAS9_FEAT_LAST)) != 0 )
-    {
-        flush_put_bits(s->opb);
-        avctx->cas9_out_size = (put_bits_count(s->opb) + 7) >> 3;
-        avctx->cas9_out = av_malloc(avctx->cas9_out_size);
-        memcpy(avctx->cas9_out, s->opkt->data, avctx->cas9_out_size);
-        av_freep(&s->opb);
-        av_packet_free(&s->opkt);
-    }
+    if ( (avctx->cas9_apply & (1 << CAS9_FEAT_LAST)) != 0 )
+        cas9_transplicate_flush(avctx, &s->cas9_xp);
 
     is16bit = av_pix_fmt_desc_get(s->avctx->pix_fmt)->comp[0].step > 1;
 

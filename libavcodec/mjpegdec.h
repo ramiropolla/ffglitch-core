@@ -40,6 +40,8 @@
 #include "idctdsp.h"
 #include "mjpegenc_common.h"
 
+#include "cas9_xp.h"
+
 #define MAX_COMPONENTS 4
 
 typedef struct MJpegDecodeContext {
@@ -138,8 +140,7 @@ typedef struct MJpegDecodeContext {
     int iccread;
 
     /* cas9 bitstream */
-    AVPacket *opkt;
-    PutBitContext *opb;
+    CAS9TransplicateContext cas9_xp;
 
     /* cas9 sidedata (for importing) */
     void *cas9_sd[32]; // should be at least [CAS9_FEAT_LAST]
