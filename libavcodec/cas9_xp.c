@@ -9,6 +9,7 @@ static const AVClass cas9_transplicate_class = {
     .version    = LIBAVUTIL_VERSION_INT,
 };
 
+/*-------------------------------------------------------------------*/
 int cas9_transplicate_init(
         AVCodecContext *avctx,
         CAS9TransplicateContext *xp,
@@ -44,12 +45,16 @@ int cas9_transplicate_init(
     return 0;
 }
 
+/*-------------------------------------------------------------------*/
 void cas9_transplicate_free(CAS9TransplicateContext *xp)
 {
+    if ( xp->o_pb == NULL )
+        return;
     av_freep(&xp->o_pb);
     av_packet_free(&xp->o_pkt);
 }
 
+/*-------------------------------------------------------------------*/
 void cas9_transplicate_flush(
         AVCodecContext *avctx,
         CAS9TransplicateContext *xp)
@@ -63,17 +68,20 @@ void cas9_transplicate_flush(
     cas9_transplicate_free(xp);
 }
 
+/*-------------------------------------------------------------------*/
 PutBitContext *cas9_transplicate_pb(CAS9TransplicateContext *xp)
 {
     return xp->o_pb;
 }
 
+/*-------------------------------------------------------------------*/
 PutBitContext *cas9_transplicate_save(CAS9TransplicateContext *xp)
 {
     xp->saved = *(xp->o_pb);
     return &xp->saved;
 }
 
+/*-------------------------------------------------------------------*/
 void cas9_transplicate_restore(
         CAS9TransplicateContext *xp,
         PutBitContext *saved)

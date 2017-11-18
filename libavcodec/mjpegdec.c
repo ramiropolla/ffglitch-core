@@ -3190,6 +3190,8 @@ av_cold int ff_mjpeg_decode_end(AVCodecContext *avctx)
 
     reset_icc_profile(s);
 
+    cas9_transplicate_free(&s->cas9_xp);
+
     return 0;
 }
 

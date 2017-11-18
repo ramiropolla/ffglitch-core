@@ -3233,10 +3233,14 @@ static void flush(AVCodecContext *avctx)
 static av_cold int mpeg_decode_end(AVCodecContext *avctx)
 {
     Mpeg1Context *s = avctx->priv_data;
+    MpegEncContext *s2 = &s->mpeg_enc_ctx;
 
     if (s->mpeg_enc_ctx_allocated)
         ff_mpv_common_end(&s->mpeg_enc_ctx);
     av_freep(&s->a53_caption);
+
+    cas9_transplicate_free(&s2->cas9_xp);
+
     return 0;
 }
 
