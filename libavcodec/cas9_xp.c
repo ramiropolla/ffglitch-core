@@ -44,6 +44,12 @@ int cas9_transplicate_init(
     return 0;
 }
 
+void cas9_transplicate_free(CAS9TransplicateContext *xp)
+{
+    av_freep(&xp->o_pb);
+    av_packet_free(&xp->o_pkt);
+}
+
 void cas9_transplicate_flush(
         AVCodecContext *avctx,
         CAS9TransplicateContext *xp)
@@ -54,8 +60,7 @@ void cas9_transplicate_flush(
     avctx->cas9_out_size = (put_bits_count(xp->o_pb) + 7) >> 3;
     avctx->cas9_out = av_malloc(avctx->cas9_out_size);
     memcpy(avctx->cas9_out, xp->o_pkt->data, avctx->cas9_out_size);
-    av_freep(&xp->o_pb);
-    av_packet_free(&xp->o_pkt);
+    cas9_transplicate_free(xp);
 }
 
 PutBitContext *cas9_transplicate_pb(CAS9TransplicateContext *xp)

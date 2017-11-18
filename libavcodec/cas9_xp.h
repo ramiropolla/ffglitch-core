@@ -23,6 +23,8 @@ void cas9_transplicate_flush(
         AVCodecContext *avctx,
         CAS9TransplicateContext *xp);
 
+void cas9_transplicate_free(CAS9TransplicateContext *xp);
+
 PutBitContext *cas9_transplicate_pb(CAS9TransplicateContext *xp);
 
 PutBitContext *cas9_transplicate_save(CAS9TransplicateContext *xp);
