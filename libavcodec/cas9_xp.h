@@ -27,6 +27,8 @@ PutBitContext *cas9_transplicate_pb(CAS9TransplicateContext *xp);
 
 PutBitContext *cas9_transplicate_save(CAS9TransplicateContext *xp);
 
-void cas9_transplicate_restore(CAS9TransplicateContext *xp);
+void cas9_transplicate_restore(
+        CAS9TransplicateContext *xp,
+        PutBitContext *saved);
 
 #endif /* AVCODEC_CAS9_XP_H */

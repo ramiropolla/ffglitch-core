@@ -195,7 +195,7 @@ static int cas9_decode_mpegmv(
     int code;
 
     if ( (s->avctx->cas9_apply & (1 << CAS9_FEAT_MV)) != 0 )
-        s->pb = *(s->opb);
+        s->pb = *cas9_transplicate_save(&s->cas9_xp);
 
     code = mpeg_decode_motion(s, fcode, pred);
     if ( code == 0xffff )
@@ -208,7 +208,7 @@ static int cas9_decode_mpegmv(
     if ( (s->avctx->cas9_apply & (1 << CAS9_FEAT_MV)) != 0 )
     {
         ff_mpeg1_encode_motion(s, code - pred, fcode);
-        *(s->opb) = s->pb;
+        cas9_transplicate_restore(&s->cas9_xp, &s->pb);
     }
     if ( (s->avctx->cas9_export & (1 << CAS9_FEAT_MV)) != 0 )
         cas9_mv_set(s, direction, j, x_or_y, code);
@@ -569,11 +569,11 @@ static inline int get_qscale(MpegEncContext *s)
 
 static int cas9_get_qscale(MpegEncContext *s, int is_mb)
 {
-    PutBitContext saved;
+    PutBitContext *saved;
     int qscale;
 
     if ( (s->avctx->cas9_apply & (1 << CAS9_FEAT_QSCALE)) != 0 )
-        saved = *(s->opb);
+        saved = cas9_transplicate_save(&s->cas9_xp);
 
     qscale = get_qscale(s);
 
@@ -586,8 +586,8 @@ static int cas9_get_qscale(MpegEncContext *s, int is_mb)
     }
     if ( (s->avctx->cas9_apply & (1 << CAS9_FEAT_QSCALE)) != 0 )
     {
-        put_bits(&saved, 5, qscale >> 1);
-        *(s->opb) = saved;
+        put_bits(saved, 5, qscale >> 1);
+        cas9_transplicate_restore(&s->cas9_xp, saved);
     }
     if ( (s->avctx->cas9_export & (1 << CAS9_FEAT_QSCALE)) != 0 )
     {
@@ -613,7 +613,7 @@ static void cas9_mpeg12_init_block(
     if ( (s->avctx->cas9_apply & (1 << CAS9_FEAT_Q_DCT)) != 0 )
     {
         memcpy(ctx->last_dc, s->last_dc, sizeof(ctx->last_dc));
-        s->pb = *(s->opb);
+        s->pb = *cas9_transplicate_save(&s->cas9_xp);
     }
 }
 
@@ -683,7 +683,7 @@ static void cas9_mpeg12_use_block(
         memcpy(last_dc, s->last_dc, sizeof(last_dc));
         memcpy(s->last_dc, ctx->last_dc, sizeof(s->last_dc));
         cas9_mpeg1_encode_block(s, ctx->qblock, i);
-        *(s->opb) = s->pb;
+        cas9_transplicate_restore(&s->cas9_xp, &s->pb);
     }
 }
 
@@ -1734,7 +1734,7 @@ cas9_mb_import_init(MpegEncContext *s)
     init_get_bits(&s->gb, ctx->data, (size + 4) * 8);
 
     if ( (s->avctx->cas9_apply & (1 << CAS9_FEAT_MB)) != 0 )
-        s->gb.pb = s->opb;
+        s->gb.pb = cas9_transplicate_pb(&s->cas9_xp);
 }
 
 static void
@@ -1762,7 +1762,7 @@ cas9_mb_import_flush(MpegEncContext *s)
         skip_bits_long(&s->gb, size);
 
     if ( (s->avctx->cas9_apply & (1 << CAS9_FEAT_MB)) != 0 )
-        s->gb.pb = s->opb;
+        s->gb.pb = cas9_transplicate_pb(&s->cas9_xp);
 
     ctx->idx++;
 }
@@ -2074,7 +2074,7 @@ static int mpeg_decode_slice(MpegEncContext *s, int mb_y,
     av_assert0(mb_y < s->mb_height);
 
     init_get_bits(&s->gb, *buf, buf_size * 8);
-    s->gb.pb = s->opb;
+    s->gb.pb = cas9_transplicate_pb(&s->cas9_xp);
     if (s->codec_id != AV_CODEC_ID_MPEG1VIDEO && s->mb_height > 2800/16)
         skip_bits(&s->gb, 3);
 
@@ -2351,7 +2351,7 @@ eos: // end of slice
         avpriv_align_put_bits(s->gb.pb);
         s->gb.pb = NULL;
         get_bits(&s->gb, 8);
-        s->gb.pb = s->opb;
+        s->gb.pb = cas9_transplicate_pb(&s->cas9_xp);
     }
     if (get_bits_left(&s->gb) < 0) {
         av_log(s, AV_LOG_ERROR, "overread %d\n", -get_bits_left(&s->gb));
@@ -2801,17 +2801,19 @@ static int decode_chunks(AVCodecContext *avctx, AVFrame *picture,
     int picture_start_code_seen = 0;
 
     for (;;) {
+        PutBitContext *opb;
         /* find next start code */
         uint32_t start_code = -1;
         const uint8_t *orig_buf_ptr = buf_ptr;
         buf_ptr = avpriv_find_start_code(buf_ptr, buf_end, &start_code);
-        if ( s2->opb != NULL && start_code < 0x200 )
+        opb = cas9_transplicate_pb(&s2->cas9_xp);
+        if ( opb != NULL && start_code < 0x200 )
         {
-            if ( put_bits_count(s2->opb) & 0x07 )
+            if ( put_bits_count(opb) & 0x07 )
                 orig_buf_ptr++;
-            flush_put_bits(s2->opb);
+            flush_put_bits(opb);
             while ( orig_buf_ptr != buf_ptr )
-                put_bits(s2->opb, 8, *orig_buf_ptr++);
+                put_bits(opb, 8, *orig_buf_ptr++);
         }
         if (start_code > 0x1ff) {
             if (!skip_frame) {
@@ -3186,22 +3188,11 @@ static int mpeg_decode_frame(AVCodecContext *avctx, void *data,
         }
     }
 
-    if ( s2->opb == NULL
-      && (avctx->cas9_apply & (1 << CAS9_FEAT_LAST)) != 0 )
+    if ( (avctx->cas9_apply & (1 << CAS9_FEAT_LAST)) != 0 )
     {
-        int pkt_size = 1;
-        pkt_size *= 1920 / 16; // just guessing 1920x1080
-        pkt_size *= 1080 / 16; // memory is cheap
-        pkt_size *= (MAX_MB_BYTES + 100);
-        pkt_size += 10000;
-        s2->opkt = av_packet_alloc();
-        ret = ff_alloc_packet2(avctx, s2->opkt, pkt_size, 0);
+        ret = cas9_transplicate_init(avctx, &s2->cas9_xp, 0x100000);
         if ( ret < 0 )
             return ret;
-        s2->opb = av_malloc(sizeof(PutBitContext));
-        if ( s2->opb == NULL )
-            return AVERROR(ENOMEM);
-        init_put_bits(s2->opb, s2->opkt->data, pkt_size);
     }
 
     ret = decode_chunks(avctx, picture, got_output, buf, buf_size);
@@ -3221,16 +3212,8 @@ static int mpeg_decode_frame(AVCodecContext *avctx, void *data,
     }
 
 the_end:
-    if ( s2->opb != NULL
-      && (avctx->cas9_apply & (1 << CAS9_FEAT_LAST)) != 0 )
-    {
-        flush_put_bits(s2->opb);
-        avctx->cas9_out_size = (put_bits_count(s2->opb) + 7) >> 3;
-        avctx->cas9_out = av_malloc(avctx->cas9_out_size);
-        memcpy(avctx->cas9_out, s2->opkt->data, avctx->cas9_out_size);
-        av_freep(&s2->opb);
-        av_packet_free(&s2->opkt);
-    }
+    if ( (avctx->cas9_apply & (1 << CAS9_FEAT_LAST)) != 0 )
+        cas9_transplicate_flush(avctx, &s2->cas9_xp);
 
     if ( *got_output )
         cas9_mpeg12_export_cleanup(s2, picture);

@@ -69,7 +69,9 @@ PutBitContext *cas9_transplicate_save(CAS9TransplicateContext *xp)
     return &xp->saved;
 }
 
-void cas9_transplicate_restore(CAS9TransplicateContext *xp)
+void cas9_transplicate_restore(
+        CAS9TransplicateContext *xp,
+        PutBitContext *saved)
 {
-    *(xp->o_pb) = xp->saved;
+    *(xp->o_pb) = *saved;
 }

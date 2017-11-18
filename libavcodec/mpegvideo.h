@@ -55,6 +55,8 @@
 #include "thread.h"
 #include "videodsp.h"
 
+#include "cas9_xp.h"
+
 #include "libavutil/opt.h"
 #include "libavutil/timecode.h"
 
@@ -564,8 +566,7 @@ typedef struct MpegEncContext {
     int noise_reduction;
 
     /* cas9 bitstream */
-    AVPacket *opkt;
-    PutBitContext *opb;
+    CAS9TransplicateContext cas9_xp;
 
     /* cas9 sidedata (for importing) */
     void *cas9_sd[32]; // should be at least [CAS9_FEAT_LAST]

@@ -300,7 +300,7 @@ int ff_mjpeg_decode_dqt(MJpegDecodeContext *s)
         }
 
         if ( (s->avctx->cas9_apply & (1 << CAS9_FEAT_DQT)) != 0 )
-            cas9_transplicate_restore(&s->cas9_xp);
+            cas9_transplicate_restore(&s->cas9_xp, saved);
 
         // XXX FIXME fine-tune, and perhaps add dc too
         s->qscale[index] = FFMAX(s->quant_matrixes[index][1],
@@ -495,7 +495,7 @@ int ff_mjpeg_decode_dht(MJpegDecodeContext *s)
     }
 
     if ( (s->avctx->cas9_apply & (1 << CAS9_FEAT_DHT)) != 0 )
-        cas9_transplicate_restore(&s->cas9_xp);
+        cas9_transplicate_restore(&s->cas9_xp, saved);
 
     return 0;
 }
@@ -1030,7 +1030,7 @@ static inline int mjpeg_decode_dc(
             ff_mjpeg_encode_dc(saved, code, s->m.huff_size_dc_luminance, s->m.huff_code_dc_luminance);
         else
             ff_mjpeg_encode_dc(saved, code, s->m.huff_size_dc_chrominance, s->m.huff_code_dc_chrominance);
-        cas9_transplicate_restore(&s->cas9_xp);
+        cas9_transplicate_restore(&s->cas9_xp, saved);
     }
     if ( (s->avctx->cas9_export & (1 << CAS9_FEAT_Q_DC)) != 0 )
         cas9_dct_set(s, component, mb_y, mb_x, block, 0, code);
@@ -1115,7 +1115,7 @@ static int decode_block(MJpegDecodeContext *s, int16_t *block, int component,
         block_last_index[n] = last_index;
         ff_mjpeg_encode_block(s, saved, &s->m, &s->scantable, last_dc,
                               block_last_index, qblock, n);
-        cas9_transplicate_restore(&s->cas9_xp);
+        cas9_transplicate_restore(&s->cas9_xp, saved);
     }
 
     return 0;
@@ -1866,7 +1866,7 @@ static int mjpeg_decode_scan(MJpegDecodeContext *s, int nb_components, int Ah,
                               || (s->avctx->cas9_apply & (1 << CAS9_FEAT_Q_DC)) != 0 )
                             {
                                 put_bits(saved, 1, code);
-                                cas9_transplicate_restore(&s->cas9_xp);
+                                cas9_transplicate_restore(&s->cas9_xp, saved);
                             }
                             if ( (s->avctx->cas9_export & (1 << CAS9_FEAT_Q_DCT)) != 0
                               || (s->avctx->cas9_export & (1 << CAS9_FEAT_Q_DC)) != 0 )
