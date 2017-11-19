@@ -6,6 +6,45 @@
 #include "get_bits_common.h"
 #include "put_bits.h"
 
+//#define CAS9_GB_DEBUG
+
+#ifdef CAS9_GB_DEBUG
+static void gb_debug(
+        const GetBitContext *s,
+        int val,
+        int orig_count,
+        int new_count,
+        int is_cache)
+{
+    int diff = new_count - orig_count;
+    char buf[33];
+    char *ptr = buf;
+    // TODO check >32 (skip)
+    if ( diff == 0 || diff > 32 )
+        return;
+    if ( is_cache )
+        val >>= 32 - diff;
+    for ( int i = 0; i < 32 - diff; i++ )
+        *ptr++ = ' ';
+    for ( int i = 0; i < diff; i++ )
+    {
+        int bit = val & (1<<(diff-i-1));
+        *ptr++ = !!bit + '0';
+    }
+    *ptr = '\0';
+    av_log(NULL, AV_LOG_ERROR, "%-32s [%6d] (%2d)\n", buf, orig_count, diff);
+}
+#define GB_DEBUG_START(s) int orig_count = get_bits_count(s)
+#define GB_DEBUG_END(s, val) gb_debug(s, val, orig_count, get_bits_count(s), 0)
+#define GB_DEBUG_END_SHOW(s, val, n) gb_debug(s, val, orig_count, orig_count + n, 0)
+#define GB_DEBUG_END_CACHE(s, val) gb_debug(s, val, orig_count, get_bits_count(s), 1)
+#else
+#define GB_DEBUG_START(s)
+#define GB_DEBUG_END(s, val)
+#define GB_DEBUG_END_SHOW(s, val, n)
+#define GB_DEBUG_END_CACHE(s, val)
+#endif
+
 #define GB_PREFIX gb_be_
 // #define BITSTREAM_READER_LE
 // #define LONG_BITSTREAM_READER
