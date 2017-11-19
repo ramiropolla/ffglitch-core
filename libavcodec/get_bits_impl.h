@@ -52,18 +52,19 @@ int get_xbits(GetBitContext *s, int n)
 {
     register int sign;
     register int32_t cache;
+    int tmp;
     OPEN_READER(re, s);
+    GB_DEBUG_START(s);
     av_assert2(n>0 && n<=25);
     UPDATE_CACHE(re, s);
     cache = GET_CACHE(re, s);
     sign  = ~cache >> 31;
+    tmp = SHOW_UBITS(re, s, n);
     if ( s->pb != NULL )
-    {
-        int tmp = SHOW_UBITS(re, s, n);
         put_bits(s->pb, n, tmp);
-    }
     LAST_SKIP_BITS(re, s, n);
     CLOSE_READER(re, s);
+    GB_DEBUG_END(s, tmp);
     return (NEG_USR32(sign ^ cache, n) ^ sign) - sign;
 }
 
@@ -71,18 +72,19 @@ int get_xbits_le(GetBitContext *s, int n)
 {
     register int sign;
     register int32_t cache;
+    int tmp;
     OPEN_READER(re, s);
+    GB_DEBUG_START(s);
     av_assert2(n>0 && n<=25);
     UPDATE_CACHE_LE(re, s);
     cache = GET_CACHE(re, s);
     sign  = sign_extend(~cache, n) >> 31;
+    tmp = SHOW_UBITS_LE(re, s, n);
     if ( s->pb != NULL )
-    {
-        int tmp = SHOW_UBITS_LE(re, s, n);
         put_bits(s->pb, n, tmp);
-    }
     LAST_SKIP_BITS(re, s, n);
     CLOSE_READER(re, s);
+    GB_DEBUG_END(s, tmp);
     return (zero_extend(sign ^ cache, n) ^ sign) - sign;
 }
 
@@ -90,6 +92,7 @@ int get_sbits(GetBitContext *s, int n)
 {
     register int tmp;
     OPEN_READER(re, s);
+    GB_DEBUG_START(s);
     av_assert2(n>0 && n<=25);
     UPDATE_CACHE(re, s);
     tmp = SHOW_UBITS(re, s, n);
@@ -98,6 +101,7 @@ int get_sbits(GetBitContext *s, int n)
     tmp = sign_extend(tmp, n);
     LAST_SKIP_BITS(re, s, n);
     CLOSE_READER(re, s);
+    GB_DEBUG_END(s, tmp);
     return tmp;
 }
 
@@ -108,6 +112,7 @@ unsigned int get_bits(GetBitContext *s, int n)
 {
     register int tmp;
     OPEN_READER(re, s);
+    GB_DEBUG_START(s);
     av_assert2(n>0 && n<=25);
     UPDATE_CACHE(re, s);
     tmp = SHOW_UBITS(re, s, n);
@@ -115,6 +120,7 @@ unsigned int get_bits(GetBitContext *s, int n)
         put_bits(s->pb, n, tmp);
     LAST_SKIP_BITS(re, s, n);
     CLOSE_READER(re, s);
+    GB_DEBUG_END(s, tmp);
     return tmp;
 }
 
@@ -130,6 +136,7 @@ unsigned int get_bits_le(GetBitContext *s, int n)
 {
     register int tmp;
     OPEN_READER(re, s);
+    GB_DEBUG_START(s);
     av_assert2(n>0 && n<=25);
     UPDATE_CACHE_LE(re, s);
     tmp = SHOW_UBITS_LE(re, s, n);
@@ -137,6 +144,7 @@ unsigned int get_bits_le(GetBitContext *s, int n)
         put_bits(s->pb, n, tmp);
     LAST_SKIP_BITS(re, s, n);
     CLOSE_READER(re, s);
+    GB_DEBUG_END(s, tmp);
     return tmp;
 }
 
@@ -147,9 +155,11 @@ unsigned int show_bits(GetBitContext *s, int n)
 {
     register int tmp;
     OPEN_READER_NOSIZE(re, s);
+    GB_DEBUG_START(s);
     av_assert2(n>0 && n<=25);
     UPDATE_CACHE(re, s);
     tmp = SHOW_UBITS(re, s, n);
+    GB_DEBUG_END_SHOW(s, tmp, n);
     return tmp;
 }
 
@@ -313,13 +323,22 @@ const uint8_t *align_get_bits(GetBitContext *s)
 int get_vlc2(GetBitContext *s, VLC_TYPE (*table)[2], int bits, int max_depth)
 {
     int code;
+#ifdef FFEDIT_GB_DEBUG
+    int dbg_cache;
+#endif
 
     OPEN_READER(re, s);
+    GB_DEBUG_START(s);
     UPDATE_CACHE(re, s);
+#ifdef FFEDIT_GB_DEBUG
+    dbg_cache = re_cache;
+#endif
 
     GET_VLC(code, re, s, table, bits, max_depth);
 
     CLOSE_READER(re, s);
+
+    GB_DEBUG_END_CACHE(s, dbg_cache);
 
     return code;
 }
@@ -334,9 +353,16 @@ void get_rl_vlc2(
         int need_update)
 {
     int level, run;
+#ifdef FFEDIT_GB_DEBUG
+    int dbg_cache;
+#endif
 
     OPEN_READER(re, s);
+    GB_DEBUG_START(s);
     UPDATE_CACHE(re, s);
+#ifdef FFEDIT_GB_DEBUG
+    dbg_cache = re_cache;
+#endif
 
     GET_RL_VLC(level, run, re, s, table, bits, max_depth, need_update);
 
@@ -344,6 +370,8 @@ void get_rl_vlc2(
 
     *plevel = level;
     *prun = run;
+
+    GB_DEBUG_END_CACHE(s, dbg_cache);
 }
 
 void get_cfhd_rl_vlc(
