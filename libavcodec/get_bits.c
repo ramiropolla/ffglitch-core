@@ -6,6 +6,44 @@
 #include "get_bits_common.h"
 #include "put_bits.h"
 
+//#define CAS9_GB_DEBUG
+
+#ifdef CAS9_GB_DEBUG
+static void gb_debug(
+        const GetBitContext *s,
+        int val,
+        const char *func,
+        int orig_count,
+        int is_cache)
+{
+    int new_count = get_bits_count(s);
+    int diff = new_count - orig_count;
+    char buf[33];
+    char *ptr = buf;
+    int i;
+    if ( diff == 0 )
+        return;
+    if ( is_cache )
+        val >>= 32 - diff;
+    for ( i = 0; i < 32 - diff; i++ )
+        *ptr++ = ' ';
+    for ( i = 0; i < diff; i++ )
+    {
+        int bit = val & (1<<(diff-i-1));
+        *ptr++ = !!bit + '0';
+    }
+    *ptr = '\0';
+    av_log(NULL, AV_LOG_ERROR, "%-32s [%6d] (%2d) %s\n", buf, orig_count, diff, func);
+}
+#define GB_DEBUG_START(s) int orig_count = get_bits_count(s)
+#define GB_DEBUG_END(s, val) gb_debug(s, val, __func__, orig_count, 0)
+#define GB_DEBUG_END_CACHE(s, val) gb_debug(s, val, __func__, orig_count, 1)
+#else
+#define GB_DEBUG_START(s)
+#define GB_DEBUG_END(s, val)
+#define GB_DEBUG_END_CACHE(s, val)
+#endif
+
 #define GB_PREFIX gb_be_
 // #define BITSTREAM_READER_LE
 // #define LONG_BITSTREAM_READER
