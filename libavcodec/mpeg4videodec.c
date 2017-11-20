@@ -145,6 +145,7 @@ static inline int mpeg4_is_resync(Mpeg4DecContext *ctx)
             int mb_num_bits = av_log2(s->mb_num - 1) + 1;
             GetBitContext gb = s->gb;
 
+            s->gb.pb = NULL;
             skip_bits(&s->gb, 1);
             align_get_bits(&s->gb);
 
@@ -1070,16 +1071,16 @@ static inline int mpeg4_decode_block(Mpeg4DecContext *ctx, int16_t *block,
             if (level == 0) {
                 /* escape */
                 if (rvlc) {
-                    if (get_bits(&s->gb, 1) == 0) {
+                    if (get_bits1(&s->gb) == 0) {
                         av_log(s->avctx, AV_LOG_ERROR,
                                "1. marker bit missing in rvlc esc\n");
                         return -1;
                     }
 
-                    last = get_bits(&s->gb, 1);
+                    last = get_bits1(&s->gb);
                     run = get_bits(&s->gb, 6);
 
-                    if (get_bits(&s->gb, 1) == 0) {
+                    if (get_bits1(&s->gb) == 0) {
                         av_log(s->avctx, AV_LOG_ERROR,
                                "2. marker bit missing in rvlc esc\n");
                         return -1;
@@ -1100,23 +1101,23 @@ static inline int mpeg4_decode_block(Mpeg4DecContext *ctx, int16_t *block,
                     if (last)
                         i += 192;
                 } else {
-#if 0
-                    int cache;
-                    cache = GET_CACHE(re, &s->gb);
-
+                    int bit = get_bits1(&s->gb);
                     if (IS_3IV1)
-                        cache ^= 0xC0000000;
+                        bit = !bit;
 
-                    if (cache & 0x80000000) {
-                        if (cache & 0x40000000) {
+                    if (bit) {
+                        bit = get_bits1(&s->gb);
+                        if (IS_3IV1)
+                            bit = !bit;
+                        if (bit) {
                             /* third escape */
-                            last = get_bits(&s->gb, 1);
+                            last = get_bits1(&s->gb);
                             run = get_bits(&s->gb, 6);
 
                             if (IS_3IV1) {
                                 level = get_sbits(&s->gb, 12);
                             } else {
-                                if (get_bits(&s->gb, 1) == 0) {
+                                if (get_bits1(&s->gb) == 0) {
                                     av_log(s->avctx, AV_LOG_ERROR,
                                            "1. marker bit missing in 3. esc\n");
                                     if (!(s->avctx->err_recognition & AV_EF_IGNORE_ERR))
@@ -1125,7 +1126,7 @@ static inline int mpeg4_decode_block(Mpeg4DecContext *ctx, int16_t *block,
 
                                 level = get_sbits(&s->gb, 12);
 
-                                if (get_bits(&s->gb, 1) == 0) {
+                                if (get_bits1(&s->gb) == 0) {
                                     av_log(s->avctx, AV_LOG_ERROR,
                                            "2. marker bit missing in 3. esc\n");
                                     if (!(s->avctx->err_recognition & AV_EF_IGNORE_ERR))
@@ -1190,10 +1191,6 @@ static inline int mpeg4_decode_block(Mpeg4DecContext *ctx, int16_t *block,
                         if ( get_bits1(&s->gb) )
                             level = -level;
                     }
-#else
-                    // TODO use GetBitContext
-                    av_assert0(0);
-#endif
                 }
             } else {
                 i    += run;
@@ -2824,6 +2821,7 @@ AVCodec ff_mpeg4_decoder = {
     .decode                = ff_h263_decode_frame,
     .capabilities          = AV_CODEC_CAP_DRAW_HORIZ_BAND | AV_CODEC_CAP_DR1 |
                              AV_CODEC_CAP_TRUNCATED | AV_CODEC_CAP_DELAY |
+                             AV_CODEC_CAP_CAS9_BITSTREAM |
                              AV_CODEC_CAP_FRAME_THREADS,
     .caps_internal         = FF_CODEC_CAP_SKIP_FRAME_FILL_PARAM,
     .flush                 = ff_mpeg_flush,
