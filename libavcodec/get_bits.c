@@ -19,15 +19,14 @@ static void gb_debug(
     int diff = new_count - orig_count;
     char buf[33];
     char *ptr = buf;
-    int i;
     // TODO check >32 (skip)
     if ( diff == 0 || diff > 32 )
         return;
     if ( is_cache )
         val >>= 32 - diff;
-    for ( i = 0; i < 32 - diff; i++ )
+    for ( int i = 0; i < 32 - diff; i++ )
         *ptr++ = ' ';
-    for ( i = 0; i < diff; i++ )
+    for ( int i = 0; i < diff; i++ )
     {
         int bit = val & (1<<(diff-i-1));
         *ptr++ = !!bit + '0';
