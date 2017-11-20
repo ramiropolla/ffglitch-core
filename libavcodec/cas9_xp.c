@@ -1,4 +1,5 @@
 
+#include "libavutil/cas9.h"
 #include "cas9_xp.h"
 #include "internal.h"
 
@@ -57,7 +58,8 @@ void cas9_transplicate_free(CAS9TransplicateContext *xp)
 /*-------------------------------------------------------------------*/
 void cas9_transplicate_flush(
         AVCodecContext *avctx,
-        CAS9TransplicateContext *xp)
+        CAS9TransplicateContext *xp,
+        AVPacket *pkt)
 {
     if ( xp->o_pb == NULL )
         return;
@@ -66,6 +68,21 @@ void cas9_transplicate_flush(
     avctx->cas9_out = av_malloc(avctx->cas9_out_size);
     memcpy(avctx->cas9_out, xp->o_pkt->data, avctx->cas9_out_size);
     cas9_transplicate_free(xp);
+#ifdef CONFIG_FFGLITCH_XP_DEBUG
+    /* Check only when replicating */
+    if ( avctx->cas9_apply == (1 << CAS9_FEAT_LAST) )
+    {
+        const uint8_t *inptr = avctx->cas9_out;
+        for ( int i = 0; i < avctx->cas9_out_size; i++ )
+        {
+            if ( inptr[i] != pkt->data[i] )
+            {
+                av_log(NULL, AV_LOG_FATAL, "ffglitch transplication mismatch at bit %d\n", i * 8);
+                av_assert0(0);
+            }
+        }
+    }
+#endif
 }
 
 /*-------------------------------------------------------------------*/

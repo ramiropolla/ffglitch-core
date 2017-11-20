@@ -12,16 +12,16 @@
 static void gb_debug(
         const GetBitContext *s,
         int val,
-        const char *func,
         int orig_count,
+        int new_count,
         int is_cache)
 {
-    int new_count = get_bits_count(s);
     int diff = new_count - orig_count;
     char buf[33];
     char *ptr = buf;
     int i;
-    if ( diff == 0 )
+    // TODO check >32 (skip)
+    if ( diff == 0 || diff > 32 )
         return;
     if ( is_cache )
         val >>= 32 - diff;
@@ -33,15 +33,17 @@ static void gb_debug(
         *ptr++ = !!bit + '0';
     }
     *ptr = '\0';
-    av_log(NULL, AV_LOG_ERROR, "%-32s [%6d] (%2d) %s\n", buf, orig_count, diff, func);
+    av_log(NULL, AV_LOG_ERROR, "%-32s [%6d] (%2d)\n", buf, orig_count, diff);
 }
 #define GB_DEBUG_START(s) int orig_count = get_bits_count(s)
-#define GB_DEBUG_END(s, val) gb_debug(s, val, __func__, orig_count, 0)
-#define GB_DEBUG_END_CACHE(s, val) gb_debug(s, val, __func__, orig_count, 1)
+#define GB_DEBUG_END(s, val) gb_debug(s, val, orig_count, get_bits_count(s), 0)
+#define GB_DEBUG_END_CACHE(s, val) gb_debug(s, val, orig_count, get_bits_count(s), 1)
+#define GB_DEBUG_LOG(fmt, ...) av_log(NULL, AV_LOG_ERROR, fmt, __VA_ARGS__)
 #else
 #define GB_DEBUG_START(s)
 #define GB_DEBUG_END(s, val)
 #define GB_DEBUG_END_CACHE(s, val)
+#define GB_DEBUG_LOG(fmt, ...)
 #endif
 
 #define GB_PREFIX gb_be_
