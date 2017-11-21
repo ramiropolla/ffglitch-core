@@ -25,6 +25,8 @@
  * H.263 decoder.
  */
 
+#include <json.h>
+
 #define UNCHECKED_BITSTREAM_READER 1
 
 #include "libavutil/cpu.h"
@@ -45,6 +47,7 @@
 #include "thread.h"
 #include "wmv2.h"
 #include "cas9.h"
+#include "cas9_json.h"
 
 static enum AVPixelFormat h263_get_format(AVCodecContext *avctx)
 {
@@ -410,6 +413,41 @@ static int decode_slice(MpegEncContext *s)
     return AVERROR_INVALIDDATA;
 }
 
+static void
+cas9_h263_export_init(MpegEncContext *s)
+{
+    AVFrame *f = s->current_picture_ptr->f;
+
+    memcpy(f->cas9_sd, s->cas9_sd, sizeof(f->cas9_sd));
+
+    if ( (s->avctx->cas9_export & (1 << CAS9_FEAT_INFO)) != 0 )
+    {
+        json_object *jframe = json_object_new_object();
+        json_object *jobj;
+        int one = 1;
+
+        jobj = json_object_new_string(
+             s->pict_type == AV_PICTURE_TYPE_I ? "I" :
+            (s->pict_type == AV_PICTURE_TYPE_P ? "P" :
+            (s->pict_type == AV_PICTURE_TYPE_B ? "B" : "S")));
+
+        json_object_object_add(jframe, "pict_type", jobj);
+
+        jobj = cas9_jmb_new(s->mb_width, s->mb_height,
+                            one, &one, &one,
+                            cas9_array_line_to_json_string, NULL);
+
+        json_object_object_add(jframe, "mb_type", jobj);
+
+        f->cas9_sd[CAS9_FEAT_INFO] = jframe;
+    }
+}
+
+static void
+cas9_h263_export_cleanup(MpegEncContext *s, AVFrame *f)
+{
+}
+
 int ff_h263_decode_frame(AVCodecContext *avctx, void *data, int *got_frame,
                          AVPacket *avpkt)
 {
@@ -420,6 +458,8 @@ int ff_h263_decode_frame(AVCodecContext *avctx, void *data, int *got_frame,
     int slice_ret = 0;
     AVFrame *pict = data;
     PutBitContext retry_pb;
+
+    memcpy(s->cas9_sd, avpkt->cas9_sd, sizeof(s->cas9_sd));
 
     /* no supplementary picture */
     if (buf_size == 0) {
@@ -635,6 +675,8 @@ retry:
     if ((ret = ff_mpv_frame_start(s, avctx)) < 0)
         return ret;
 
+    cas9_h263_export_init(s);
+
     if (!s->divx_packed)
         ff_thread_finish_setup(avctx);
 
@@ -752,6 +794,9 @@ frame_end:
         ret = get_consumed_bytes(s, buf_size);
 
 the_end:
+    if ( *got_frame )
+        cas9_h263_export_cleanup(s, pict);
+
     if ( (avctx->cas9_apply & (1 << CAS9_FEAT_LAST)) != 0 )
         cas9_transplicate_flush(avctx, &s->cas9_xp, avpkt);
 
@@ -791,6 +836,7 @@ AVCodec ff_h263_decoder = {
     .flush          = ff_mpeg_flush,
     .max_lowres     = 3,
     .pix_fmts       = ff_h263_hwaccel_pixfmt_list_420,
+    .cas9_features  = (1 << CAS9_FEAT_INFO)
 };
 
 AVCodec ff_h263p_decoder = {
@@ -821,4 +867,5 @@ AVCodec ff_h263p_decoder = {
 #endif
                         NULL
                     },
+    .cas9_features  = (1 << CAS9_FEAT_INFO)
 };
