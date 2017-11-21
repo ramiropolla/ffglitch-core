@@ -22,6 +22,7 @@
 
 #define UNCHECKED_BITSTREAM_READER 1
 
+#include "libavutil/cas9.h"
 #include "libavutil/internal.h"
 #include "libavutil/opt.h"
 #include "error_resilience.h"
@@ -2830,4 +2831,5 @@ AVCodec ff_mpeg4_decoder = {
     .profiles              = NULL_IF_CONFIG_SMALL(ff_mpeg4_video_profiles),
     .update_thread_context = ONLY_IF_THREADS_ENABLED(mpeg4_update_thread_context),
     .priv_class = &mpeg4_class,
+    .cas9_features         = (1 << CAS9_FEAT_INFO)
 };
