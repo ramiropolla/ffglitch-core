@@ -220,6 +220,13 @@ intx_line_to_json_string(
             snprintf(sbuf, sizeof(sbuf), "%-*s", null_len, "null");
             printbuf_memappend(pb, sbuf, strlen(sbuf));
         }
+        else if ( json_object_get_userdata1(jval) )
+        {
+            const char *s;
+
+            s = json_object_to_json_string_ext(jval, JSON_C_TO_STRING_PRETTY);
+            printbuf_memappend(pb, s, strlen(s));
+        }
         else
         {
             if ( arr_len > 1 )
