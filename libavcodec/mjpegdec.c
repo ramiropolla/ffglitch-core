@@ -2942,7 +2942,7 @@ fail:
 the_end:
 
     if ( (avctx->cas9_apply & (1 << CAS9_FEAT_LAST)) != 0 )
-        cas9_transplicate_flush(avctx, &s->cas9_xp, &s->gb, avpkt);
+        cas9_transplicate_flush(avctx, &s->cas9_xp, avpkt);
 
     is16bit = av_pix_fmt_desc_get(s->avctx->pix_fmt)->comp[0].step > 1;
 

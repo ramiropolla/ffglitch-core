@@ -773,7 +773,7 @@ the_end:
         cas9_h263_export_cleanup(s, pict);
 
     if ( (avctx->cas9_apply & (1 << CAS9_FEAT_LAST)) != 0 )
-        cas9_transplicate_flush(avctx, &s->cas9_xp, &s->gb, avpkt);
+        cas9_transplicate_flush(avctx, &s->cas9_xp, avpkt);
 
     return ret;
 }

@@ -23,7 +23,6 @@ int cas9_transplicate_init(
 void cas9_transplicate_flush(
         AVCodecContext *avctx,
         CAS9TransplicateContext *xp,
-        GetBitContext *gb,
         AVPacket *pkt);
 
 void cas9_transplicate_free(CAS9TransplicateContext *xp);

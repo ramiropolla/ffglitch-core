@@ -3128,7 +3128,7 @@ static int mpeg_decode_frame(AVCodecContext *avctx, void *data,
 
 the_end:
     if ( (avctx->cas9_apply & (1 << CAS9_FEAT_LAST)) != 0 )
-        cas9_transplicate_flush(avctx, &s2->cas9_xp, &s2->gb, avpkt);
+        cas9_transplicate_flush(avctx, &s2->cas9_xp, avpkt);
 
     if ( *got_output )
         cas9_mpeg12_export_cleanup(s2, picture);

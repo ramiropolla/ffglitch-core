@@ -73,13 +73,11 @@ static char *dump_byte(char *buf, uint8_t val)
 void cas9_transplicate_flush(
         AVCodecContext *avctx,
         CAS9TransplicateContext *xp,
-        GetBitContext *gb,
         AVPacket *pkt)
 {
     int bitcount;
     if ( xp->o_pb == NULL )
         return;
-    align_get_bits(gb);
     bitcount = put_bits_count(xp->o_pb);
     flush_put_bits(xp->o_pb);
     avctx->cas9_out_size = (bitcount + 7) >> 3;
