@@ -152,7 +152,7 @@ unsigned int show_bits(GetBitContext *s, int n)
     av_assert2(n>0 && n<=25);
     UPDATE_CACHE(re, s);
     tmp = SHOW_UBITS(re, s, n);
-    GB_DEBUG_END(s, tmp);
+    GB_DEBUG_END_SHOW(s, tmp, n);
     return tmp;
 }
 
