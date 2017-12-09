@@ -2,6 +2,8 @@
 #ifndef AVCODEC_CAS9_MV_H
 #define AVCODEC_CAS9_MV_H
 
+#include <json.h>
+
 #include "avcodec.h"
 #include "put_bits.h"
 #include "get_bits.h"
