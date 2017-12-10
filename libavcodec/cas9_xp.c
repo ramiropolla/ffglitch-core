@@ -106,15 +106,15 @@ void cas9_transplicate_flush(
                         break;
                 if ( i * 8 + j >= bitcount )
                     continue;
-                for ( i = start; i < end; i++ )
+                for ( int k = start; k < end; k++ )
                 {
                     *ptr1++ = ' ';
-                    ptr1 = dump_byte(ptr1, inptr[i]);
+                    ptr1 = dump_byte(ptr1, pkt->data[k]);
                     *ptr2++ = ' ';
-                    ptr2 = dump_byte(ptr2, pkt->data[i]);
+                    ptr2 = dump_byte(ptr2, inptr[k]);
                 }
-                av_log(NULL, AV_LOG_FATAL, "%d: %s\n", start * 8, buf1);
-                av_log(NULL, AV_LOG_FATAL, "%d: %s\n", start * 8, buf2);
+                av_log(NULL, AV_LOG_FATAL, "orig %d: %s\n", start * 8, buf1);
+                av_log(NULL, AV_LOG_FATAL, "cas9 %d: %s\n", start * 8, buf2);
                 av_log(NULL, AV_LOG_FATAL, "ffglitch replication mismatch at bit %d + %d (bitcount %d)\n", i * 8, j, bitcount);
                 av_assert0(0);
             }
