@@ -714,6 +714,12 @@ retry:
 
     av_assert1(s->bitstream_buffer_size == 0);
 frame_end:
+    if ( s->codec_id == AV_CODEC_ID_MPEG4
+      && s->avctx->cas9_apply != 0 )
+    {
+        PutBitContext *opb = cas9_transplicate_pb(&s->cas9_xp);
+        ff_mpeg4_stuffing(opb);
+    }
     ff_er_frame_end(&s->er);
 
     if (avctx->hwaccel) {
