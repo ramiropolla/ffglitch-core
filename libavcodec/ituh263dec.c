@@ -48,6 +48,7 @@
 #include "mpegvideodata.h"
 #include "cas9.h"
 #include "cas9_json.h"
+#include "cas9_mv.h"
 
 // The defines below define the number of bits that are read at once for
 // reading vlc values. Changing these may improve speed and data cache needs
@@ -282,6 +283,47 @@ int ff_h263_resync(MpegEncContext *s){
     return -1;
 }
 
+void cas9_h263_mv_init_mb(
+        MpegEncContext *s,
+        int nb_directions,
+        int nb_blocks)
+{
+    AVFrame *f = s->current_picture_ptr->f;
+    if ( (s->avctx->cas9_export & (1 << CAS9_FEAT_MV)) != 0 )
+        cas9_mv_export_init_mb(f, s->mb_y, s->mb_x, nb_directions, nb_blocks);
+    if ( (s->avctx->cas9_import & (1 << CAS9_FEAT_MV)) != 0 )
+        cas9_mv_import_init_mb(f, s->mb_y, s->mb_x, nb_directions, nb_blocks);
+}
+
+int cas9_h263_decode_motion(
+        MpegEncContext *s,
+        int pred,
+        int f_code,
+        int x_or_y)     // 0 = x, 1 = y
+{
+    AVFrame *f = s->current_picture_ptr->f;
+    int code;
+
+    if ( (s->avctx->cas9_apply & (1 << CAS9_FEAT_MV)) != 0 )
+        s->pb = *cas9_transplicate_save(&s->cas9_xp);
+
+    code = ff_h263_decode_motion(s, pred, f_code);
+    if ( code == 0xffff )
+        return code;
+
+    if ( (s->avctx->cas9_import & (1 << CAS9_FEAT_MV)) != 0 )
+        code = cas9_mv_get(f, x_or_y);
+    if ( (s->avctx->cas9_apply & (1 << CAS9_FEAT_MV)) != 0 )
+    {
+        ff_h263_encode_motion(&s->pb, code - pred, f_code);
+        cas9_transplicate_restore(&s->cas9_xp, &s->pb);
+    }
+    if ( (s->avctx->cas9_export & (1 << CAS9_FEAT_MV)) != 0 )
+        cas9_mv_set(f, x_or_y, code);
+
+    return code;
+}
+
 int ff_h263_decode_motion(MpegEncContext * s, int pred, int f_code)
 {
     int code, val, sign, shift;
@@ -396,16 +438,17 @@ static void preview_obmc(MpegEncContext *s){
         if ((cbpc & 16) == 0) {
                 s->current_picture.mb_type[xy] = MB_TYPE_16x16 | MB_TYPE_L0;
                 /* 16x16 motion prediction */
+                cas9_h263_mv_init_mb(s, 1, 1);
                 mot_val= ff_h263_pred_motion(s, 0, 0, &pred_x, &pred_y);
                 if (s->umvplus)
                     mx = h263p_decode_umotion(s, pred_x);
                 else
-                    mx = ff_h263_decode_motion(s, pred_x, 1);
+                    mx = cas9_h263_decode_motion(s, pred_x, 1, 0);
 
                 if (s->umvplus)
                     my = h263p_decode_umotion(s, pred_y);
                 else
-                    my = ff_h263_decode_motion(s, pred_y, 1);
+                    my = cas9_h263_decode_motion(s, pred_y, 1, 1);
 
                 mot_val[0       ]= mot_val[2       ]=
                 mot_val[0+stride]= mot_val[2+stride]= mx;
@@ -413,17 +456,18 @@ static void preview_obmc(MpegEncContext *s){
                 mot_val[1+stride]= mot_val[3+stride]= my;
         } else {
             s->current_picture.mb_type[xy] = MB_TYPE_8x8 | MB_TYPE_L0;
+            cas9_h263_mv_init_mb(s, 1, 4);
             for(i=0;i<4;i++) {
                 mot_val = ff_h263_pred_motion(s, i, 0, &pred_x, &pred_y);
                 if (s->umvplus)
                     mx = h263p_decode_umotion(s, pred_x);
                 else
-                    mx = ff_h263_decode_motion(s, pred_x, 1);
+                    mx = cas9_h263_decode_motion(s, pred_x, 1, 0);
 
                 if (s->umvplus)
                     my = h263p_decode_umotion(s, pred_y);
                 else
-                    my = ff_h263_decode_motion(s, pred_y, 1);
+                    my = cas9_h263_decode_motion(s, pred_y, 1, 1);
                 if (s->umvplus && (mx - pred_x) == 1 && (my - pred_y) == 1)
                     skip_bits1(&s->gb); /* Bit stuffing to prevent PSC */
                 mot_val[0] = mx;
@@ -752,11 +796,12 @@ int ff_h263_decode_mb(MpegEncContext *s,
             s->current_picture.mb_type[xy] = MB_TYPE_16x16 | MB_TYPE_L0;
             /* 16x16 motion prediction */
             s->mv_type = MV_TYPE_16X16;
+            cas9_h263_mv_init_mb(s, 1, 1);
             ff_h263_pred_motion(s, 0, 0, &pred_x, &pred_y);
             if (s->umvplus)
                mx = h263p_decode_umotion(s, pred_x);
             else
-               mx = ff_h263_decode_motion(s, pred_x, 1);
+               mx = cas9_h263_decode_motion(s, pred_x, 1, 0);
 
             if (mx >= 0xffff)
                 return SLICE_ERROR;
@@ -764,7 +809,7 @@ int ff_h263_decode_mb(MpegEncContext *s,
             if (s->umvplus)
                my = h263p_decode_umotion(s, pred_y);
             else
-               my = ff_h263_decode_motion(s, pred_y, 1);
+               my = cas9_h263_decode_motion(s, pred_y, 1, 1);
 
             if (my >= 0xffff)
                 return SLICE_ERROR;
@@ -776,19 +821,20 @@ int ff_h263_decode_mb(MpegEncContext *s,
         } else {
             s->current_picture.mb_type[xy] = MB_TYPE_8x8 | MB_TYPE_L0;
             s->mv_type = MV_TYPE_8X8;
+            cas9_h263_mv_init_mb(s, 1, 4);
             for(i=0;i<4;i++) {
                 mot_val = ff_h263_pred_motion(s, i, 0, &pred_x, &pred_y);
                 if (s->umvplus)
                     mx = h263p_decode_umotion(s, pred_x);
                 else
-                    mx = ff_h263_decode_motion(s, pred_x, 1);
+                    mx = cas9_h263_decode_motion(s, pred_x, 1, 0);
                 if (mx >= 0xffff)
                     return SLICE_ERROR;
 
                 if (s->umvplus)
                     my = h263p_decode_umotion(s, pred_y);
                 else
-                    my = ff_h263_decode_motion(s, pred_y, 1);
+                    my = cas9_h263_decode_motion(s, pred_y, 1, 1);
                 if (my >= 0xffff)
                     return SLICE_ERROR;
                 s->mv[0][i][0] = mx;
@@ -859,6 +905,8 @@ int ff_h263_decode_mb(MpegEncContext *s,
             s->mv_type= MV_TYPE_16X16;
 //FIXME UMV
 
+            cas9_h263_mv_init_mb(s, 2, 1);
+
             if(USES_LIST(mb_type, 0)){
                 int16_t *mot_val= ff_h263_pred_motion(s, 0, 0, &pred_x, &pred_y);
                 s->mv_dir = MV_DIR_FORWARD;
@@ -866,14 +914,14 @@ int ff_h263_decode_mb(MpegEncContext *s,
                 if (s->umvplus)
                     mx = h263p_decode_umotion(s, pred_x);
                 else
-                    mx = ff_h263_decode_motion(s, pred_x, 1);
+                    mx = cas9_h263_decode_motion(s, pred_x, 1, 0);
                 if (mx >= 0xffff)
                     return SLICE_ERROR;
 
                 if (s->umvplus)
                     my = h263p_decode_umotion(s, pred_y);
                 else
-                    my = ff_h263_decode_motion(s, pred_y, 1);
+                    my = cas9_h263_decode_motion(s, pred_y, 1, 1);
                 if (my >= 0xffff)
                     return SLICE_ERROR;
 
@@ -893,14 +941,14 @@ int ff_h263_decode_mb(MpegEncContext *s,
                 if (s->umvplus)
                     mx = h263p_decode_umotion(s, pred_x);
                 else
-                    mx = ff_h263_decode_motion(s, pred_x, 1);
+                    mx = cas9_h263_decode_motion(s, pred_x, 1, 0);
                 if (mx >= 0xffff)
                     return SLICE_ERROR;
 
                 if (s->umvplus)
                     my = h263p_decode_umotion(s, pred_y);
                 else
-                    my = ff_h263_decode_motion(s, pred_y, 1);
+                    my = cas9_h263_decode_motion(s, pred_y, 1, 1);
                 if (my >= 0xffff)
                     return SLICE_ERROR;
 
@@ -956,8 +1004,9 @@ intra:
     }
 
     while(pb_mv_count--){
-        ff_h263_decode_motion(s, 0, 1);
-        ff_h263_decode_motion(s, 0, 1);
+        /* TODO */
+        cas9_h263_decode_motion(s, 0, 1, 0);
+        cas9_h263_decode_motion(s, 0, 1, 1);
     }
 
     /* decode each block */
