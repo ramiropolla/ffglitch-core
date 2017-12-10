@@ -48,6 +48,7 @@
 #include "wmv2.h"
 #include "cas9.h"
 #include "cas9_json.h"
+#include "cas9_mv.h"
 
 static enum AVPixelFormat h263_get_format(AVCodecContext *avctx)
 {
@@ -441,11 +442,18 @@ cas9_h263_export_init(MpegEncContext *s)
 
         f->cas9_sd[CAS9_FEAT_INFO] = jframe;
     }
+
+    if ( (s->avctx->cas9_export & (1 << CAS9_FEAT_MV)) != 0 )
+        cas9_mv_export_init(f, s->mb_height, s->mb_width);
+    else if ( (s->avctx->cas9_import & (1 << CAS9_FEAT_MV)) != 0 )
+        cas9_mv_import_init(f);
 }
 
 static void
 cas9_h263_export_cleanup(MpegEncContext *s, AVFrame *f)
 {
+    if ( (s->avctx->cas9_export & (1 << CAS9_FEAT_MV)) != 0 )
+        cas9_mv_export_cleanup(f);
 }
 
 int ff_h263_decode_frame(AVCodecContext *avctx, void *data, int *got_frame,
@@ -837,6 +845,7 @@ AVCodec ff_h263_decoder = {
     .max_lowres     = 3,
     .pix_fmts       = ff_h263_hwaccel_pixfmt_list_420,
     .cas9_features  = (1 << CAS9_FEAT_INFO)
+                    | (1 << CAS9_FEAT_MV)
 };
 
 AVCodec ff_h263p_decoder = {
@@ -868,4 +877,5 @@ AVCodec ff_h263p_decoder = {
                         NULL
                     },
     .cas9_features  = (1 << CAS9_FEAT_INFO)
+                    | (1 << CAS9_FEAT_MV)
 };
