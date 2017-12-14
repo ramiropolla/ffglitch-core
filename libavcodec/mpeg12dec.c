@@ -102,6 +102,17 @@ static const uint32_t btype2mb_type[11] = {
     MB_TYPE_QUANT | MB_TYPE_L0L1 | MB_TYPE_CBP,
 };
 
+static void cas9_mb_type_str(char *buf, int mb_type)
+{
+    *buf++ = (mb_type & MB_TYPE_INTRA)   ? 'I' : ' ';
+    *buf++ = (mb_type & MB_TYPE_CBP)     ? 'c' : ' ';
+    *buf++ = (mb_type & MB_TYPE_QUANT)   ? 'q' : ' ';
+    *buf++ = (mb_type & MB_TYPE_L0)      ? 'f' : ' ';
+    *buf++ = (mb_type & MB_TYPE_L1)      ? 'b' : ' ';
+    *buf++ = (mb_type & MB_TYPE_ZERO_MV) ? '0' : ' ';
+    *buf = '\0';
+}
+
 /* as H.263, but only 17 codes */
 static int mpeg_decode_motion(MpegEncContext *s, int fcode, int pred)
 {
@@ -720,6 +731,19 @@ static int mpeg_decode_mb(MpegEncContext *s, int16_t block[12][64])
         break;
     }
     ff_tlog(s->avctx, "mb_type=%x\n", mb_type);
+    if ( (s->avctx->cas9_export & (1 << CAS9_FEAT_INFO)) != 0 )
+    {
+        char buf[10];
+        json_object *jframe = f->cas9_sd[CAS9_FEAT_INFO];
+        json_object *jmb_type;
+        json_object *jso;
+
+        json_object_object_get_ex(jframe, "mb_type", &jmb_type);
+
+        cas9_mb_type_str(buf, mb_type);
+        jso = json_object_new_string(buf);
+        cas9_jmb_set(jmb_type, 0, s->mb_y, s->mb_x, 0, jso);
+    }
 //    motion_type = 0; /* avoid warning */
     if (IS_INTRA(mb_type)) {
         s->bdsp.clear_blocks(s->block[0]);
@@ -1736,13 +1760,21 @@ cas9_mpeg12_export_init(MpegEncContext *s)
     if ( (s->avctx->cas9_export & (1 << CAS9_FEAT_INFO)) != 0 )
     {
         json_object *jframe = json_object_new_object();
+        json_object *jobj;
+        int one = 1;
 
-        json_object *jpict_type = json_object_new_string(
-                   s->pict_type == AV_PICTURE_TYPE_I ? "I" :
-                  (s->pict_type == AV_PICTURE_TYPE_P ? "P" :
-                  (s->pict_type == AV_PICTURE_TYPE_B ? "B" : "S")));
+        jobj = json_object_new_string(
+             s->pict_type == AV_PICTURE_TYPE_I ? "I" :
+            (s->pict_type == AV_PICTURE_TYPE_P ? "P" :
+            (s->pict_type == AV_PICTURE_TYPE_B ? "B" : "S")));
 
-        json_object_object_add(jframe, "pict_type", jpict_type);
+        json_object_object_add(jframe, "pict_type", jobj);
+
+        jobj = cas9_jmb_new(s->mb_width, s->mb_height,
+                            one, &one, &one,
+                            cas9_array_line_to_json_string, NULL);
+
+        json_object_object_add(jframe, "mb_type", jobj);
 
         f->cas9_sd[CAS9_FEAT_INFO] = jframe;
     }

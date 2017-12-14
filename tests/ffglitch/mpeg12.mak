@@ -6,6 +6,7 @@ FFGLITCH_TESTS += mpeg2video_traffic_128_5_list         \
                   mpeg2video_traffic_128_5_mv           \
                   mpeg2video_traffic_128_5_qscale       \
                   mpeg2video_traffic_128_5_mb           \
+                  mpeg2video_prepared_128_5_info        \
                   mpeg2video_prepared_128_5_q_dct       \
                   mpeg2video_prepared_128_5_mv          \
 
