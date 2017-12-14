@@ -85,7 +85,7 @@ cas9_jmb_new(
     }
     json_object_object_add(jscan, "data", jdata);
 
-    cas9_jmb_set_context(jscan, v_count, h_count);
+    cas9_jmb_set_context(jscan, nb_components, v_count, h_count);
 
     return jscan;
 }
@@ -94,13 +94,17 @@ cas9_jmb_new(
 void
 cas9_jmb_set_context(
         json_object *jso,
+        int nb_components,
         int *v_count,
         int *h_count)
 {
     mb_array_ctx *ctx = av_mallocz(sizeof(mb_array_ctx));
 
-    memcpy(ctx->v_count, v_count, sizeof(ctx->v_count));
-    memcpy(ctx->h_count, h_count, sizeof(ctx->h_count));
+    for ( size_t component = 0; component < nb_components; component++ )
+    {
+        ctx->v_count[component] = v_count[component];
+        ctx->h_count[component] = h_count[component];
+    }
 
     json_object_object_get_ex(jso, "data", &ctx->jdata);
 

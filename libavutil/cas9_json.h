@@ -24,6 +24,7 @@ cas9_jmb_new(
 void
 cas9_jmb_set_context(
         json_object *jso,
+        int nb_components,
         int *v_count,
         int *h_count);
 json_object *

@@ -1807,14 +1807,14 @@ cas9_mpeg12_export_init(MpegEncContext *s)
     else if ( (s->avctx->cas9_import & (1 << CAS9_FEAT_Q_DCT)) != 0 )
     {
         json_object *jframe = f->cas9_sd[CAS9_FEAT_Q_DCT];
-
+        int nb_components = 3;
         int h_count[3] = { 2, 1, 1 };
         int v_count[3] = { 2, 1, 1 };
 
         if ( !s->chroma_y_shift )
             v_count[1] = v_count[2] = 2;
 
-        cas9_jmb_set_context(jframe, v_count, h_count);
+        cas9_jmb_set_context(jframe, nb_components, v_count, h_count);
     }
 
     if ( (s->avctx->cas9_export & (1 << CAS9_FEAT_MB)) != 0 )

@@ -1709,16 +1709,16 @@ cas9_dct_export_scan_progressive(MJpegDecodeContext *s)
 }
 
 static void
-cas9_dct_import_scan_baseline(MJpegDecodeContext *s)
+cas9_dct_import_scan_baseline(MJpegDecodeContext *s, int nb_components)
 {
     enum CAS9Feature feature = i_dc_or_dct(s);
     AVFrame *f = s->picture_ptr;
     json_object *jframe = f->cas9_sd[feature];
-    cas9_jmb_set_context(jframe, s->v_scount, s->h_scount);
+    cas9_jmb_set_context(jframe, nb_components, s->v_scount, s->h_scount);
 }
 
 static void
-cas9_dct_import_scan_progressive(MJpegDecodeContext *s)
+cas9_dct_import_scan_progressive(MJpegDecodeContext *s, int nb_components)
 {
     enum CAS9Feature feature = i_dc_or_dct(s);
     AVFrame *f = s->picture_ptr;
@@ -1728,7 +1728,7 @@ cas9_dct_import_scan_progressive(MJpegDecodeContext *s)
 
     json_object_object_get_ex(jframe, "scans", &jscans);
     jscan = json_object_array_get_idx(jscans, s->cur_scan-1);
-    cas9_jmb_set_context(jscan, s->v_scount, s->h_scount);
+    cas9_jmb_set_context(jscan, nb_components, s->v_scount, s->h_scount);
     json_object_set_userdata(jframe, jscan, NULL);
 }
 
@@ -1773,9 +1773,9 @@ static int mjpeg_decode_scan(MJpegDecodeContext *s, int nb_components, int Ah,
            || (s->avctx->cas9_import & (1 << CAS9_FEAT_Q_DC)) != 0 )
     {
         if ( !s->progressive )
-            cas9_dct_import_scan_baseline(s);
+            cas9_dct_import_scan_baseline(s, nb_components);
         else
-            cas9_dct_import_scan_progressive(s);
+            cas9_dct_import_scan_progressive(s, nb_components);
     }
 
     for (i = 0; i < nb_components; i++) {
