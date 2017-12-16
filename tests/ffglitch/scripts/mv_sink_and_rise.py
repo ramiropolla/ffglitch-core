@@ -18,5 +18,9 @@ with open(sys.argv[1], 'r') as f:
                     # for each row
                     for y in fwd:
                         for i,x in enumerate(y):
-                            y[i][0] = 0
+                            if isinstance(x[0], (int, long)):
+                                y[i][0] = 0
+                            else:
+                                for j,b in enumerate(x):
+                                    x[j][0] = 0
     print json.dumps(data)
