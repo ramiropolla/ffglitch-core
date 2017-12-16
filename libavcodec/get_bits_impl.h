@@ -415,63 +415,63 @@ int AV_JOIN(dbg_, get_bits_count)(const GetBitContext *s, const char *file, int 
 void AV_JOIN(dbg_, skip_bits_long)(GetBitContext *s, int n, const char *file, int line, const char *func);
 void AV_JOIN(dbg_, skip_bits_long)(GetBitContext *s, int n, const char *file, int line, const char *func)
 {
-    GB_DEBUG_LOG("[%s][%d][%s] %s()\n", file, line, func, __func__);
+    GB_DEBUG_LOG("[%s][%d][%s] %s(%d)\n", file, line, func, __func__, n);
     return skip_bits_long(s, n);
 }
 
 int AV_JOIN(dbg_, get_xbits)(GetBitContext *s, int n, const char *file, int line, const char *func);
 int AV_JOIN(dbg_, get_xbits)(GetBitContext *s, int n, const char *file, int line, const char *func)
 {
-    GB_DEBUG_LOG("[%s][%d][%s] %s()\n", file, line, func, __func__);
+    GB_DEBUG_LOG("[%s][%d][%s] %s(%d)\n", file, line, func, __func__, n);
     return get_xbits(s, n);
 }
 
 int AV_JOIN(dbg_, get_xbits_le)(GetBitContext *s, int n, const char *file, int line, const char *func);
 int AV_JOIN(dbg_, get_xbits_le)(GetBitContext *s, int n, const char *file, int line, const char *func)
 {
-    GB_DEBUG_LOG("[%s][%d][%s] %s()\n", file, line, func, __func__);
+    GB_DEBUG_LOG("[%s][%d][%s] %s(%d)\n", file, line, func, __func__, n);
     return get_xbits_le(s, n);
 }
 
 int AV_JOIN(dbg_, get_sbits)(GetBitContext *s, int n, const char *file, int line, const char *func);
 int AV_JOIN(dbg_, get_sbits)(GetBitContext *s, int n, const char *file, int line, const char *func)
 {
-    GB_DEBUG_LOG("[%s][%d][%s] %s()\n", file, line, func, __func__);
+    GB_DEBUG_LOG("[%s][%d][%s] %s(%d)\n", file, line, func, __func__, n);
     return get_sbits(s, n);
 }
 
 unsigned int AV_JOIN(dbg_, get_bits)(GetBitContext *s, int n, const char *file, int line, const char *func);
 unsigned int AV_JOIN(dbg_, get_bits)(GetBitContext *s, int n, const char *file, int line, const char *func)
 {
-    GB_DEBUG_LOG("[%s][%d][%s] %s()\n", file, line, func, __func__);
+    GB_DEBUG_LOG("[%s][%d][%s] %s(%d)\n", file, line, func, __func__, n);
     return get_bits(s, n);
 }
 
 int AV_JOIN(dbg_, get_bitsz)(GetBitContext *s, int n, const char *file, int line, const char *func);
 int AV_JOIN(dbg_, get_bitsz)(GetBitContext *s, int n, const char *file, int line, const char *func)
 {
-    GB_DEBUG_LOG("[%s][%d][%s] %s()\n", file, line, func, __func__);
+    GB_DEBUG_LOG("[%s][%d][%s] %s(%d)\n", file, line, func, __func__, n);
     return get_bitsz(s, n);
 }
 
 unsigned int AV_JOIN(dbg_, get_bits_le)(GetBitContext *s, int n, const char *file, int line, const char *func);
 unsigned int AV_JOIN(dbg_, get_bits_le)(GetBitContext *s, int n, const char *file, int line, const char *func)
 {
-    GB_DEBUG_LOG("[%s][%d][%s] %s()\n", file, line, func, __func__);
+    GB_DEBUG_LOG("[%s][%d][%s] %s(%d)\n", file, line, func, __func__, n);
     return get_bits_le(s, n);
 }
 
 unsigned int AV_JOIN(dbg_, show_bits)(GetBitContext *s, int n, const char *file, int line, const char *func);
 unsigned int AV_JOIN(dbg_, show_bits)(GetBitContext *s, int n, const char *file, int line, const char *func)
 {
-    GB_DEBUG_LOG("[%s][%d][%s] %s()\n", file, line, func, __func__);
+    GB_DEBUG_LOG("[%s][%d][%s] %s(%d)\n", file, line, func, __func__, n);
     return show_bits(s, n);
 }
 
 void AV_JOIN(dbg_, skip_bits)(GetBitContext *s, int n, const char *file, int line, const char *func);
 void AV_JOIN(dbg_, skip_bits)(GetBitContext *s, int n, const char *file, int line, const char *func)
 {
-    GB_DEBUG_LOG("[%s][%d][%s] %s()\n", file, line, func, __func__);
+    GB_DEBUG_LOG("[%s][%d][%s] %s(%d)\n", file, line, func, __func__, n);
     return skip_bits(s, n);
 }
 
@@ -499,28 +499,28 @@ void AV_JOIN(dbg_, skip_bits1)(GetBitContext *s, const char *file, int line, con
 unsigned int AV_JOIN(dbg_, get_bits_long)(GetBitContext *s, int n, const char *file, int line, const char *func);
 unsigned int AV_JOIN(dbg_, get_bits_long)(GetBitContext *s, int n, const char *file, int line, const char *func)
 {
-    GB_DEBUG_LOG("[%s][%d][%s] %s()\n", file, line, func, __func__);
+    GB_DEBUG_LOG("[%s][%d][%s] %s(%d)\n", file, line, func, __func__, n);
     return get_bits_long(s, n);
 }
 
 uint64_t AV_JOIN(dbg_, get_bits64)(GetBitContext *s, int n, const char *file, int line, const char *func);
 uint64_t AV_JOIN(dbg_, get_bits64)(GetBitContext *s, int n, const char *file, int line, const char *func)
 {
-    GB_DEBUG_LOG("[%s][%d][%s] %s()\n", file, line, func, __func__);
+    GB_DEBUG_LOG("[%s][%d][%s] %s(%d)\n", file, line, func, __func__, n);
     return get_bits64(s, n);
 }
 
 int AV_JOIN(dbg_, get_sbits_long)(GetBitContext *s, int n, const char *file, int line, const char *func);
 int AV_JOIN(dbg_, get_sbits_long)(GetBitContext *s, int n, const char *file, int line, const char *func)
 {
-    GB_DEBUG_LOG("[%s][%d][%s] %s()\n", file, line, func, __func__);
+    GB_DEBUG_LOG("[%s][%d][%s] %s(%d)\n", file, line, func, __func__, n);
     return get_sbits_long(s, n);
 }
 
 unsigned int AV_JOIN(dbg_, show_bits_long)(GetBitContext *s, int n, const char *file, int line, const char *func);
 unsigned int AV_JOIN(dbg_, show_bits_long)(GetBitContext *s, int n, const char *file, int line, const char *func)
 {
-    GB_DEBUG_LOG("[%s][%d][%s] %s()\n", file, line, func, __func__);
+    GB_DEBUG_LOG("[%s][%d][%s] %s(%d)\n", file, line, func, __func__, n);
     return show_bits_long(s, n);
 }
 
