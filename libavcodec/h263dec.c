@@ -455,6 +455,7 @@ int ff_h263_decode_frame(AVCodecContext *avctx, void *data, int *got_frame,
     int ret;
     int slice_ret = 0;
     AVFrame *pict = data;
+    PutBitContext retry_pb;
 
     memcpy(s->cas9_sd, avpkt->cas9_sd, sizeof(s->cas9_sd));
 
@@ -524,6 +525,10 @@ retry:
         s->gb.pb = cas9_transplicate_pb(&s->cas9_xp);
     }
 
+    retry_pb.buf = NULL;
+    if ( s->cas9_xp.o_pb != NULL )
+        retry_pb = *cas9_transplicate_pb(&s->cas9_xp);
+
     if (!s->context_initialized)
         // we need the idct permutation for reading a custom matrix
         ff_mpv_idct_init(s);
@@ -586,7 +591,11 @@ retry:
 
     if (CONFIG_MPEG4_DECODER && avctx->codec_id == AV_CODEC_ID_MPEG4) {
         if (ff_mpeg4_workaround_bugs(avctx) == 1)
+        {
+            if ( retry_pb.buf != NULL )
+                cas9_transplicate_restore(&s->cas9_xp, &retry_pb);
             goto retry;
+        }
     }
 
     /* After H.263 & MPEG-4 header decode we have the height, width,
