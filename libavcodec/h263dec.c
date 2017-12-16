@@ -30,6 +30,7 @@
 #define UNCHECKED_BITSTREAM_READER 1
 
 #include "libavutil/cas9.h"
+#include "libavutil/cas9_json.h"
 #include "libavutil/cpu.h"
 #include "avcodec.h"
 #include "error_resilience.h"
@@ -422,13 +423,21 @@ cas9_h263_export_init(MpegEncContext *s)
     if ( (s->avctx->cas9_export & (1 << CAS9_FEAT_INFO)) != 0 )
     {
         json_object *jframe = json_object_new_object();
+        json_object *jobj;
+        int one = 1;
 
-        json_object *jpict_type = json_object_new_string(
-                   s->pict_type == AV_PICTURE_TYPE_I ? "I" :
-                  (s->pict_type == AV_PICTURE_TYPE_P ? "P" :
-                  (s->pict_type == AV_PICTURE_TYPE_B ? "B" : "S")));
+        jobj = json_object_new_string(
+             s->pict_type == AV_PICTURE_TYPE_I ? "I" :
+            (s->pict_type == AV_PICTURE_TYPE_P ? "P" :
+            (s->pict_type == AV_PICTURE_TYPE_B ? "B" : "S")));
 
-        json_object_object_add(jframe, "pict_type", jpict_type);
+        json_object_object_add(jframe, "pict_type", jobj);
+
+        jobj = cas9_jmb_new(s->mb_width, s->mb_height,
+                            one, &one, &one,
+                            cas9_array_line_to_json_string, NULL);
+
+        json_object_object_add(jframe, "mb_type", jobj);
 
         f->cas9_sd[CAS9_FEAT_INFO] = jframe;
     }

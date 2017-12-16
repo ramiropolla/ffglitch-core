@@ -35,6 +35,7 @@
 #include "libavutil/internal.h"
 #include "libavutil/mathematics.h"
 #include "libavutil/cas9.h"
+#include "libavutil/cas9_json.h"
 #include "avcodec.h"
 #include "mpegvideo.h"
 #include "h263.h"
@@ -74,6 +75,26 @@ static const int h263_mb_type_b_map[15]= {
     MB_TYPE_INTRA4x4                | MB_TYPE_CBP,
     MB_TYPE_INTRA4x4                | MB_TYPE_CBP | MB_TYPE_QUANT,
 };
+
+static void cas9_mb_type_str(char *buf, int mb_type)
+{
+    *buf++ = (mb_type & MB_TYPE_INTRA)      ? 'I'
+           : (mb_type & MB_TYPE_DIRECT2)    ? 'D'
+           :                                  ' ';
+    *buf++ = (mb_type & MB_TYPE_CBP)        ? 'c' : ' ';
+    *buf++ = (mb_type & MB_TYPE_QUANT)      ? 'q' : ' ';
+    *buf++ = (mb_type & MB_TYPE_16x16)      ? 'F'
+           : (mb_type & MB_TYPE_16x8)       ? 'H'
+           : (mb_type & MB_TYPE_8x8)        ? '4'
+           :                                  ' ';
+    *buf++ = (mb_type & MB_TYPE_GMC)        ? 'G' : ' ';
+    *buf++ = (mb_type & MB_TYPE_L0)         ? 'f' : ' ';
+    *buf++ = (mb_type & MB_TYPE_L1)         ? 'b' : ' ';
+    *buf++ = (mb_type & MB_TYPE_ACPRED)     ? 'a' : ' ';
+    *buf++ = (mb_type & MB_TYPE_INTERLACED) ? 'i' : ' ';
+    *buf++ = (mb_type & MB_TYPE_SKIP)       ? 'S' : ' ';
+    *buf = '\0';
+}
 
 void ff_h263_show_pict_info(MpegEncContext *s){
     if(s->avctx->debug&FF_DEBUG_PICT_INFO){
@@ -1002,6 +1023,21 @@ intra:
             preview_obmc(s);
     }
 end:
+
+    if ( (s->avctx->cas9_export & (1 << CAS9_FEAT_INFO)) != 0 )
+    {
+        char buf[16];
+        AVFrame *f = s->current_picture_ptr->f;
+        json_object *jframe = f->cas9_sd[CAS9_FEAT_INFO];
+        json_object *jmb_type;
+        json_object *jso;
+
+        json_object_object_get_ex(jframe, "mb_type", &jmb_type);
+
+        cas9_mb_type_str(buf, s->current_picture.mb_type[xy]);
+        jso = json_object_new_string(buf);
+        cas9_jmb_set(jmb_type, 0, s->mb_y, s->mb_x, 0, jso);
+    }
 
     if (get_bits_left(&s->gb) < 0)
         return AVERROR_INVALIDDATA;

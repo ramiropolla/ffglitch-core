@@ -107,6 +107,7 @@ static void cas9_mb_type_str(char *buf, int mb_type)
     *buf++ = (mb_type & MB_TYPE_INTRA)   ? 'I' : ' ';
     *buf++ = (mb_type & MB_TYPE_CBP)     ? 'c' : ' ';
     *buf++ = (mb_type & MB_TYPE_QUANT)   ? 'q' : ' ';
+    *buf++ = (mb_type & MB_TYPE_16x16)   ? 'F' : ' ';
     *buf++ = (mb_type & MB_TYPE_L0)      ? 'f' : ' ';
     *buf++ = (mb_type & MB_TYPE_L1)      ? 'b' : ' ';
     *buf++ = (mb_type & MB_TYPE_ZERO_MV) ? '0' : ' ';
