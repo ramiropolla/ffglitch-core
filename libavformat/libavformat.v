@@ -12,6 +12,7 @@ LIBAVFORMAT_MAJOR {
         ffurl_close;
         ffurl_open;
         ffurl_write;
+        cas9_*;
     local:
         *;
 };
