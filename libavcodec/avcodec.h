@@ -1109,6 +1109,10 @@ typedef struct RcOverride{
  */
 #define AV_CODEC_CAP_ENCODER_REORDERED_OPAQUE (1 << 20)
 
+/* ffedit */
+#define AV_CODEC_CAP_FFEDIT_BITSTREAM     (1 << 21)
+#define AV_CODEC_CAP_FFEDIT_SLICE_THREADS (1 << 22)
+
 /* Exported side data.
    These flags can be passed in AVCodecContext.export_side_data before initialization.
 */
@@ -1544,6 +1548,12 @@ typedef struct AVPacket {
     AVPacketSideData *side_data;
     int side_data_elems;
 
+    /* ffedit JSON context */
+    void *jctx; // json_ctx_t *
+
+    /* ffedit side data */
+    void *ffedit_sd[32]; // should be at least [FFEDIT_FEAT_LAST]
+
     /**
      * Duration of this packet in AVStream->time_base units, 0 if unknown.
      * Equals next_pts - this_pts in presentation order.
@@ -1645,6 +1655,9 @@ typedef struct AVCodecContext {
      */
     unsigned int codec_tag;
 
+    void *ffedit_out;
+    size_t ffedit_out_size;
+
     void *priv_data;
 
     /**
@@ -1706,6 +1719,11 @@ typedef struct AVCodecContext {
      * - decoding: Set by user.
      */
     int flags2;
+
+    /* ffedit features */
+    uint64_t ffedit_export;
+    uint64_t ffedit_import;
+    uint64_t ffedit_apply;
 
     /**
      * some codecs need / can use extradata like Huffman tables.
@@ -3699,6 +3717,9 @@ typedef struct AVCodec {
      * List of supported codec_tags, terminated by FF_CODEC_TAGS_END.
      */
     const uint32_t *codec_tags;
+
+    /* ffedit features */
+    int ffedit_features;
 } AVCodec;
 
 #if FF_API_CODEC_GET_SET
