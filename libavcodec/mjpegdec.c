@@ -782,9 +782,8 @@ static inline int mjpeg_decode_dc(MJpegDecodeContext *s, int dc_index)
     }
 
     if (code)
-        return get_xbits(&s->gb, code);
-    else
-        return 0;
+        code = get_xbits(&s->gb, code);
+    return code;
 }
 
 /* decode block and dequantize */
