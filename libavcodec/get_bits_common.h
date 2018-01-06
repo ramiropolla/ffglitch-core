@@ -25,4 +25,9 @@ typedef struct GetBitContext {
 #   define MIN_CACHE_BITS 25
 #endif
 
+#ifdef CONFIG_FFGLITCH_XP_DEBUG
+#define AV_GLUE3(a, b, c) a ## b ## c
+#define AV_JOIN3(a, b, c) AV_GLUE3(a, b, c)
+#endif
+
 #endif /* AVCODEC_GET_BITS_COMMON_H */

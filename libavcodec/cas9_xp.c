@@ -55,6 +55,20 @@ void cas9_transplicate_free(CAS9TransplicateContext *xp)
     av_packet_free(&xp->o_pkt);
 }
 
+#ifdef CONFIG_FFGLITCH_XP_DEBUG
+/*-------------------------------------------------------------------*/
+static char *dump_byte(char *buf, uint8_t val)
+{
+    for ( int i = 0; i < 8; i++ )
+    {
+        int bit = val & (1<<(8-i-1));
+        *buf++ = !!bit + '0';
+    }
+    *buf = '\0';
+    return buf;
+}
+#endif
+
 /*-------------------------------------------------------------------*/
 void cas9_transplicate_flush(
         AVCodecContext *avctx,
@@ -70,6 +84,43 @@ void cas9_transplicate_flush(
     avctx->cas9_out = av_malloc(avctx->cas9_out_size);
     memcpy(avctx->cas9_out, xp->o_pkt->data, avctx->cas9_out_size);
     cas9_transplicate_free(xp);
+#ifdef CONFIG_FFGLITCH_XP_DEBUG
+    /* Check only when replicating */
+    if ( avctx->cas9_apply == (1 << CAS9_FEAT_LAST) )
+    {
+        const uint8_t *inptr = avctx->cas9_out;
+        size_t out_size = avctx->cas9_out_size;
+        for ( int i = 0; i < out_size; i++ )
+        {
+            if ( inptr[i] != pkt->data[i] )
+            {
+                char buf1[(8+1)*8 + 1];
+                char buf2[(8+1)*8 + 1];
+                char *ptr1 = buf1;
+                char *ptr2 = buf2;
+                int start = FFMAX(0, i-2);
+                int end = FFMIN(out_size, i+6);
+                int j;
+                for ( j = 0; j < 8; j++ )
+                    if ( (inptr[i] & (1<<(8-j-1))) != (pkt->data[i] & (1<<(8-j-1))) )
+                        break;
+                if ( i * 8 + j >= bitcount )
+                    continue;
+                for ( int k = start; k < end; k++ )
+                {
+                    *ptr1++ = ' ';
+                    ptr1 = dump_byte(ptr1, pkt->data[k]);
+                    *ptr2++ = ' ';
+                    ptr2 = dump_byte(ptr2, inptr[k]);
+                }
+                av_log(NULL, AV_LOG_FATAL, "orig %d: %s\n", start * 8, buf1);
+                av_log(NULL, AV_LOG_FATAL, "cas9 %d: %s\n", start * 8, buf2);
+                av_log(NULL, AV_LOG_FATAL, "ffglitch replication mismatch at bit %d + %d (bitcount %d)\n", i * 8, j, bitcount);
+                av_assert0(0);
+            }
+        }
+    }
+#endif
 }
 
 /*-------------------------------------------------------------------*/
