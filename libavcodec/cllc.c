@@ -106,8 +106,6 @@ static int read_argb_line(CLLCContext *ctx, GetBitContext *gb, int *top_left,
     int code;
     int i;
 
-    OPEN_READER(bits, gb);
-
     dst     = outbuf;
     pred[0] = top_left[0];
     pred[1] = top_left[1];
@@ -116,8 +114,7 @@ static int read_argb_line(CLLCContext *ctx, GetBitContext *gb, int *top_left,
 
     for (i = 0; i < ctx->avctx->width; i++) {
         /* Always get the alpha component */
-        UPDATE_CACHE(bits, gb);
-        GET_VLC(code, bits, gb, vlc[0].table, VLC_BITS, VLC_DEPTH);
+        code = get_vlc2(gb, vlc[0].table, VLC_BITS, VLC_DEPTH);
 
         pred[0] += code;
         dst[0]   = pred[0];
@@ -125,22 +122,19 @@ static int read_argb_line(CLLCContext *ctx, GetBitContext *gb, int *top_left,
         /* Skip the components if they are  entirely transparent */
         if (dst[0]) {
             /* Red */
-            UPDATE_CACHE(bits, gb);
-            GET_VLC(code, bits, gb, vlc[1].table, VLC_BITS, VLC_DEPTH);
+            code = get_vlc2(gb, vlc[1].table, VLC_BITS, VLC_DEPTH);
 
             pred[1] += code;
             dst[1]   = pred[1];
 
             /* Green */
-            UPDATE_CACHE(bits, gb);
-            GET_VLC(code, bits, gb, vlc[2].table, VLC_BITS, VLC_DEPTH);
+            code = get_vlc2(gb, vlc[2].table, VLC_BITS, VLC_DEPTH);
 
             pred[2] += code;
             dst[2]   = pred[2];
 
             /* Blue */
-            UPDATE_CACHE(bits, gb);
-            GET_VLC(code, bits, gb, vlc[3].table, VLC_BITS, VLC_DEPTH);
+            code = get_vlc2(gb, vlc[3].table, VLC_BITS, VLC_DEPTH);
 
             pred[3] += code;
             dst[3]   = pred[3];
@@ -152,8 +146,6 @@ static int read_argb_line(CLLCContext *ctx, GetBitContext *gb, int *top_left,
 
         dst += 4;
     }
-
-    CLOSE_READER(bits, gb);
 
     top_left[0]  = outbuf[0];
 
@@ -174,22 +166,17 @@ static int read_rgb24_component_line(CLLCContext *ctx, GetBitContext *gb,
     int pred, code;
     int i;
 
-    OPEN_READER(bits, gb);
-
     dst  = outbuf;
     pred = *top_left;
 
     /* Simultaneously read and restore the line */
     for (i = 0; i < ctx->avctx->width; i++) {
-        UPDATE_CACHE(bits, gb);
-        GET_VLC(code, bits, gb, vlc->table, VLC_BITS, VLC_DEPTH);
+        code = get_vlc2(gb, vlc->table, VLC_BITS, VLC_DEPTH);
 
         pred  += code;
         dst[0] = pred;
         dst   += 3;
     }
-
-    CLOSE_READER(bits, gb);
 
     /* Stash the first pixel */
     *top_left = outbuf[0];
@@ -204,20 +191,15 @@ static int read_yuv_component_line(CLLCContext *ctx, GetBitContext *gb,
     int pred, code;
     int i;
 
-    OPEN_READER(bits, gb);
-
     pred = *top_left;
 
     /* Simultaneously read and restore the line */
     for (i = 0; i < ctx->avctx->width >> is_chroma; i++) {
-        UPDATE_CACHE(bits, gb);
-        GET_VLC(code, bits, gb, vlc->table, VLC_BITS, VLC_DEPTH);
+        code = get_vlc2(gb, vlc->table, VLC_BITS, VLC_DEPTH);
 
         pred     += code;
         outbuf[i] = pred;
     }
-
-    CLOSE_READER(bits, gb);
 
     /* Stash the first pixel */
     *top_left = outbuf[0];
