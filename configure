@@ -428,6 +428,8 @@ Optimization options (experts only):
   --disable-fast-unaligned consider unaligned accesses slow
 
 Developer options (useful when working on FFmpeg itself):
+  --ffglitch-xp-debug      enable extra debugging for ffglitch transplication
+                           (put_bits and get_bits)
   --disable-debug          disable debugging symbols
   --enable-debug=LEVEL     set the debug level [$debuglevel]
   --disable-optimizations  disable compiler optimizations
@@ -2168,6 +2170,7 @@ CONFIG_EXTRA="
     faandct
     faanidct
     fdctdsp
+    ffglitch_xp_debug
     flacdsp
     fmtconvert
     frame_thread_encoder
@@ -3673,6 +3676,9 @@ for opt do
         ;;
         --disable-devices)
             disable $INDEV_LIST $OUTDEV_LIST
+        ;;
+        --ffglitch-xp-debug)
+            enable ffglitch_xp_debug
         ;;
         --enable-debug=*)
             debuglevel="$optval"

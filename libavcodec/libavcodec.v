@@ -8,6 +8,8 @@ LIBAVCODEC_MAJOR {
         get_ue_golomb_long;
         get_ur_golomb_shorten;
         cas9_*;
+        dbg_gb_*;
+        dbg_pb_*;
     local:
         *;
 };
