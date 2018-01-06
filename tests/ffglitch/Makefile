@@ -7,6 +7,7 @@ CAS9_JSON=$(SRC_PATH)/tests/ffglitch/json
 
 include $(SRC_PATH)/tests/ffglitch/mpeg12.mak
 include $(SRC_PATH)/tests/ffglitch/mjpeg.mak
+include $(SRC_PATH)/tests/ffglitch/mpeg4.mak
 
 .PHONY: $(FFGLITCH_TESTS)
 ffglitch-tests: $(FFGLITCH_TESTS)

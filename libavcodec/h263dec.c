@@ -44,6 +44,7 @@
 #include "qpeldsp.h"
 #include "thread.h"
 #include "wmv2.h"
+#include "cas9.h"
 
 static enum AVPixelFormat h263_get_format(AVCodecContext *avctx)
 {
@@ -151,6 +152,9 @@ av_cold int ff_h263_decode_end(AVCodecContext *avctx)
     MpegEncContext *s = avctx->priv_data;
 
     ff_mpv_common_end(s);
+
+    cas9_transplicate_free(&s->cas9_xp);
+
     return 0;
 }
 
@@ -415,6 +419,7 @@ int ff_h263_decode_frame(AVCodecContext *avctx, void *data, int *got_frame,
     int ret;
     int slice_ret = 0;
     AVFrame *pict = data;
+    PutBitContext retry_pb;
 
     /* no supplementary picture */
     if (buf_size == 0) {
@@ -474,6 +479,18 @@ retry:
     if (ret < 0)
         return ret;
 
+    if ( (avctx->cas9_apply & (1 << CAS9_FEAT_LAST)) != 0 )
+    {
+        ret = cas9_transplicate_init(avctx, &s->cas9_xp, 0x100000);
+        if ( ret < 0 )
+            return ret;
+        s->gb.pb = cas9_transplicate_pb(&s->cas9_xp);
+    }
+
+    retry_pb.buf = NULL;
+    if ( s->cas9_xp.o_pb != NULL )
+        retry_pb = *cas9_transplicate_pb(&s->cas9_xp);
+
     if (!s->context_initialized)
         // we need the idct permutation for reading a custom matrix
         ff_mpv_idct_init(s);
@@ -508,7 +525,10 @@ retry:
         }
     }
     if (ret == FRAME_SKIPPED)
-        return get_consumed_bytes(s, buf_size);
+    {
+        ret = get_consumed_bytes(s, buf_size);
+        goto the_end;
+    }
 
     /* skip if the header was thrashed */
     if (ret < 0) {
@@ -533,7 +553,11 @@ retry:
 
     if (CONFIG_MPEG4_DECODER && avctx->codec_id == AV_CODEC_ID_MPEG4) {
         if (ff_mpeg4_workaround_bugs(avctx) == 1)
+        {
+            if ( retry_pb.buf != NULL )
+                cas9_transplicate_restore(&s->cas9_xp, &retry_pb);
             goto retry;
+        }
     }
 
     /* After H.263 & MPEG-4 header decode we have the height, width,
@@ -574,19 +598,30 @@ retry:
     /* skip B-frames if we don't have reference frames */
     if (!s->last_picture_ptr &&
         (s->pict_type == AV_PICTURE_TYPE_B || s->droppable))
-        return get_consumed_bytes(s, buf_size);
+    {
+        ret = get_consumed_bytes(s, buf_size);
+        goto the_end;
+    }
     if ((avctx->skip_frame >= AVDISCARD_NONREF &&
          s->pict_type == AV_PICTURE_TYPE_B)    ||
         (avctx->skip_frame >= AVDISCARD_NONKEY &&
          s->pict_type != AV_PICTURE_TYPE_I)    ||
         avctx->skip_frame >= AVDISCARD_ALL)
-        return get_consumed_bytes(s, buf_size);
+    {
+        ret = get_consumed_bytes(s, buf_size);
+        goto the_end;
+    }
 
     if (s->next_p_frame_damaged) {
         if (s->pict_type == AV_PICTURE_TYPE_B)
-            return get_consumed_bytes(s, buf_size);
+        {
+            ret = get_consumed_bytes(s, buf_size);
+            goto the_end;
+        }
         else
+        {
             s->next_p_frame_damaged = 0;
+        }
     }
 
     if ((!s->no_rounding) || s->pict_type == AV_PICTURE_TYPE_B) {
@@ -656,6 +691,12 @@ retry:
 
     av_assert1(s->bitstream_buffer_size == 0);
 frame_end:
+    if ( s->codec_id == AV_CODEC_ID_MPEG4
+      && s->avctx->cas9_apply != 0 )
+    {
+        PutBitContext *opb = cas9_transplicate_pb(&s->cas9_xp);
+        ff_mpeg4_stuffing(opb);
+    }
     ff_er_frame_end(&s->er);
 
     if (avctx->hwaccel) {
@@ -706,9 +747,15 @@ frame_end:
     }
 
     if (slice_ret < 0 && (avctx->err_recognition & AV_EF_EXPLODE))
-        return slice_ret;
+        ret = slice_ret;
     else
-        return get_consumed_bytes(s, buf_size);
+        ret = get_consumed_bytes(s, buf_size);
+
+the_end:
+    if ( (avctx->cas9_apply & (1 << CAS9_FEAT_LAST)) != 0 )
+        cas9_transplicate_flush(avctx, &s->cas9_xp, avpkt);
+
+    return ret;
 }
 
 const enum AVPixelFormat ff_h263_hwaccel_pixfmt_list_420[] = {
@@ -738,6 +785,7 @@ AVCodec ff_h263_decoder = {
     .close          = ff_h263_decode_end,
     .decode         = ff_h263_decode_frame,
     .capabilities   = AV_CODEC_CAP_DRAW_HORIZ_BAND | AV_CODEC_CAP_DR1 |
+                      AV_CODEC_CAP_CAS9_BITSTREAM |
                       AV_CODEC_CAP_TRUNCATED | AV_CODEC_CAP_DELAY,
     .caps_internal  = FF_CODEC_CAP_SKIP_FRAME_FILL_PARAM,
     .flush          = ff_mpeg_flush,
@@ -755,6 +803,7 @@ AVCodec ff_h263p_decoder = {
     .close          = ff_h263_decode_end,
     .decode         = ff_h263_decode_frame,
     .capabilities   = AV_CODEC_CAP_DRAW_HORIZ_BAND | AV_CODEC_CAP_DR1 |
+                      AV_CODEC_CAP_CAS9_BITSTREAM |
                       AV_CODEC_CAP_TRUNCATED | AV_CODEC_CAP_DELAY,
     .caps_internal  = FF_CODEC_CAP_SKIP_FRAME_FILL_PARAM,
     .flush          = ff_mpeg_flush,
