@@ -1,6 +1,15 @@
 Files without standard license headers:
 compat/avisynth/windowsPorts/basicDataTypeConversions.h
 compat/avisynth/windowsPorts/windows2linux.h
+fftools/ffedit.c
+libavcodec/ffedit.c
+libavcodec/ffedit.h
+libavcodec/ffedit_json.c
+libavcodec/ffedit_json.h
+libavcodec/ffedit_mv.c
+libavcodec/ffedit_mv.h
+libavcodec/ffedit_xp.c
+libavcodec/ffedit_xp.h
 libavcodec/file_open.c
 libavcodec/get_bits.c
 libavcodec/get_bits.h
@@ -22,9 +31,15 @@ libavdevice/file_open.c
 libavdevice/reverse.c
 libavfilter/af_arnndn.c
 libavfilter/log2_tab.c
+libavformat/ffedit.c
+libavformat/ffedit.h
 libavformat/file_open.c
 libavformat/golomb_tab.c
 libavformat/log2_tab.c
+libavutil/json.c
+libavutil/json.h
+libavutil/json_dump.c
+libavutil/json_parse.c
 libswresample/log2_tab.c
 libswscale/log2_tab.c
 tools/uncoded_frame.c
@@ -40,10 +55,13 @@ compat/avisynth/windowsPorts/windows2linux.h
 compat/djgpp/math.h
 compat/float/float.h
 compat/float/limits.h
+libavcodec/ffedit.h
+libavcodec/ffedit_json.h
 libavcodec/get_bits_funcs.h
 libavcodec/get_bits_impl.h
 libavcodec/get_bits_undef.h
 libavcodec/put_bits_funcs.h
 libavcodec/put_bits_impl.h
+libavutil/json.h
 Use of av_clip() where av_clip_uintp2() could be used:
 Use of av_clip() where av_clip_intp2() could be used:

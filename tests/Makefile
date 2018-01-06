@@ -11,7 +11,7 @@ $(AREF): CMP=
 
 APITESTSDIR := tests/api
 DNNTESTSDIR := tests/dnn
-FATE_OUTDIRS = tests/data tests/data/fate tests/data/filtergraphs tests/data/lavf tests/data/lavf-fate tests/data/pixfmt tests/vsynth1 $(APITESTSDIR) $(DNNTESTSDIR)
+FATE_OUTDIRS = tests/data tests/data/fate tests/data/filtergraphs tests/data/lavf tests/data/lavf-fate tests/data/pixfmt tests/vsynth1 $(APITESTSDIR) $(DNNTESTSDIR) tests/ffedit/
 OUTDIRS += $(FATE_OUTDIRS)
 
 $(VREF): tests/videogen$(HOSTEXESUF) | tests/vsynth1
@@ -270,6 +270,8 @@ testclean::
 -include $(wildcard tests/*.d)
 
 include $(SRC_PATH)/tests/checkasm/Makefile
+
+include $(SRC_PATH)/tests/ffedit/Makefile
 
 .PHONY: fate* lcov lcov-reset
 .INTERMEDIATE: coverage.info

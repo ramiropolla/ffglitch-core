@@ -1899,6 +1899,7 @@ PROGRAM_LIST="
     ffplay
     ffprobe
     ffmpeg
+    ffedit
 "
 
 SUBSYSTEM_LIST="
@@ -3659,6 +3660,7 @@ ffplay_select="rdft crop_filter transpose_filter hflip_filter vflip_filter rotat
 ffplay_suggest="shell32"
 ffprobe_deps="avcodec avformat"
 ffprobe_suggest="shell32"
+ffedit_deps="avcodec avformat"
 
 # documentation
 podpages_deps="perl"

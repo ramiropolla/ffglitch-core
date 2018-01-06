@@ -38,6 +38,8 @@
 #include "libavcodec/exif.h"
 #include "libavcodec/internal.h"
 
+#include "ffedit.h"
+
 typedef struct AVIStream {
     int64_t frame_offset;   /* current frame (video) or byte (audio) counter
                              * (used to compute the pts) */
@@ -113,6 +115,7 @@ static const AVMetadataConv avi_metadata_conv[] = {
     { 0 },
 };
 
+static int avi_read_idx1(AVFormatContext *s, int size);
 static int avi_load_index(AVFormatContext *s);
 static int guess_ni_flag(AVFormatContext *s);
 
@@ -132,15 +135,22 @@ static inline int get_duration(AVIStream *ast, int len)
 
 static int get_riff(AVFormatContext *s, AVIOContext *pb)
 {
+    FFEditOutputContext *ectx = s->ectx;
+    int64_t pos_in_file;
+    int size;
     AVIContext *avi = s->priv_data;
     char header[8] = {0};
     int i;
 
     /* check RIFF header */
     avio_read(pb, header, 4);
-    avi->riff_end  = avio_rl32(pb); /* RIFF chunk size */
-    avi->riff_end += avio_tell(pb); /* RIFF chunk end */
+    pos_in_file = avio_tell(pb);
+    size = avio_rl32(pb);
+    avi->riff_end  = size;            /* RIFF chunk size */
+    avi->riff_end += pos_in_file + 4; /* RIFF chunk end */
     avio_read(pb, header + 4, 4);
+
+    ffe_output_fixup(ectx, FFEDIT_FIXUP_SIZE, pos_in_file, size, pos_in_file + 4, size);
 
     for (i = 0; avi_headers[i][0]; i++)
         if (!memcmp(header, avi_headers[i], 8))
@@ -157,6 +167,7 @@ static int get_riff(AVFormatContext *s, AVIOContext *pb)
 
 static int read_odml_index(AVFormatContext *s, int frame_num)
 {
+    FFEditOutputContext *ectx = s->ectx;
     AVIContext *avi     = s->priv_data;
     AVIOContext *pb     = s->pb;
     int longs_per_entry = avio_rl16(pb);
@@ -210,10 +221,19 @@ static int read_odml_index(AVFormatContext *s, int frame_num)
 
     for (i = 0; i < entries_in_use; i++) {
         if (index_type) {
+            int64_t pos_in_file = avio_tell(pb);
+
             int64_t pos = avio_rl32(pb) + base - 8;
+            int64_t orig_pos = pos;
             int len     = avio_rl32(pb);
+            int64_t orig_len = len;
             int key     = len >= 0;
             len &= 0x7FFFFFFF;
+
+            ffe_output_fixup(ectx, FFEDIT_FIXUP_OFFSET, pos_in_file, orig_pos, pos, 0);
+            ffe_output_fixup(ectx, FFEDIT_FIXUP_SIZE, pos_in_file + 4, orig_len, pos, len);
+            ffe_output_fixup(ectx, FFEDIT_FIXUP_SIZE, pos + 4, orig_len, pos + 8, len);
+            ffe_output_padding(ectx, pos + 8 + len, len & 1, 0x00, 2);
 
             av_log(s, AV_LOG_TRACE, "pos:%"PRId64", len:%X\n", pos, len);
 
@@ -466,6 +486,7 @@ static int calculate_bitrate(AVFormatContext *s)
 
 static int avi_read_header(AVFormatContext *s)
 {
+    FFEditOutputContext *ectx = s->ectx;
     AVIContext *avi = s->priv_data;
     AVIOContext *pb = s->pb;
     unsigned int tag, tag1, handler;
@@ -498,10 +519,16 @@ static int avi_read_header(AVFormatContext *s)
     codec_type   = -1;
     frame_period = 0;
     for (;;) {
+        int64_t pos_in_file;
+
         if (avio_feof(pb))
             goto fail;
         tag  = avio_rl32(pb);
+        pos_in_file = avio_tell(pb);
         size = avio_rl32(pb);
+
+        ffe_output_fixup(ectx, FFEDIT_FIXUP_SIZE, pos_in_file, size, pos_in_file + 4, size);
+        ffe_output_padding(ectx, pos_in_file + 4 + size, size & 1, 0x00, 2);
 
         print_tag(s, "tag", tag, size);
 
@@ -947,10 +974,7 @@ FF_ENABLE_DEPRECATION_WARNINGS
             break;
         case MKTAG('i', 'n', 'd', 'x'):
             pos = avio_tell(pb);
-            if ((pb->seekable & AVIO_SEEKABLE_NORMAL) && !(s->flags & AVFMT_FLAG_IGNIDX) &&
-                avi->use_odml &&
-                read_odml_index(s, 0) < 0 &&
-                (s->error_recognition & AV_EF_EXPLODE))
+            if ( read_odml_index(s, 0) < 0 )
                 goto fail;
             avio_seek(pb, pos + size, SEEK_SET);
             break;
@@ -1002,11 +1026,15 @@ FF_ENABLE_DEPRECATION_WARNINGS
                 avi->movi_end  = avi->fsize;
                 goto end_of_header;
             }
-        /* Do not fail for very large idx1 tags */
-        case MKTAG('i', 'd', 'x', '1'):
             /* skip tag */
             size += (size & 1);
             avio_skip(pb, size);
+            break;
+        case MKTAG('i', 'd', 'x', '1'):
+            pos = avio_tell(pb);
+            if ( avi_read_idx1(s, size) < 0 )
+                goto fail;
+            avio_seek(pb, pos + size, SEEK_SET);
             break;
         }
     }
@@ -1551,6 +1579,7 @@ resync:
  * for each stream. */
 static int avi_read_idx1(AVFormatContext *s, int size)
 {
+    FFEditOutputContext *ectx = s->ectx;
     AVIContext *avi = s->priv_data;
     AVIOContext *pb = s->pb;
     int nb_index_entries, i;
@@ -1581,6 +1610,9 @@ static int avi_read_idx1(AVFormatContext *s, int size)
 
     /* Read the entries and sort them in each stream component. */
     for (i = 0; i < nb_index_entries; i++) {
+        int64_t pos_in_file = avio_tell(pb);
+        uint32_t orig_pos;
+
         if (avio_feof(pb))
             return -1;
 
@@ -1608,7 +1640,13 @@ static int avi_read_idx1(AVFormatContext *s, int size)
                 data_offset  = first_packet_pos - pos;
             first_packet = 0;
         }
+        orig_pos = pos;
         pos += data_offset;
+
+        ffe_output_fixup(ectx, FFEDIT_FIXUP_OFFSET, pos_in_file + 8, orig_pos, pos, 0);
+        ffe_output_fixup(ectx, FFEDIT_FIXUP_SIZE, pos_in_file + 12, len, pos, len);
+        ffe_output_fixup(ectx, FFEDIT_FIXUP_SIZE, pos + 4, len, pos + 8, len);
+        ffe_output_padding(ectx, pos + 8 + len, len & 1, 0x00, 2);
 
         av_log(s, AV_LOG_TRACE, "%d cum_len=%"PRId64"\n", len, ast->cum_len);
 
@@ -1947,5 +1985,6 @@ AVInputFormat ff_avi_demuxer = {
     .read_packet    = avi_read_packet,
     .read_close     = avi_read_close,
     .read_seek      = avi_read_seek,
+    .flags          = AVFMT_FFEDIT_BITSTREAM,
     .priv_class = &demuxer_class,
 };

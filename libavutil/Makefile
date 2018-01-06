@@ -46,6 +46,7 @@ HEADERS = adler32.h                                                     \
           imgutils.h                                                    \
           intfloat.h                                                    \
           intreadwrite.h                                                \
+          json.h                                                        \
           lfg.h                                                         \
           log.h                                                         \
           macros.h                                                      \
@@ -127,6 +128,9 @@ OBJS = adler32.o                                                        \
        imgutils.o                                                       \
        integer.o                                                        \
        intmath.o                                                        \
+       json.o                                                           \
+       json_dump.o                                                      \
+       json_parse.o                                                     \
        lfg.o                                                            \
        lls.o                                                            \
        log.o                                                            \

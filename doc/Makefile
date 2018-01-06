@@ -79,6 +79,13 @@ doc/%-all.html: doc/%.texi $(SRC_PATH)/doc/t2h.init $(GENTEXI)
 	$(M)texi2html -I doc -monolithic --D=config-all --init-file $(SRC_PATH)/doc/t2h.init --output $@ $<
 endif
 
+doc/ffedit.pod:
+	touch $@
+doc/ffedit.1:
+	touch $@
+doc/ffedit-all.1:
+	touch $@
+
 doc/%.pod: TAG = POD
 doc/%.pod: doc/%.texi $(SRC_PATH)/doc/texi2pod.pl $(GENTEXI)
 	$(Q)$(TEXIDEP)
