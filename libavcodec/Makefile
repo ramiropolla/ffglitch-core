@@ -54,6 +54,10 @@ OBJS = ac3_parser.o                                                     \
        put_bits.o                                                       \
        golomb_gb.o                                                      \
        golomb_pb.o                                                      \
+       cas9.o                                                           \
+       cas9_json.o                                                      \
+       cas9_xp.o                                                        \
+       cas9_mv.o                                                        \
 
 # subsystems
 OBJS-$(CONFIG_AANDCTTABLES)            += aandcttab.o

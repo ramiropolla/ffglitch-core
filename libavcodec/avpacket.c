@@ -46,6 +46,7 @@ FF_ENABLE_DEPRECATION_WARNINGS
     pkt->buf                  = NULL;
     pkt->side_data            = NULL;
     pkt->side_data_elems      = 0;
+    memset(pkt->cas9_sd, 0x00, sizeof(pkt->cas9_sd));
 }
 
 AVPacket *av_packet_alloc(void)
@@ -585,6 +586,7 @@ FF_ENABLE_DEPRECATION_WARNINGS
         }
         memcpy(dst_data, src_data, size);
     }
+    memcpy(dst->cas9_sd, src->cas9_sd, sizeof(dst->cas9_sd));
 
     return 0;
 }

@@ -413,6 +413,9 @@ typedef struct AVFrame {
     AVFrameSideData **side_data;
     int            nb_side_data;
 
+    /* cas9 side data */
+    void *cas9_sd[32]; // should be at least [CAS9_FEAT_LAST]
+
 /**
  * @defgroup lavu_frame_flags AV_FRAME_FLAGS
  * @ingroup lavu_frame

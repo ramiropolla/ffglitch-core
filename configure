@@ -1616,6 +1616,7 @@ EXTERNAL_LIBRARY_LIST="
     libiec61883
     libilbc
     libjack
+    libjson_c
     libkvazaar
     libmodplug
     libmp3lame
@@ -1732,6 +1733,7 @@ PROGRAM_LIST="
     ffplay
     ffprobe
     ffmpeg
+    ffglitch
 "
 
 SUBSYSTEM_LIST="
@@ -3350,7 +3352,7 @@ cws2fws_extralibs="zlib_extralibs"
 
 # libraries, in linking order
 avcodec_deps="avutil"
-avcodec_suggest="libm"
+avcodec_suggest="libm libjson_c"
 avcodec_select="null_bsf"
 avdevice_deps="avformat avcodec avutil"
 avdevice_suggest="libm"
@@ -3383,6 +3385,7 @@ ffplay_select="rdft crop_filter transpose_filter hflip_filter vflip_filter rotat
 ffplay_suggest="shell32"
 ffprobe_deps="avcodec avformat"
 ffprobe_suggest="shell32"
+ffglitch_deps="avcodec avformat"
 
 # documentation
 podpages_deps="perl"
@@ -6063,6 +6066,8 @@ enabled rkmpp             && { require_pkg_config rkmpp rockchip_mpp  rockchip/r
                                { enabled libdrm ||
                                  die "ERROR: rkmpp requires --enable-libdrm"; }
                              }
+
+enabled ffglitch          && require_pkg_config libjson_c json-c json.h json_object_set_userdata
 
 if enabled gcrypt; then
     GCRYPT_CONFIG="${cross_prefix}libgcrypt-config"

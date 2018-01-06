@@ -1,6 +1,15 @@
 Files without standard license headers:
 compat/avisynth/windowsPorts/basicDataTypeConversions.h
 compat/avisynth/windowsPorts/windows2linux.h
+fftools/ffglitch.c
+libavcodec/cas9.c
+libavcodec/cas9.h
+libavcodec/cas9_json.c
+libavcodec/cas9_json.h
+libavcodec/cas9_mv.c
+libavcodec/cas9_mv.h
+libavcodec/cas9_xp.c
+libavcodec/cas9_xp.h
 libavcodec/file_open.c
 libavcodec/get_bits.c
 libavcodec/get_bits.h
@@ -19,6 +28,8 @@ libavcodec/reverse.c
 libavdevice/file_open.c
 libavdevice/reverse.c
 libavfilter/log2_tab.c
+libavformat/cas9.c
+libavformat/cas9.h
 libavformat/file_open.c
 libavformat/golomb_tab.c
 libavformat/log2_tab.c
@@ -37,6 +48,8 @@ compat/avisynth/windowsPorts/windows2linux.h
 compat/cuda/dynlink_loader.h
 compat/float/float.h
 compat/float/limits.h
+libavcodec/cas9.h
+libavcodec/cas9_json.h
 libavcodec/get_bits_funcs.h
 libavcodec/get_bits_impl.h
 libavcodec/get_bits_undef.h

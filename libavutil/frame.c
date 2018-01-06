@@ -336,6 +336,7 @@ FF_DISABLE_DEPRECATION_WARNINGS
 FF_ENABLE_DEPRECATION_WARNINGS
 #endif
 
+    memcpy(dst->cas9_sd, src->cas9_sd, sizeof(dst->cas9_sd));
     for (i = 0; i < src->nb_side_data; i++) {
         const AVFrameSideData *sd_src = src->side_data[i];
         AVFrameSideData *sd_dst;
@@ -511,6 +512,7 @@ void av_frame_unref(AVFrame *frame)
     if (!frame)
         return;
 
+    memset(frame->cas9_sd, 0x00, sizeof(frame->cas9_sd));
     wipe_side_data(frame);
 
     for (i = 0; i < FF_ARRAY_ELEMS(frame->buf); i++)

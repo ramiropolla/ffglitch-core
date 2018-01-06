@@ -1039,6 +1039,8 @@ typedef struct RcOverride{
  * choice for probing.
  */
 #define AV_CODEC_CAP_AVOID_PROBING       (1 << 17)
+/* cas9 */
+#define AV_CODEC_CAP_CAS9_BITSTREAM      (1 << 18)
 /**
  * Codec is intra only.
  */
@@ -1428,6 +1430,9 @@ typedef struct AVPacket {
     AVPacketSideData *side_data;
     int side_data_elems;
 
+    /* cas9 side data */
+    void *cas9_sd[32]; // should be at least [CAS9_FEAT_LAST]
+
     /**
      * Duration of this packet in AVStream->time_base units, 0 if unknown.
      * Equals next_pts - this_pts in presentation order.
@@ -1529,6 +1534,9 @@ typedef struct AVCodecContext {
      */
     unsigned int codec_tag;
 
+    void *cas9_out;
+    size_t cas9_out_size;
+
     void *priv_data;
 
     /**
@@ -1590,6 +1598,11 @@ typedef struct AVCodecContext {
      * - decoding: Set by user.
      */
     int flags2;
+
+    /* cas9 features */
+    uint64_t cas9_export;
+    uint64_t cas9_import;
+    uint64_t cas9_apply;
 
     /**
      * some codecs need / can use extradata like Huffman tables.
@@ -3529,6 +3542,9 @@ typedef struct AVCodec {
      * The user can only access this field via avcodec_get_hw_config().
      */
     const struct AVCodecHWConfigInternal **hw_configs;
+
+    /* cas9 features */
+    int cas9_features;
 } AVCodec;
 
 #if FF_API_CODEC_GET_SET
