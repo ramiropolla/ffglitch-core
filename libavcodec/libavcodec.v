@@ -7,6 +7,7 @@ LIBAVCODEC_MAJOR {
         get_se_golomb_long;
         get_ue_golomb_long;
         get_ur_golomb_shorten;
+        ffe_*;
     local:
         *;
 };

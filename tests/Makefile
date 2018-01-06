@@ -10,7 +10,7 @@ FFMPEG=ffmpeg$(PROGSSUF)$(EXESUF)
 $(AREF): CMP=
 
 APITESTSDIR := tests/api
-OBJDIRS += tests/data tests/vsynth1 tests/data/filtergraphs $(APITESTSDIR)/
+OBJDIRS += tests/data tests/vsynth1 tests/data/filtergraphs $(APITESTSDIR)/ tests/ffedit/
 
 $(VREF): tests/videogen$(HOSTEXESUF) | tests/vsynth1
 	$(M)./$< 'tests/vsynth1/'
@@ -250,6 +250,8 @@ testclean::
 -include $(wildcard tests/*.d)
 
 include $(SRC_PATH)/tests/checkasm/Makefile
+
+include $(SRC_PATH)/tests/ffedit/Makefile
 
 .PHONY: fate* lcov lcov-reset
 .INTERMEDIATE: coverage.info

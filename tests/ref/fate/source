@@ -1,6 +1,15 @@
 Files without standard license headers:
 compat/avisynth/windowsPorts/basicDataTypeConversions.h
 compat/avisynth/windowsPorts/windows2linux.h
+fftools/ffedit.c
+libavcodec/ffedit.c
+libavcodec/ffedit.h
+libavcodec/ffedit_json.c
+libavcodec/ffedit_json.h
+libavcodec/ffedit_mv.c
+libavcodec/ffedit_mv.h
+libavcodec/ffedit_xp.c
+libavcodec/ffedit_xp.h
 libavcodec/file_open.c
 libavcodec/get_bits.c
 libavcodec/get_bits.h
@@ -19,6 +28,8 @@ libavcodec/reverse.c
 libavdevice/file_open.c
 libavdevice/reverse.c
 libavfilter/log2_tab.c
+libavformat/ffedit.c
+libavformat/ffedit.h
 libavformat/file_open.c
 libavformat/golomb_tab.c
 libavformat/log2_tab.c
@@ -37,6 +48,8 @@ compat/avisynth/windowsPorts/windows2linux.h
 compat/cuda/dynlink_loader.h
 compat/float/float.h
 compat/float/limits.h
+libavcodec/ffedit.h
+libavcodec/ffedit_json.h
 libavcodec/get_bits_funcs.h
 libavcodec/get_bits_impl.h
 libavcodec/get_bits_undef.h

@@ -328,6 +328,8 @@ struct AVFormatContext;
 struct AVDeviceInfoList;
 struct AVDeviceCapabilitiesQuery;
 
+struct FFEditOutputContext;
+
 /**
  * @defgroup metadata_api Public Metadata API
  * @{
@@ -489,6 +491,9 @@ typedef struct AVProbeData {
                                         */
 
 #define AVFMT_SEEK_TO_PTS   0x4000000 /**< Seeking is based on PTS */
+
+/* ffedit */
+#define AVFMT_FFEDIT_BITSTREAM 0x08000000
 
 /**
  * @addtogroup lavf_encoding
@@ -1926,6 +1931,9 @@ typedef struct AVFormatContext {
      * - decoding: set by user
      */
     int max_streams;
+
+    /* ffedit */
+    struct FFEditOutputContext *ectx;
 } AVFormatContext;
 
 #if FF_API_FORMAT_GET_SET

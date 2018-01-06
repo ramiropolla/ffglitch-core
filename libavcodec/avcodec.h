@@ -1039,6 +1039,8 @@ typedef struct RcOverride{
  * choice for probing.
  */
 #define AV_CODEC_CAP_AVOID_PROBING       (1 << 17)
+/* ffedit */
+#define AV_CODEC_CAP_FFEDIT_BITSTREAM    (1 << 18)
 /**
  * Codec is intra only.
  */
@@ -1441,6 +1443,9 @@ typedef struct AVPacket {
     AVPacketSideData *side_data;
     int side_data_elems;
 
+    /* ffedit side data */
+    void *ffedit_sd[32]; // should be at least [FFEDIT_FEAT_LAST]
+
     /**
      * Duration of this packet in AVStream->time_base units, 0 if unknown.
      * Equals next_pts - this_pts in presentation order.
@@ -1542,6 +1547,9 @@ typedef struct AVCodecContext {
      */
     unsigned int codec_tag;
 
+    void *ffedit_out;
+    size_t ffedit_out_size;
+
     void *priv_data;
 
     /**
@@ -1603,6 +1611,11 @@ typedef struct AVCodecContext {
      * - decoding: Set by user.
      */
     int flags2;
+
+    /* ffedit features */
+    uint64_t ffedit_export;
+    uint64_t ffedit_import;
+    uint64_t ffedit_apply;
 
     /**
      * some codecs need / can use extradata like Huffman tables.
@@ -3547,6 +3560,9 @@ typedef struct AVCodec {
      * The user can only access this field via avcodec_get_hw_config().
      */
     const struct AVCodecHWConfigInternal **hw_configs;
+
+    /* ffedit features */
+    int ffedit_features;
 } AVCodec;
 
 #if FF_API_CODEC_GET_SET
