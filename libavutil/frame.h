@@ -748,6 +748,12 @@ typedef struct AVFrame {
      * Duration of the frame, in the same units as pts. 0 if unknown.
      */
     int64_t duration;
+
+    /* ffedit JSON context */
+    void *jctx; // json_ctx_t *
+
+    /* ffedit side data */
+    void *ffedit_sd[32]; // should be at least [FFEDIT_FEAT_LAST]
 } AVFrame;
 
 

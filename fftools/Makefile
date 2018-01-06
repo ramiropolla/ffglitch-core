@@ -1,13 +1,14 @@
 AVPROGS-$(CONFIG_FFMPEG)   += ffmpeg
 AVPROGS-$(CONFIG_FFPLAY)   += ffplay
 AVPROGS-$(CONFIG_FFPROBE)  += ffprobe
+AVPROGS-$(CONFIG_FFEDIT)   += ffedit
 FFGLITCH-$(CONFIG_FFMPEG)  += ffgac$(PROGSSUF)$(EXESUF)
 
 AVPROGS     := $(AVPROGS-yes:%=%$(PROGSSUF)$(EXESUF))
 PROGS       += $(AVPROGS)
 PROGS       += $(FFGLITCH-yes)
 
-AVBASENAMES  = ffmpeg ffplay ffprobe
+AVBASENAMES  = ffmpeg ffplay ffprobe ffedit
 ALLAVPROGS   = $(AVBASENAMES:%=%$(PROGSSUF)$(EXESUF))
 ALLAVPROGS_G = $(AVBASENAMES:%=%$(PROGSSUF)_g$(EXESUF))
 

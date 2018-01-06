@@ -564,6 +564,12 @@ typedef struct AVPacket {
      * or muxers.
      */
     AVRational time_base;
+
+    /* ffedit JSON context */
+    void *jctx; // json_ctx_t *
+
+    /* ffedit side data */
+    void *ffedit_sd[32]; // should be at least [FFEDIT_FEAT_LAST]
 } AVPacket;
 
 #if FF_API_INIT_PACKET

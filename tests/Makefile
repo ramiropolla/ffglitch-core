@@ -23,7 +23,7 @@ FFMPEG=ffmpeg$(PROGSSUF)$(EXESUF)
 $(AREF): CMP=
 
 APITESTSDIR := tests/api
-FATE_OUTDIRS = tests/data tests/data/fate tests/data/filtergraphs tests/data/maps tests/data/streamgroups tests/data/lavf tests/data/lavf-fate tests/data/pixfmt tests/vsynth1 $(APITESTSDIR)
+FATE_OUTDIRS = tests/data tests/data/fate tests/data/filtergraphs tests/data/maps tests/data/streamgroups tests/data/lavf tests/data/lavf-fate tests/data/pixfmt tests/vsynth1 $(APITESTSDIR) tests/ffedit/
 OUTDIRS += $(FATE_OUTDIRS)
 
 $(VREF): tests/videogen$(HOSTEXESUF) | tests/vsynth1
@@ -339,6 +339,8 @@ testclean::
 -include $(wildcard tests/*.d)
 
 include $(SRC_PATH)/tests/checkasm/Makefile
+
+include $(SRC_PATH)/tests/ffedit/Makefile
 
 .PHONY: fate* lcov lcov-reset
 .INTERMEDIATE: coverage.info

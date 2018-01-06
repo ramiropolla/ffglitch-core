@@ -61,6 +61,11 @@ OBJS = ac3_parser.o                                                     \
        vlc.o                                                            \
        vorbis_parser.o                                                  \
        xiph.o                                                           \
+       ffedit.o                                                         \
+       ffedit_json.o                                                    \
+       ffedit_xp.o                                                      \
+       ffedit_mb.o                                                      \
+       ffedit_mv.o                                                      \
 
 # subsystems
 include $(SRC_PATH)/libavcodec/vvc/Makefile

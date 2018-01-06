@@ -47,6 +47,8 @@ void av_init_packet(AVPacket *pkt)
     pkt->opaque               = NULL;
     pkt->opaque_ref           = NULL;
     pkt->time_base            = av_make_q(0, 1);
+    memset(pkt->ffedit_sd, 0x00, sizeof(pkt->ffedit_sd));
+    pkt->jctx = NULL;
 }
 #endif
 
@@ -420,6 +422,8 @@ int av_packet_copy_props(AVPacket *dst, const AVPacket *src)
         }
         memcpy(dst_data, src_data, size);
     }
+    memcpy(dst->ffedit_sd, src->ffedit_sd, sizeof(dst->ffedit_sd));
+    dst->jctx = src->jctx;
 
     return 0;
 }

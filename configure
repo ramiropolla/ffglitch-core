@@ -2064,6 +2064,7 @@ PROGRAM_LIST="
     ffplay
     ffprobe
     ffmpeg
+    ffedit
 "
 
 SUBSYSTEM_LIST="
@@ -4013,6 +4014,8 @@ ffplay_select="crop_filter transpose_filter hflip_filter vflip_filter rotate_fil
 ffplay_suggest="shell32 libplacebo vulkan"
 ffprobe_deps="avcodec avformat"
 ffprobe_suggest="shell32"
+ffedit_deps="avcodec avformat"
+ffedit_deps_any="libdl LoadLibrary"
 
 # documentation
 podpages_deps="perl"

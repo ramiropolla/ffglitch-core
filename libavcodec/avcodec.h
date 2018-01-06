@@ -429,6 +429,14 @@ typedef struct RcOverride{
  */
 #define AV_GET_ENCODE_BUFFER_FLAG_REF (1 << 0)
 
+/* ffedit */
+typedef struct FFEditTransplicatePacket {
+    int64_t i_pos;
+    size_t i_size;
+    uint8_t *data;
+    size_t o_size;
+} FFEditTransplicatePacket;
+
 /**
  * main external API structure.
  * New fields can be added to the end with minor version bumps.
@@ -2075,6 +2083,17 @@ typedef struct AVCodecContext {
      */
     AVFrameSideData  **decoded_side_data;
     int             nb_decoded_side_data;
+
+    /* ffedit transplicate */
+    FFEditTransplicatePacket *ffe_xp_packets;
+    size_t                 nb_ffe_xp_packets;
+
+    /* ffedit features */
+    uint64_t ffedit_export;
+    uint64_t ffedit_import;
+    uint64_t ffedit_apply;
+#define FFEDIT_FLAGS_PARSE_ONLY     1
+    int ffedit_flags;
 } AVCodecContext;
 
 /**

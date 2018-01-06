@@ -1,4 +1,5 @@
 Files without standard license headers:
+fftools/ffedit_common.c
 libavcodec/file_open.c
 libavcodec/ilbcdata.h
 libavcodec/ilbcdec.c

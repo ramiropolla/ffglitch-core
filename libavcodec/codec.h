@@ -165,6 +165,10 @@
  */
 #define AV_CODEC_CAP_ENCODER_FLUSH   (1 << 21)
 
+/* ffedit */
+#define AV_CODEC_CAP_FFEDIT_BITSTREAM     (1 << 22)
+#define AV_CODEC_CAP_FFEDIT_SLICE_THREADS (1 << 23)
+
 /**
  * The encoder is able to output reconstructed frame data, i.e. raw frames that
  * would be produced by decoding the encoded bitstream.
@@ -228,6 +232,9 @@ typedef struct AVCodec {
      * Array of supported channel layouts, terminated with a zeroed layout.
      */
     const AVChannelLayout *ch_layouts;
+
+    /* ffedit features */
+    int ffedit_features;
 } AVCodec;
 
 /**

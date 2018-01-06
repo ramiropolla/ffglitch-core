@@ -331,6 +331,8 @@
 struct AVFormatContext;
 struct AVFrame;
 
+struct FFEditOutputContext;
+
 /**
  * @defgroup metadata_api Public Metadata API
  * @{
@@ -501,6 +503,10 @@ typedef struct AVProbeData {
                                         */
 
 #define AVFMT_SEEK_TO_PTS   0x4000000 /**< Seeking is based on PTS */
+
+/* ffedit */
+#define AVFMT_FFEDIT_BITSTREAM 0x08000000
+#define AVFMT_FFEDIT_RAWSTREAM 0x10000000
 
 /**
  * @addtogroup lavf_encoding
@@ -1870,6 +1876,9 @@ typedef struct AVFormatContext {
      * @return 0 on success, a negative AVERROR code on failure
      */
     int (*io_close2)(struct AVFormatContext *s, AVIOContext *pb);
+
+    /* ffedit */
+    struct FFEditOutputContext *ectx;
 } AVFormatContext;
 
 /**
