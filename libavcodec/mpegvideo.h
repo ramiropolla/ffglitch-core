@@ -572,6 +572,8 @@ typedef struct MpegEncContext {
     int b_frame_strategy;
     int b_sensitivity;
 
+    int fixed_f_code;
+
     /* frame skip options for encoding */
     int frame_skip_threshold;
     int frame_skip_factor;
@@ -626,6 +628,7 @@ FF_MPV_OPT_CMP_FUNC, \
 { "mv0",            "always try a mb with mv=<0,0>",                     0, AV_OPT_TYPE_CONST, { .i64 = FF_MPV_FLAG_MV0 },    0, 0, FF_MPV_OPT_FLAGS, "mpv_flags" },\
 { "forcemv",        "always write mvs for p frames (even if <0,0>)",     0, AV_OPT_TYPE_CONST, { .i64 = FF_MPV_FLAG_FORCE_MV }, 0, 0, FF_MPV_OPT_FLAGS, "mpv_flags" },\
 { "nopimb",         "do not use intra mbs for predictive frames",        0, AV_OPT_TYPE_CONST, { .i64 = FF_MPV_FLAG_NOPIMB }, 0, 0, FF_MPV_OPT_FLAGS, "mpv_flags" },\
+{ "fcode", "always use this f_code for motion_vectors", FF_MPV_OFFSET(fixed_f_code), AV_OPT_TYPE_INT, { .i64 = 0 }, 0, 8, FF_MPV_OPT_FLAGS }, \
 { "luma_elim_threshold",   "single coefficient elimination threshold for luminance (negative values also consider dc coefficient)",\
                                                                       FF_MPV_OFFSET(luma_elim_threshold), AV_OPT_TYPE_INT, { .i64 = 0 }, INT_MIN, INT_MAX, FF_MPV_OPT_FLAGS },\
 { "chroma_elim_threshold", "single coefficient elimination threshold for chrominance (negative values also consider dc coefficient)",\
