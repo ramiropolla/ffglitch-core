@@ -687,6 +687,17 @@ av_cold int ff_mpv_common_init(MpegEncContext *s)
 
     clear_context(s);
 
+    if ( s->f_code_expr_str != NULL )
+    {
+        static const char *const var_names[] = { "N", NULL };
+        ret = av_expr_parse(&s->f_code_expr, s->f_code_expr_str, var_names, NULL, NULL, NULL, NULL, 0, s->avctx);
+        if ( ret < 0 )
+        {
+            av_log(s->avctx, AV_LOG_ERROR, "Error while parsing expression '%s'\n", s->f_code_expr_str);
+            return ret;
+        }
+    }
+
     if (s->encoding && s->avctx->slices)
         nb_slices = s->avctx->slices;
 
@@ -805,6 +816,8 @@ void ff_mpv_common_end(MpegEncContext *s)
     s->next_picture_ptr         =
     s->current_picture_ptr      = NULL;
     s->linesize = s->uvlinesize = 0;
+
+    av_expr_free(s->f_code_expr);
 }
 
 

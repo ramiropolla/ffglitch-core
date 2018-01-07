@@ -527,6 +527,10 @@ typedef struct MpegEncContext {
     int b_frame_strategy;
     int b_sensitivity;
 
+    char *f_code_expr_str;
+    AVExpr *f_code_expr;
+    double f_code_var_values[2];
+
     /* frame skip options for encoding */
     int frame_skip_threshold;
     int frame_skip_factor;

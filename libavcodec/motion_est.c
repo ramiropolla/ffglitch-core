@@ -1602,6 +1602,20 @@ void ff_estimate_b_frame_motion(MpegEncContext * s,
 /* find best f_code for ME which do unlimited searches */
 int ff_get_best_fcode(MpegEncContext * s, const int16_t (*mv_table)[2], int type)
 {
+    if ( s->f_code_expr_str != NULL )
+    {
+        int ret;
+        s->f_code_var_values[0] = s->avctx->frame_num;
+        ret = av_expr_eval(s->f_code_expr, s->f_code_var_values, NULL);
+        switch ( s->codec_id )
+        {
+        case AV_CODEC_ID_MPEG2VIDEO:
+            return av_clip(ret, 1, 5);
+        case AV_CODEC_ID_MPEG4:
+            return av_clip(ret, 1, 7);
+        }
+        return ret;
+    }
     if (s->motion_est != FF_ME_ZERO) {
         int score[8];
         int i, y, range= s->avctx->me_range ? s->avctx->me_range : (INT_MAX/2);
