@@ -1133,6 +1133,7 @@ static int warned_cfg = 0;
 
 static void print_all_libs_info(int flags, int level)
 {
+#if 0
     PRINT_LIB_INFO(avutil,     AVUTIL,     flags, level);
     PRINT_LIB_INFO(avcodec,    AVCODEC,    flags, level);
     PRINT_LIB_INFO(avformat,   AVFORMAT,   flags, level);
@@ -1142,6 +1143,7 @@ static void print_all_libs_info(int flags, int level)
     PRINT_LIB_INFO(swscale,    SWSCALE,    flags, level);
     PRINT_LIB_INFO(swresample, SWRESAMPLE, flags, level);
     PRINT_LIB_INFO(postproc,   POSTPROC,   flags, level);
+#endif
 }
 
 static void print_program_info(int flags, int level)
@@ -1153,6 +1155,8 @@ static void print_program_info(int flags, int level)
         av_log(NULL, level, " Copyright (c) %d-%d the FFmpeg developers",
                program_birth_year, CONFIG_THIS_YEAR);
     av_log(NULL, level, "\n");
+    if (flags & SHOW_COPYRIGHT)
+        av_log(NULL, level, "  FFedit <http://ffglitch.org> Copyright (c) 2017-2019 Ramiro Polla\n");
     av_log(NULL, level, "%sbuilt with %s\n", indent, CC_IDENT);
 
     av_log(NULL, level, "%sconfiguration: " FFMPEG_CONFIGURATION "\n", indent);
