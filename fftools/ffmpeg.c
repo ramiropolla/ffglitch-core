@@ -4761,6 +4761,8 @@ int main(int argc, char **argv)
     int i, ret;
     int64_t ti;
 
+    hack_musl_pthread_stack_size();
+
     init_dynload();
 
     register_exit(ffmpeg_cleanup);
