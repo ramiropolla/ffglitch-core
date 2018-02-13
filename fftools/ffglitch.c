@@ -473,6 +473,8 @@ int main(int argc, char *argv[])
     int fret = -1;
     int ret;
 
+    hack_musl_pthread_stack_size();
+
     /* init stuff */
     av_log_set_flags(AV_LOG_SKIP_REPEATED);
     parse_loglevel(argc, argv, options);
