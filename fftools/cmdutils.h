@@ -645,4 +645,6 @@ void *grow_array(void *array, int elem_size, int *size, int new_size);
 
 double get_rotation(AVStream *st);
 
+void hack_musl_pthread_stack_size(void);
+
 #endif /* FFTOOLS_CMDUTILS_H */
