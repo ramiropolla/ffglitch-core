@@ -2356,6 +2356,7 @@ SYSTEM_FEATURES="
 "
 
 SYSTEM_FUNCS="
+    __default_stacksize
     access
     aligned_malloc
     arc4random_buf
@@ -6771,6 +6772,7 @@ if ! disabled pthreads && ! enabled w32threads && ! enabled os2threads; then
     if enabled pthreads; then
         check_builtin sem_timedwait semaphore.h "sem_t *s; sem_init(s,0,0); sem_timedwait(s,0); sem_destroy(s)" $pthreads_extralibs
         check_func pthread_cancel $pthreads_extralibs
+        check_func __default_stacksize $pthreads_extralibs
         hdrs=pthread.h
         if enabled pthread_np_h; then
             hdrs="$hdrs pthread_np.h"

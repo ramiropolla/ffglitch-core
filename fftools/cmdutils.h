@@ -483,4 +483,6 @@ double get_rotation(const int32_t *displaymatrix);
 /* read file contents into a string */
 char *file_read(const char *filename);
 
+void hack_musl_pthread_stack_size(void);
+
 #endif /* FFTOOLS_CMDUTILS_H */

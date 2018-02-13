@@ -1153,3 +1153,18 @@ char *file_read(const char *filename)
         return NULL;
     return str;
 }
+
+void hack_musl_pthread_stack_size(void)
+{
+#if HAVE___DEFAULT_STACKSIZE
+    // WARNING HUGE HACK
+
+    // set musl's default pthread stack size to the same value as the
+    // stack size for the process.
+    extern size_t __default_stacksize;
+    struct rlimit rlim;
+
+    if ( getrlimit(RLIMIT_STACK, &rlim) == 0 )
+        __default_stacksize = (size_t) rlim.rlim_cur;
+#endif
+}
