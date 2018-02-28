@@ -1,13 +1,36 @@
 Files without standard license headers:
 compat/avisynth/windowsPorts/basicDataTypeConversions.h
 compat/avisynth/windowsPorts/windows2linux.h
+fftools/ffglitch.c
+libavcodec/cas9.c
+libavcodec/cas9.h
+libavcodec/cas9_json.c
+libavcodec/cas9_json.h
+libavcodec/cas9_mv.c
+libavcodec/cas9_mv.h
+libavcodec/cas9_xp.c
+libavcodec/cas9_xp.h
 libavcodec/file_open.c
+libavcodec/get_bits.c
+libavcodec/get_bits.h
+libavcodec/get_bits_common.h
+libavcodec/get_bits_funcs.h
+libavcodec/get_bits_funcs_dbg.h
+libavcodec/get_bits_undef.h
+libavcodec/golomb.h
+libavcodec/golomb_common.h
 libavcodec/interplayacm.c
 libavcodec/log2_tab.c
+libavcodec/put_bits.c
+libavcodec/put_bits.h
+libavcodec/put_bits_common.h
+libavcodec/put_bits_funcs.h
 libavcodec/reverse.c
 libavdevice/file_open.c
 libavdevice/reverse.c
 libavfilter/log2_tab.c
+libavformat/cas9.c
+libavformat/cas9.h
 libavformat/file_open.c
 libavformat/golomb_tab.c
 libavformat/log2_tab.c
@@ -30,5 +53,13 @@ compat/cuda/dynlink_nvcuvid.h
 compat/float/float.h
 compat/float/limits.h
 compat/nvenc/nvEncodeAPI.h
+libavcodec/cas9.h
+libavcodec/cas9_json.h
+libavcodec/get_bits_funcs.h
+libavcodec/get_bits_funcs_dbg.h
+libavcodec/get_bits_impl.h
+libavcodec/get_bits_undef.h
+libavcodec/put_bits_funcs.h
+libavcodec/put_bits_impl.h
 Use of av_clip() where av_clip_uintp2() could be used:
 Use of av_clip() where av_clip_intp2() could be used:
