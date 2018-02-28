@@ -386,15 +386,7 @@ static av_always_inline int dnxhd_decode_dct_block(const DNXHDContext *ctx,
         goto error;
     }
     if (len) {
-#if 0
-        level = GET_CACHE(bs, &row->gb);
-        LAST_SKIP_BITS(bs, &row->gb, len);
-        sign  = ~level >> 31;
-        level = (NEG_USR32(sign ^ level, len) ^ sign) - sign;
-#else
-        // TODO use GetBitContext
-        av_assert0(0);
-#endif
+        level = get_xbits(&row->gb, len);
         row->last_dc[component] += level * (1 << dc_shift);
     }
     block[0] = row->last_dc[component];
