@@ -607,35 +607,41 @@ static av_cold int decode_init_thread_copy(AVCodecContext *avctx)
     code = table[index][0];                                 \
     n    = table[index][1];                                 \
     if (max_depth > 1 && n < 0) {                           \
+        skip_bits(gb, bits);                                \
+                                                            \
         nb_bits = -n;                                       \
-        index   = get_bits(gb, nb_bits) + code;             \
+        index   = show_bits(gb, nb_bits) + code;            \
         code    = table[index][0];                          \
         n       = table[index][1];                          \
         if (max_depth > 2 && n < 0) {                       \
+            skip_bits(gb, nb_bits);                         \
+                                                            \
             nb_bits = -n;                                   \
-            index   = get_bits(gb, nb_bits) + code;         \
+            index   = show_bits(gb, nb_bits) + code;        \
             code    = table[index][0];                      \
             n       = table[index][1];                      \
         }                                                   \
     }                                                       \
     dst = code;                                             \
+    skip_bits(gb, n);
 
 
 #define GET_VLC_DUAL(dst0, dst1, name, gb, dtable, table1, table2,  \
                      bits, max_depth, OP)                           \
     do {                                                            \
-        unsigned int index = get_bits(gb, bits);                    \
+        unsigned int index = show_bits(gb, bits);                   \
         int          code, n = dtable[index][1];                    \
                                                                     \
         if (n<=0) {                                                 \
             int nb_bits;                                            \
             VLC_INTERN(dst0, table1, gb, name, bits, max_depth);    \
                                                                     \
-            index = get_bits(gb, bits);                             \
+            index = show_bits(gb, bits);                            \
             VLC_INTERN(dst1, table2, gb, name, bits, max_depth);    \
         } else {                                                    \
             code = dtable[index][0];                                \
             OP(dst0, dst1, code);                                   \
+            skip_bits(gb, n);                                       \
         }                                                           \
     } while (0)
 
@@ -703,7 +709,7 @@ static void decode_plane_bitstream(HYuvContext *s, int width, int plane)
         if( width&1 && get_bits_left(&s->gb)>0 ) {
             unsigned int index;
             int nb_bits, code, n;
-            index = get_bits(&s->gb, VLC_BITS);
+            index = show_bits(&s->gb, VLC_BITS);
             VLC_INTERN(s->temp[0][width-1], s->vlc[plane].table,
                        &s->gb, re, VLC_BITS, 3);
         }
@@ -720,7 +726,7 @@ static void decode_plane_bitstream(HYuvContext *s, int width, int plane)
         if( width&1 && get_bits_left(&s->gb)>0 ) {
             unsigned int index;
             int nb_bits, code, n;
-            index = get_bits(&s->gb, VLC_BITS);
+            index = show_bits(&s->gb, VLC_BITS);
             VLC_INTERN(s->temp16[0][width-1], s->vlc[plane].table,
                        &s->gb, re, VLC_BITS, 3);
         }
@@ -766,39 +772,40 @@ static av_always_inline void decode_bgr_1(HYuvContext *s, int count,
         unsigned int index;
         int code, n, nb_bits;
 
-        index = get_bits(&s->gb, VLC_BITS);
+        index = show_bits(&s->gb, VLC_BITS);
         n     = s->vlc[4].table[index][1];
 
         if (n>0) {
             code  = s->vlc[4].table[index][0];
             *(uint32_t *) &s->temp[0][4 * i] = s->pix_bgr_map[code];
+            skip_bits(&s->gb, n);
         } else {
             if (decorrelate) {
                 VLC_INTERN(s->temp[0][4 * i + G], s->vlc[1].table,
                            &s->gb, re, VLC_BITS, 3);
 
-                index = get_bits(&s->gb, VLC_BITS);
+                index = show_bits(&s->gb, VLC_BITS);
                 VLC_INTERN(code, s->vlc[0].table, &s->gb, re, VLC_BITS, 3);
                 s->temp[0][4 * i + B] = code + s->temp[0][4 * i + G];
 
-                index = get_bits(&s->gb, VLC_BITS);
+                index = show_bits(&s->gb, VLC_BITS);
                 VLC_INTERN(code, s->vlc[2].table, &s->gb, re, VLC_BITS, 3);
                 s->temp[0][4 * i + R] = code + s->temp[0][4 * i + G];
             } else {
                 VLC_INTERN(s->temp[0][4 * i + B], s->vlc[0].table,
                            &s->gb, re, VLC_BITS, 3);
 
-                index = get_bits(&s->gb, VLC_BITS);
+                index = show_bits(&s->gb, VLC_BITS);
                 VLC_INTERN(s->temp[0][4 * i + G], s->vlc[1].table,
                            &s->gb, re, VLC_BITS, 3);
 
-                index = get_bits(&s->gb, VLC_BITS);
+                index = show_bits(&s->gb, VLC_BITS);
                 VLC_INTERN(s->temp[0][4 * i + R], s->vlc[2].table,
                            &s->gb, re, VLC_BITS, 3);
             }
         }
         if (alpha) {
-            index = get_bits(&s->gb, VLC_BITS);
+            index = show_bits(&s->gb, VLC_BITS);
             VLC_INTERN(s->temp[0][4 * i + A], s->vlc[2].table,
                        &s->gb, re, VLC_BITS, 3);
         } else
