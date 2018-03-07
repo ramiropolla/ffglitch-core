@@ -305,7 +305,7 @@ static inline int decode_vlc_codeword(GetBitContext *gb, unsigned codebook)
     unsigned int buf, code;
     int log, prefix_len, len;
 
-    buf = show_bits(gb, 31);
+    buf = show_bits(gb, MIN_CACHE_BITS) << (32-MIN_CACHE_BITS);
 
     /* number of prefix bits to switch between Rice and expGolomb */
     switch_bits = (codebook & 3) + 1;
