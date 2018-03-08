@@ -305,9 +305,7 @@ static inline int decode_vlc_codeword(GetBitContext *gb, unsigned codebook)
     unsigned int buf, code;
     int log, prefix_len, len;
 
-    OPEN_READER(re, gb);
-    UPDATE_CACHE(re, gb);
-    buf = GET_CACHE(re, gb);
+    buf = show_bits(gb, MIN_CACHE_BITS) << (32-MIN_CACHE_BITS);
 
     /* number of prefix bits to switch between Rice and expGolomb */
     switch_bits = (codebook & 3) + 1;
@@ -320,19 +318,17 @@ static inline int decode_vlc_codeword(GetBitContext *gb, unsigned codebook)
         if (!rice_order) {
             /* shortcut for faster decoding of rice codes without remainder */
             code = log;
-            LAST_SKIP_BITS(re, gb, log + 1);
+            skip_bits(gb, log + 1);
         } else {
             prefix_len = log + 1;
             code = (log << rice_order) + NEG_USR32(buf << prefix_len, rice_order);
-            LAST_SKIP_BITS(re, gb, prefix_len + rice_order);
+            skip_bits(gb, prefix_len + rice_order);
         }
     } else { /* otherwise we got a exp golomb code */
         len  = (log << 1) - switch_bits + exp_order + 1;
         code = NEG_USR32(buf, len) - (1 << exp_order) + (switch_bits << rice_order);
-        LAST_SKIP_BITS(re, gb, len);
+        skip_bits(gb, len);
     }
-
-    CLOSE_READER(re, gb);
 
     return code;
 }
