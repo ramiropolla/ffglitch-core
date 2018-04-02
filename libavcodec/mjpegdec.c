@@ -2993,7 +2993,8 @@ eoi_parser:
         }
 
 skip:
-        if ( (avctx->cas9_apply & (1 << CAS9_FEAT_LAST)) != 0 )
+        if ( start_code == SOS
+          && (avctx->cas9_apply & (1 << CAS9_FEAT_LAST)) != 0 )
         {
             PutBitContext *opb = cas9_transplicate_pb(&s->cas9_xp);
             ff_mjpeg_escape_FF(opb, start_escape);
