@@ -19,6 +19,7 @@ static void gb_debug(
     int diff = new_count - orig_count;
     char buf[33];
     char *ptr = buf;
+    int pbcount = 0;
     // TODO check >32 (skip)
     if ( diff == 0 || diff > 32 )
         return;
@@ -32,7 +33,10 @@ static void gb_debug(
         *ptr++ = !!bit + '0';
     }
     *ptr = '\0';
-    av_log(NULL, AV_LOG_ERROR, "%-32s [%6d] (%2d)\n", buf, orig_count, diff);
+    if ( s->pb != NULL )
+        pbcount = put_bits_count(s->pb);
+    av_log(NULL, AV_LOG_ERROR, "%-32s [gb:%6d] [pb:%6d] (%2d)\n",
+           buf, orig_count, pbcount - diff, diff);
 }
 #define GB_DEBUG_START(s) int orig_count = get_bits_count(s)
 #define GB_DEBUG_END(s, val) gb_debug(s, val, orig_count, get_bits_count(s), 0)
