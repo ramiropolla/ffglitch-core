@@ -17,13 +17,13 @@
 # endif /* LONG_BITSTREAM_READER */
 #endif /* BITSTREAM_READER_LE */
 
-#ifdef CONFIG_FFGLITCH_XP_DEBUG
+#if CONFIG_FFGLITCH_XP_DEBUG
 #include "get_bits_funcs_dbg.h"
 #else
 #include "get_bits_funcs.h"
 #endif
 
-#ifdef CONFIG_FFGLITCH_XP_DEBUG
+#if CONFIG_FFGLITCH_XP_DEBUG
 #undef get_bits_count
 #undef get_xbits
 #undef get_xbits_le

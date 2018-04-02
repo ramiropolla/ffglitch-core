@@ -428,7 +428,7 @@ int skip_1stop_8data_bits(GetBitContext *gb)
 
 #include "get_bits_undef.h"
 
-#ifdef CONFIG_FFGLITCH_XP_DEBUG
+#if CONFIG_FFGLITCH_XP_DEBUG
 int AV_JOIN(dbg_, get_bits_count)(const GetBitContext *s, const char *file, int line, const char *func);
 int AV_JOIN(dbg_, get_bits_count)(const GetBitContext *s, const char *file, int line, const char *func)
 {

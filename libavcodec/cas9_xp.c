@@ -55,7 +55,7 @@ void cas9_transplicate_free(CAS9TransplicateContext *xp)
     av_packet_free(&xp->o_pkt);
 }
 
-#ifdef CONFIG_FFGLITCH_XP_DEBUG
+#if CONFIG_FFGLITCH_XP_DEBUG
 /*-------------------------------------------------------------------*/
 static char *dump_byte(char *buf, uint8_t val)
 {
@@ -84,7 +84,7 @@ void cas9_transplicate_flush(
     avctx->cas9_out = av_malloc(avctx->cas9_out_size);
     memcpy(avctx->cas9_out, xp->o_pkt->data, avctx->cas9_out_size);
     cas9_transplicate_free(xp);
-#ifdef CONFIG_FFGLITCH_XP_DEBUG
+#if CONFIG_FFGLITCH_XP_DEBUG
     /* Check only when replicating */
     if ( avctx->cas9_apply == (1 << CAS9_FEAT_LAST) )
     {
