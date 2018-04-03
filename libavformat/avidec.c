@@ -227,6 +227,7 @@ static int read_odml_index(AVFormatContext *s, int frame_num)
             cas9_output_fixup(c9, CAS9_FIXUP_OFFSET, pos_in_file, orig_pos, pos, 0);
             cas9_output_fixup(c9, CAS9_FIXUP_SIZE, pos_in_file + 4, orig_len, pos, len);
             cas9_output_fixup(c9, CAS9_FIXUP_SIZE, pos + 4, orig_len, pos + 8, len);
+            cas9_output_padding(c9, pos + 8 + len, len & 1, 0x00, 2);
 
             av_log(s, AV_LOG_TRACE, "pos:%"PRId64", len:%X\n", pos, len);
 
@@ -519,6 +520,7 @@ static int avi_read_header(AVFormatContext *s)
         size = avio_rl32(pb);
 
         cas9_output_fixup(c9, CAS9_FIXUP_SIZE, pos_in_file, size, pos_in_file + 4, size);
+        cas9_output_padding(c9, pos_in_file + 4 + size, size & 1, 0x00, 2);
 
         print_tag("tag", tag, size);
 
@@ -1628,6 +1630,7 @@ static int avi_read_idx1(AVFormatContext *s, int size)
         cas9_output_fixup(c9, CAS9_FIXUP_OFFSET, pos_in_file + 8, orig_pos, pos, 0);
         cas9_output_fixup(c9, CAS9_FIXUP_SIZE, pos_in_file + 12, len, pos, len);
         cas9_output_fixup(c9, CAS9_FIXUP_SIZE, pos + 4, len, pos + 8, len);
+        cas9_output_padding(c9, pos + 8 + len, len & 1, 0x00, 2);
 
         av_log(s, AV_LOG_TRACE, "%d cum_len=%"PRId64"\n", len, ast->cum_len);
 
