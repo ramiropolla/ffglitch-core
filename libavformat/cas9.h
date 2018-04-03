@@ -15,6 +15,8 @@ typedef struct cas9_packet {
 
     uint8_t *data;
     size_t o_size;
+
+    int alignment;
 } cas9_packet;
 
 int cas9_output_packet(
@@ -23,6 +25,13 @@ int cas9_output_packet(
         size_t i_size,
         uint8_t *data,
         size_t o_size);
+
+int cas9_output_padding(
+        CAS9OutputContext *c9,
+        int64_t i_pos,
+        size_t i_size,
+        uint8_t val,
+        int alignment);
 
 /*----------------------------- FIXUPS ------------------------------*/
 enum CAS9FixupType {

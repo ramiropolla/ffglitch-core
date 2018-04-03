@@ -40,12 +40,13 @@ int cas9_output_open(
     return 0;
 }
 
-int cas9_output_packet(
+static int output_packet_internal(
         CAS9OutputContext *c9,
         int64_t i_pos,
         size_t i_size,
         uint8_t *data,
-        size_t o_size)
+        size_t o_size,
+        int alignment)
 {
     size_t nb_packets = c9->nb_packets;
     size_t idx = nb_packets++;
@@ -62,10 +63,43 @@ int cas9_output_packet(
     c9_packet->i_pos = i_pos;
     c9_packet->i_size = i_size;
     c9_packet->o_size = o_size;
-    c9_packet->data = av_malloc(o_size);
-    memcpy(c9_packet->data, data, o_size);
+    c9_packet->alignment = alignment;
+    if ( alignment != 0 )
+    {
+        c9_packet->data = av_malloc(alignment);
+        memset(c9_packet->data, (uint8_t) o_size, alignment);
+    }
+    else
+    {
+        c9_packet->data = av_malloc(o_size);
+        memcpy(c9_packet->data, data, o_size);
+    }
 
     return 0;
+}
+
+int cas9_output_packet(
+        CAS9OutputContext *c9,
+        int64_t i_pos,
+        size_t i_size,
+        uint8_t *data,
+        size_t o_size)
+{
+    if ( c9 == NULL )
+        return 0;
+    return output_packet_internal(c9, i_pos, i_size, data, o_size, 0);
+}
+
+int cas9_output_padding(
+        CAS9OutputContext *c9,
+        int64_t i_pos,
+        size_t i_size,
+        uint8_t val,
+        int alignment)
+{
+    if ( c9 == NULL )
+        return 0;
+    return output_packet_internal(c9, i_pos, i_size, NULL, val, alignment);
 }
 
 int cas9_output_fixup(
@@ -111,13 +145,18 @@ int cas9_output_fixup(
     return 0;
 }
 
-static void update_fixups(CAS9OutputContext *c9, int64_t pos, int64_t delta)
+static void update_fixups(
+        CAS9OutputContext *c9,
+        int64_t pos,
+        int64_t delta,
+        int is_padding)
 {
     /* delta is non-zero */
 
     for ( size_t i = 0; i < c9->nb_fixups; i++ )
     {
         cas9_fixup *fixup = &c9->fixups[i];
+        int ok = 0;
         switch ( fixup->type )
         {
         case CAS9_FIXUP_OFFSET:
@@ -125,7 +164,11 @@ static void update_fixups(CAS9OutputContext *c9, int64_t pos, int64_t delta)
                 fixup->val += delta;
             break;
         case CAS9_FIXUP_SIZE:
-            if ( pos >= fixup->a1 && pos <= fixup->a2 )
+            // padding packets should not modify fixups that have the same
+            // start position. they are padding the previous packet, and not
+            // adding to the beginning of the next packet.
+            ok = is_padding ? (pos > fixup->a1) : (pos >= fixup->a1);
+            if ( ok && pos <= fixup->a2 )
                 fixup->val += delta;
             break;
         }
@@ -183,6 +226,7 @@ int cas9_output_flush(CAS9OutputContext *c9)
     for ( size_t i = 0; i < c9->nb_packets; i++ )
     {
         cas9_packet *packet = &c9->packets[i];
+        int is_padding = (packet->alignment != 0);
         int64_t delta;
         int64_t o_pos;
 
@@ -194,12 +238,14 @@ int cas9_output_flush(CAS9OutputContext *c9)
 
         /* write new packet to output file */
         o_pos = avio_tell(o_pb);
+        if ( is_padding )
+            packet->o_size = -o_pos & (packet->alignment - 1);
         avio_write(o_pb, packet->data, packet->o_size);
 
         /* update fixups if needed */
         delta = (int64_t) packet->o_size - packet->i_size;
         if ( delta != 0 )
-            update_fixups(c9, o_pos, delta);
+            update_fixups(c9, o_pos, delta, is_padding);
     }
 
     /* write trailer */
