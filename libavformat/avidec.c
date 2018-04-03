@@ -136,15 +136,22 @@ static inline int get_duration(AVIStream *ast, int len)
 
 static int get_riff(AVFormatContext *s, AVIOContext *pb)
 {
+    CAS9OutputContext *c9 = s->c9;
+    int64_t pos_in_file;
+    int size;
     AVIContext *avi = s->priv_data;
     char header[8] = {0};
     int i;
 
     /* check RIFF header */
     avio_read(pb, header, 4);
-    avi->riff_end  = avio_rl32(pb); /* RIFF chunk size */
-    avi->riff_end += avio_tell(pb); /* RIFF chunk end */
+    pos_in_file = avio_tell(pb);
+    size = avio_rl32(pb);
+    avi->riff_end  = size;            /* RIFF chunk size */
+    avi->riff_end += pos_in_file + 4; /* RIFF chunk end */
     avio_read(pb, header + 4, 4);
+
+    cas9_output_fixup(c9, CAS9_FIXUP_SIZE, pos_in_file, size, pos_in_file + 4, size);
 
     for (i = 0; avi_headers[i][0]; i++)
         if (!memcmp(header, avi_headers[i], 8))
