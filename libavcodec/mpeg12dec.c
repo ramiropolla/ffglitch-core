@@ -59,6 +59,7 @@
 #include "profiles.h"
 #include "startcode.h"
 #include "thread.h"
+#include "ffedit.h"
 
 #define A53_MAX_CC_COUNT 2000
 
@@ -1011,6 +1012,47 @@ FF_ENABLE_DEPRECATION_WARNINGS
     return 0;
 }
 
+static void ffe_transplicate_bytes(
+        FFEditTransplicateContext *xp,
+        const uint8_t *buf,
+        size_t len)
+{
+    if ( xp->pb != NULL )
+    {
+        while ( len-- )
+            put_bits(xp->pb, 8, *buf++);
+    }
+}
+
+static int ffe_transplicate_init_get_bits(
+        FFEditTransplicateContext *xp,
+        GetBitContext *gb,
+        const uint8_t *buf,
+        int bit_size)
+{
+    int ret = init_get_bits(gb, buf, bit_size);
+    gb->pb = xp->pb;
+    return ret;
+}
+
+/* Transplicate start_code and init get_bits */
+static int ffe_mpeg12_init_get_bits8(
+        FFEditTransplicateContext *xp,
+        GetBitContext *gb,
+        const uint8_t *buf,
+        int bit_size8)
+{
+    ffe_transplicate_bytes(xp, buf - 4, 4);
+    return ffe_transplicate_init_get_bits(xp, gb, buf, bit_size8 * 8);
+}
+
+static void ffe_mpeg12_flush_get_bits(
+        FFEditTransplicateContext *xp)
+{
+    if ( xp->pb != NULL )
+        flush_put_bits(xp->pb);
+}
+
 static int mpeg1_decode_picture(AVCodecContext *avctx, const uint8_t *buf,
                                 int buf_size)
 {
@@ -1018,7 +1060,7 @@ static int mpeg1_decode_picture(AVCodecContext *avctx, const uint8_t *buf,
     MpegEncContext *s = &s1->mpeg_enc_ctx;
     int ref, f_code, vbv_delay, ret;
 
-    ret = init_get_bits8(&s->gb, buf, buf_size);
+    ret = ffe_mpeg12_init_get_bits8(&s->ffe_xp, &s->gb, buf, buf_size);
     if (ret < 0)
         return ret;
 
@@ -1055,6 +1097,9 @@ static int mpeg1_decode_picture(AVCodecContext *avctx, const uint8_t *buf,
 
     s->y_dc_scale = 8;
     s->c_dc_scale = 8;
+
+    ffe_mpeg12_flush_get_bits(&s->ffe_xp);
+
     return 0;
 }
 
@@ -1382,7 +1427,7 @@ static int mpeg_decode_slice(MpegEncContext *s, int mb_y,
 
     av_assert0(mb_y < s->mb_height);
 
-    ret = init_get_bits8(&s->gb, *buf, buf_size);
+    ret = ffe_mpeg12_init_get_bits8(&s->ffe_xp, &s->gb, *buf, buf_size);
     if (ret < 0)
         return ret;
 
@@ -1537,6 +1582,7 @@ static int mpeg_decode_slice(MpegEncContext *s, int mb_y,
 
                 if (left >= 32 && !is_d10) {
                     GetBitContext gb = s->gb;
+                    gb.pb = NULL;
                     align_get_bits(&gb);
                     if (show_bits(&gb, 24) == 0x060E2B) {
                         av_log(avctx, AV_LOG_DEBUG, "Invalid MXF data found in video stream\n");
@@ -1578,23 +1624,30 @@ static int mpeg_decode_slice(MpegEncContext *s, int mb_y,
             /* read increment again */
             s->mb_skip_run = 0;
             for (;;) {
-                int code = get_vlc2(&s->gb, ff_mbincr_vlc,
-                                    MBINCR_VLC_BITS, 2);
+                int code;
+                /* NOTE: the call to get_vlc2() below would return code
+                 *       35 for 8 zero bits (which should mean a new
+                 *       start code, and therefore an end of slice). We
+                 *       explicitly check for the code with show_bits()
+                 *       to avoid overreading the GetBitContext.
+                 */
+                if ( show_bits(&s->gb, 8) == 0x00 )
+                {
+                    if (s->mb_skip_run != 0 || show_bits(&s->gb, 23) != 0) {
+                        av_log(s->avctx, AV_LOG_ERROR, "slice mismatch\n");
+                        return AVERROR_INVALIDDATA;
+                    }
+                    goto eos; /* end of slice */
+                }
+                code = get_vlc2(&s->gb, ff_mbincr_vlc,
+                                MBINCR_VLC_BITS, 2);
                 if (code < 0) {
                     av_log(s->avctx, AV_LOG_ERROR, "mb incr damaged\n");
                     return AVERROR_INVALIDDATA;
-                }
-                if (code >= 33) {
-                    if (code == 33) {
-                        s->mb_skip_run += 33;
-                    } else if (code == 35) {
-                        if (s->mb_skip_run != 0 || show_bits(&s->gb, 15) != 0) {
-                            av_log(s->avctx, AV_LOG_ERROR, "slice mismatch\n");
-                            return AVERROR_INVALIDDATA;
-                        }
-                        goto eos; /* end of slice */
-                    }
-                    /* otherwise, stuffing, nothing to do */
+                } else if (code == 33) {
+                    s->mb_skip_run += 33;
+                } else if (code == 34) {
+                    /* stuffing, nothing to do */
                 } else {
                     s->mb_skip_run += code;
                     break;
@@ -1642,6 +1695,9 @@ eos: // end of slice
     }
     *buf += (get_bits_count(&s->gb) - 1) / 8;
     ff_dlog(s, "Slice start:%d %d  end:%d %d\n", s->resync_mb_x, s->resync_mb_y, s->mb_x, s->mb_y);
+
+    ffe_mpeg12_flush_get_bits(&s->ffe_xp);
+
     return 0;
 }
 
@@ -1754,7 +1810,7 @@ static int mpeg1_decode_sequence(AVCodecContext *avctx,
     int width, height;
     int i, v, j;
 
-    int ret = init_get_bits8(&s->gb, buf, buf_size);
+    int ret = ffe_mpeg12_init_get_bits8(&s->ffe_xp, &s->gb, buf, buf_size);
     if (ret < 0)
         return ret;
 
@@ -1832,6 +1888,8 @@ static int mpeg1_decode_sequence(AVCodecContext *avctx,
     if (s->avctx->debug & FF_DEBUG_PICT_INFO)
         av_log(s->avctx, AV_LOG_DEBUG, "vbv buffer: %d, bitrate:%"PRId64", aspect_ratio_info: %d \n",
                s->avctx->rc_buffer_size, s->bit_rate, s1->aspect_ratio_info);
+
+    ffe_mpeg12_flush_get_bits(&s->ffe_xp);
 
     return 0;
 }
@@ -2052,6 +2110,17 @@ static void mpeg_decode_user_data(AVCodecContext *avctx,
     Mpeg1Context *s = avctx->priv_data;
     const uint8_t *buf_end = p + buf_size;
     Mpeg1Context *s1 = avctx->priv_data;
+    MpegEncContext *s2 = &s->mpeg_enc_ctx;
+
+    /* FFedit: transplicate one chunk (except start_code) */
+    if ( ffe_transplicate_pb(&s2->ffe_xp) != NULL )
+    {
+        uint32_t start_code = -1;
+        const uint8_t *next_chunk = avpriv_find_start_code(p, buf_end, &start_code);
+        next_chunk -= 4;
+        ffe_transplicate_bytes(&s2->ffe_xp, p - 4, 4);
+        ffe_transplicate_bytes(&s2->ffe_xp, p, next_chunk - p);
+    }
 
 #if 0
     int i;
@@ -2124,7 +2193,7 @@ static int mpeg_decode_gop(AVCodecContext *avctx,
     int broken_link;
     int64_t tc;
 
-    int ret = init_get_bits8(&s->gb, buf, buf_size);
+    int ret = ffe_mpeg12_init_get_bits8(&s->ffe_xp, &s->gb, buf, buf_size);
     if (ret < 0)
         return ret;
 
@@ -2143,6 +2212,8 @@ static int mpeg_decode_gop(AVCodecContext *avctx,
                "GOP (%s) closed_gop=%d broken_link=%d\n",
                tcbuf, s1->closed_gop, broken_link);
     }
+
+    ffe_mpeg12_flush_get_bits(&s->ffe_xp);
 
     return 0;
 }
@@ -2163,6 +2234,10 @@ static int decode_chunks(AVCodecContext *avctx, AVFrame *picture,
         uint32_t start_code = -1;
         buf_ptr = avpriv_find_start_code(buf_ptr, buf_end, &start_code);
         if (start_code > 0x1ff) {
+            /* NOTE: a start_code greater than 0x000001ff means that
+             *       avpriv_find_start_code() failed. In a valid file,
+             *       this means we have reached buf_end.
+             */
             if (!skip_frame) {
                 if (HAVE_THREADS &&
                     (avctx->active_thread_type & FF_THREAD_SLICE) &&
@@ -2173,8 +2248,12 @@ static int decode_chunks(AVCodecContext *avctx, AVFrame *picture,
                     avctx->execute(avctx, slice_decode_thread,
                                    &s2->thread_context[0], NULL,
                                    s->slice_count, sizeof(void *));
+                    s2->er.error_count = 0;
                     for (i = 0; i < s->slice_count; i++)
+                    {
+                        ffe_transplicate_merge(avctx, &s2->ffe_xp, &s2->thread_context[i]->ffe_xp);
                         s2->er.error_count += s2->thread_context[i]->er.error_count;
+                    }
                 }
 
                 ret = slice_end(avctx, picture);
@@ -2246,8 +2325,12 @@ static int decode_chunks(AVCodecContext *avctx, AVFrame *picture,
                 avctx->execute(avctx, slice_decode_thread,
                                s2->thread_context, NULL,
                                s->slice_count, sizeof(void *));
+                s2->er.error_count = 0;
                 for (i = 0; i < s->slice_count; i++)
+                {
+                    ffe_transplicate_merge(avctx, &s2->ffe_xp, &s2->thread_context[i]->ffe_xp);
                     s2->er.error_count += s2->thread_context[i]->er.error_count;
+                }
                 s->slice_count = 0;
             }
             if (last_code == 0 || last_code == SLICE_MIN_START_CODE) {
@@ -2271,7 +2354,7 @@ static int decode_chunks(AVCodecContext *avctx, AVFrame *picture,
             }
             break;
         case EXT_START_CODE:
-            ret = init_get_bits8(&s2->gb, buf_ptr, input_size);
+            ret = ffe_mpeg12_init_get_bits8(&s2->ffe_xp, &s2->gb, buf_ptr, input_size);
             if (ret < 0)
                 return ret;
 
@@ -2308,6 +2391,7 @@ static int decode_chunks(AVCodecContext *avctx, AVFrame *picture,
                 }
                 break;
             }
+            ffe_mpeg12_flush_get_bits(&s2->ffe_xp);
             break;
         case USER_START_CODE:
             mpeg_decode_user_data(avctx, buf_ptr, input_size);
@@ -2456,7 +2540,14 @@ static int decode_chunks(AVCodecContext *avctx, AVFrame *picture,
                         ret = ff_update_duplicate_context(thread_context, s2);
                         if (ret < 0)
                             return ret;
-                        ret = init_get_bits8(&thread_context->gb, buf_ptr, input_size);
+                        if ( (avctx->ffedit_apply & (1 << FFEDIT_FEAT_LAST)) != 0 )
+                        {
+                            ffe_transplicate_free(&thread_context->ffe_xp);
+                            ret = ffe_transplicate_init(avctx, &thread_context->ffe_xp, buf_size);
+                            if ( ret < 0 )
+                                return ret;
+                        }
+                        ret = ffe_transplicate_init_get_bits(&thread_context->ffe_xp, &thread_context->gb, buf_ptr, input_size * 8);
                         if (ret < 0)
                             return ret;
                         s->slice_count++;
@@ -2505,7 +2596,8 @@ static int mpeg_decode_frame(AVCodecContext *avctx, AVFrame *picture,
 
             *got_output = 1;
         }
-        return buf_size;
+        ret = buf_size;
+        goto the_end;
     }
 
     if (s->mpeg_enc_ctx_allocated == 0 && (   s2->codec_tag == AV_RL32("VCR2")
@@ -2530,6 +2622,13 @@ static int mpeg_decode_frame(AVCodecContext *avctx, AVFrame *picture,
         }
     }
 
+    if ( (avctx->ffedit_apply & (1 << FFEDIT_FEAT_LAST)) != 0 )
+    {
+        ret = ffe_transplicate_init(avctx, &s2->ffe_xp, buf_size);
+        if ( ret < 0 )
+            return ret;
+    }
+
     ret = decode_chunks(avctx, picture, got_output, buf, buf_size);
     if (ret<0 || *got_output) {
         s2->current_picture_ptr = NULL;
@@ -2550,6 +2649,10 @@ static int mpeg_decode_frame(AVCodecContext *avctx, AVFrame *picture,
         }
     }
 
+the_end:
+    if ( (avctx->ffedit_apply & (1 << FFEDIT_FEAT_LAST)) != 0 )
+        ffe_transplicate_flush(avctx, &s2->ffe_xp, avpkt);
+
     return ret;
 }
 
@@ -2567,10 +2670,14 @@ static void flush(AVCodecContext *avctx)
 static av_cold int mpeg_decode_end(AVCodecContext *avctx)
 {
     Mpeg1Context *s = avctx->priv_data;
+    MpegEncContext *s2 = &s->mpeg_enc_ctx;
 
     if (s->mpeg_enc_ctx_allocated)
         ff_mpv_common_end(&s->mpeg_enc_ctx);
     av_buffer_unref(&s->a53_buf_ref);
+
+    ffe_transplicate_free(&s2->ffe_xp);
+
     return 0;
 }
 
@@ -2584,6 +2691,8 @@ const FFCodec ff_mpeg1video_decoder = {
     .close                 = mpeg_decode_end,
     FF_CODEC_DECODE_CB(mpeg_decode_frame),
     .p.capabilities        = AV_CODEC_CAP_DRAW_HORIZ_BAND | AV_CODEC_CAP_DR1 |
+                             AV_CODEC_CAP_FFEDIT_BITSTREAM |
+                             AV_CODEC_CAP_FFEDIT_SLICE_THREADS |
                              AV_CODEC_CAP_DELAY | AV_CODEC_CAP_SLICE_THREADS,
     .caps_internal         = FF_CODEC_CAP_SKIP_FRAME_FILL_PARAM,
     .flush                 = flush,
@@ -2641,6 +2750,8 @@ const FFCodec ff_mpeg2video_decoder = {
     .close          = mpeg_decode_end,
     FF_CODEC_DECODE_CB(mpeg_decode_frame),
     .p.capabilities = AV_CODEC_CAP_DRAW_HORIZ_BAND | AV_CODEC_CAP_DR1 |
+                      AV_CODEC_CAP_FFEDIT_BITSTREAM |
+                      AV_CODEC_CAP_FFEDIT_SLICE_THREADS |
                       AV_CODEC_CAP_DELAY | AV_CODEC_CAP_SLICE_THREADS,
     .caps_internal  = FF_CODEC_CAP_SKIP_FRAME_FILL_PARAM,
     .flush          = flush,
@@ -2686,6 +2797,8 @@ const FFCodec ff_mpegvideo_decoder = {
     .close          = mpeg_decode_end,
     FF_CODEC_DECODE_CB(mpeg_decode_frame),
     .p.capabilities = AV_CODEC_CAP_DRAW_HORIZ_BAND | AV_CODEC_CAP_DR1 |
+                      AV_CODEC_CAP_FFEDIT_BITSTREAM |
+                      AV_CODEC_CAP_FFEDIT_SLICE_THREADS |
                       AV_CODEC_CAP_DELAY | AV_CODEC_CAP_SLICE_THREADS,
     .caps_internal  = FF_CODEC_CAP_SKIP_FRAME_FILL_PARAM,
     .flush          = flush,

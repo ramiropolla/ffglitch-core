@@ -49,6 +49,7 @@
 #include "videodsp.h"
 
 #include "libavutil/script.h"
+#include "ffedit_xp.h"
 
 #define MAX_THREADS 32
 
@@ -552,6 +553,9 @@ typedef struct MpegEncContext {
     char *pict_type_script_fname;
     FFScriptContext *pict_type_script;
     FFScriptObject *pict_type_func;
+
+    /* ffedit bitstream */
+    FFEditTransplicateContext ffe_xp;
 
 } MpegEncContext;
 
