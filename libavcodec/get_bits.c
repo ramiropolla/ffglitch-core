@@ -42,11 +42,13 @@ static void gb_debug(
 #define GB_DEBUG_END(s, val) gb_debug(s, val, orig_count, get_bits_count(s), 0)
 #define GB_DEBUG_END_SHOW(s, val, n) gb_debug(s, val, orig_count, orig_count + n, 0)
 #define GB_DEBUG_END_CACHE(s, val) gb_debug(s, val, orig_count, get_bits_count(s), 1)
+#define GB_DEBUG_LOG(fmt, ...) av_log(NULL, AV_LOG_ERROR, fmt, __VA_ARGS__)
 #else
 #define GB_DEBUG_START(s)
 #define GB_DEBUG_END(s, val)
 #define GB_DEBUG_END_SHOW(s, val, n)
 #define GB_DEBUG_END_CACHE(s, val)
+#define GB_DEBUG_LOG(fmt, ...)
 #endif
 
 #define GB_PREFIX gb_be_

@@ -449,6 +449,8 @@ Optimization options (experts only):
   --disable-fast-unaligned consider unaligned accesses slow
 
 Developer options (useful when working on FFmpeg itself):
+  --ffedit-xp-debug        enable extra debugging for ffedit transplication
+                           (put_bits and get_bits)
   --disable-debug          disable debugging symbols
   --enable-debug=LEVEL     set the debug level [$debuglevel]
   --disable-optimizations  disable compiler optimizations
@@ -2346,6 +2348,7 @@ CONFIG_EXTRA="
     faandct
     faanidct
     fdctdsp
+    ffedit_xp_debug
     flacdsp
     fmtconvert
     frame_thread_encoder
@@ -3960,6 +3963,9 @@ for opt do
         ;;
         --disable-devices)
             disable $INDEV_LIST $OUTDEV_LIST
+        ;;
+        --ffedit-xp-debug)
+            enable ffedit_xp_debug
         ;;
         --enable-debug=*)
             debuglevel="$optval"

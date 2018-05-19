@@ -15,6 +15,7 @@ libavcodec/get_bits.c
 libavcodec/get_bits.h
 libavcodec/get_bits_common.h
 libavcodec/get_bits_funcs.h
+libavcodec/get_bits_funcs_dbg.h
 libavcodec/get_bits_undef.h
 libavcodec/golomb.h
 libavcodec/golomb_common.h
@@ -58,6 +59,7 @@ compat/float/limits.h
 libavcodec/ffedit.h
 libavcodec/ffedit_json.h
 libavcodec/get_bits_funcs.h
+libavcodec/get_bits_funcs_dbg.h
 libavcodec/get_bits_impl.h
 libavcodec/get_bits_undef.h
 libavcodec/put_bits_funcs.h
