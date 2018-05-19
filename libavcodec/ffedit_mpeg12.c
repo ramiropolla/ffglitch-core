@@ -4,6 +4,7 @@
 #include <stdatomic.h>
 
 #include "ffedit_json.h"
+#include "ffedit_mb.h"
 #include "ffedit_mv.h"
 
 #include "ffedit_mpegvideo.c"
@@ -754,6 +755,37 @@ ffe_mpeg2_decode_block_intra(
     return ret;
 }
 
+//---------------------------------------------------------------------
+// mb
+
+static int mpeg_decode_mb(MpegEncContext *s, int16_t block[12][64]);
+
+static int
+ffe_mpeg_decode_mb(MpegEncContext *s, int16_t block[12][64])
+{
+    AVFrame *f = s->current_picture_ptr->f;
+    FFEditTransplicateContext *xp = NULL;
+    ffe_mb_mb_ctx mbctx;
+    int ret;
+
+    if ( (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_MB)) != 0 )
+        xp = &s->ffe_xp;
+
+    if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_MB)) != 0 )
+        ffe_mb_export_init_mb(&mbctx, &s->gb);
+    else if ( (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_MB)) != 0 )
+        ffe_mb_import_init_mb(&mbctx, f, &s->gb, xp, s->mb_y, s->mb_x);
+
+    ret = mpeg_decode_mb(s, s->block);
+
+    if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_MB)) != 0 )
+        ffe_mb_export_flush_mb(&mbctx, s->jctx, f, &s->gb, s->mb_y, s->mb_x);
+    else if ( (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_MB)) != 0 )
+        ffe_mb_import_flush_mb(&mbctx, f, &s->gb, xp, s->mb_y, s->mb_x);
+
+    return ret;
+}
+
 /*-------------------------------------------------------------------*/
 /* common                                                            */
 /*-------------------------------------------------------------------*/
@@ -799,6 +831,11 @@ ffe_mpeg12_init(MpegEncContext *s)
         ffe_mpeg12_export_dct_init(s, f);
     else if ( i_which_dct_feat(s) != FFEDIT_FEAT_LAST )
         ffe_mpeg12_import_dct_init(s, f);
+
+    if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_MB)) != 0 )
+        ffe_mb_export_init(s->jctx, f, s->mb_height, s->mb_width);
+    else if ( (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_MB)) != 0 )
+        ffe_mb_import_init(s->jctx, f);
 }
 
 static void
@@ -815,4 +852,7 @@ ffe_mpeg12_export_cleanup(MpegEncContext *s, AVFrame *f)
 
     if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_QSCALE)) != 0 )
         ffe_mpeg12_export_qscale_cleanup(s, f);
+
+    if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_MB)) != 0 )
+        ffe_mb_export_cleanup(s->jctx, f);
 }

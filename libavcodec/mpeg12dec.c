@@ -1619,7 +1619,7 @@ static int mpeg_decode_slice(MpegEncContext *s, int mb_y,
     }
 
     for (;;) {
-        if ((ret = mpeg_decode_mb(s, s->block)) < 0)
+        if ((ret = ffe_mpeg_decode_mb(s, s->block)) < 0)
             return ret;
 
         // Note motion_val is normally NULL unless we want to extract the MVs.
@@ -2827,6 +2827,7 @@ const FFCodec ff_mpeg1video_decoder = {
                        | (1 << FFEDIT_FEAT_Q_DCT_DELTA)
                        | (1 << FFEDIT_FEAT_Q_DC)
                        | (1 << FFEDIT_FEAT_Q_DC_DELTA)
+                       | (1 << FFEDIT_FEAT_MB)
 };
 
 #define M2V_OFFSET(x) offsetof(Mpeg1Context, x)
@@ -2909,6 +2910,7 @@ const FFCodec ff_mpeg2video_decoder = {
                        | (1 << FFEDIT_FEAT_Q_DCT_DELTA)
                        | (1 << FFEDIT_FEAT_Q_DC)
                        | (1 << FFEDIT_FEAT_Q_DC_DELTA)
+                       | (1 << FFEDIT_FEAT_MB)
 };
 
 //legacy decoder
@@ -2936,6 +2938,7 @@ const FFCodec ff_mpegvideo_decoder = {
                        | (1 << FFEDIT_FEAT_Q_DCT_DELTA)
                        | (1 << FFEDIT_FEAT_Q_DC)
                        | (1 << FFEDIT_FEAT_Q_DC_DELTA)
+                       | (1 << FFEDIT_FEAT_MB)
 };
 
 typedef struct IPUContext {

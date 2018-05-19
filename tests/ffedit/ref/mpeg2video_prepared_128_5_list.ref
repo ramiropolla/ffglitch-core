@@ -8,3 +8,4 @@ FFEdit support for codec 'MPEG-2 video':
 	[mv          ]: motion vectors
 	[mv_delta    ]: motion vectors (delta only)
 	[qscale      ]: quantization scale
+	[mb          ]: macroblock
