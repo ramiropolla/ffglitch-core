@@ -259,9 +259,12 @@ int ff_mjpeg_decode_dht(MJpegDecodeContext *s)
     int len, index, i, class, n, v, code_max;
     uint8_t bits_table[17];
     uint8_t val_table[256];
+    ffe_dht_ctx_t dctx;
     int ret = 0;
 
-    len = get_bits(&s->gb, 16) - 2;
+    ffe_mjpeg_dht_init(s, &dctx);
+
+    len = ffe_mjpeg_dht_len(s, &dctx);
 
     if (8*len > get_bits_left(&s->gb)) {
         av_log(s->avctx, AV_LOG_ERROR, "dht: len %d is too large\n", len);
@@ -277,9 +280,12 @@ int ff_mjpeg_decode_dht(MJpegDecodeContext *s)
         index = get_bits(&s->gb, 4);
         if (index >= 4)
             return AVERROR_INVALIDDATA;
+
+        ffe_mjpeg_dht_table(s, &dctx, &class, &index, bits_table, val_table);
+
         n = 0;
         for (i = 1; i <= 16; i++) {
-            bits_table[i] = get_bits(&s->gb, 8);
+            bits_table[i] = ffe_mjpeg_dht_bits(s, &dctx, bits_table, i);
             n += bits_table[i];
         }
         len -= 17;
@@ -288,12 +294,14 @@ int ff_mjpeg_decode_dht(MJpegDecodeContext *s)
 
         code_max = 0;
         for (i = 0; i < n; i++) {
-            v = get_bits(&s->gb, 8);
+            v = ffe_mjpeg_dht_val(s, &dctx, val_table, i);
             if (v > code_max)
                 code_max = v;
             val_table[i] = v;
         }
         len -= n;
+
+        ffe_mjpeg_dht_export(s, &dctx, class, index, bits_table, val_table);
 
         /* build VLC and flush previous vlc if present */
         ff_free_vlc(&s->vlcs[class][index]);
@@ -315,6 +323,9 @@ int ff_mjpeg_decode_dht(MJpegDecodeContext *s)
         for (i = 0; i < 256; i++)
             s->raw_huffman_values[class][index][i] = val_table[i];
     }
+
+    ffe_mjpeg_dht_term(s, &dctx);
+
     return 0;
 }
 
@@ -2918,6 +2929,7 @@ AVCodec ff_mjpeg_decoder = {
                      | (1 << FFEDIT_FEAT_Q_DCT)
                      | (1 << FFEDIT_FEAT_Q_DC)
                      | (1 << FFEDIT_FEAT_DQT)
+                     | (1 << FFEDIT_FEAT_DHT)
 };
 #endif
 #if CONFIG_THP_DECODER
