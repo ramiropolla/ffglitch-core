@@ -207,6 +207,7 @@ av_cold int ff_mjpeg_decode_init(AVCodecContext *avctx)
 int ff_mjpeg_decode_dqt(MJpegDecodeContext *s)
 {
     int len, index, i;
+    ffe_dqt_ctx_t dctx;
 
     len = get_bits(&s->gb, 16) - 2;
 
@@ -214,6 +215,8 @@ int ff_mjpeg_decode_dqt(MJpegDecodeContext *s)
         av_log(s->avctx, AV_LOG_ERROR, "dqt: len %d is too large\n", len);
         return AVERROR_INVALIDDATA;
     }
+
+    ffe_mjpeg_dqt_init(s, &dctx);
 
     while (len >= 65) {
         int pr = get_bits(&s->gb, 4);
@@ -225,9 +228,12 @@ int ff_mjpeg_decode_dqt(MJpegDecodeContext *s)
         if (index >= 4)
             return -1;
         av_log(s->avctx, AV_LOG_DEBUG, "index=%d\n", index);
+
+        ffe_mjpeg_dqt_table(s, &dctx, index);
+
         /* read quant table */
         for (i = 0; i < 64; i++) {
-            s->quant_matrixes[index][i] = get_bits(&s->gb, pr ? 16 : 8);
+            s->quant_matrixes[index][i] = ffe_mjpeg_dqt_val(s, &dctx, pr ? 16 : 8, i);
             if (s->quant_matrixes[index][i] == 0) {
                 av_log(s->avctx, AV_LOG_ERROR, "dqt: 0 quant value\n");
                 return AVERROR_INVALIDDATA;
@@ -241,6 +247,9 @@ int ff_mjpeg_decode_dqt(MJpegDecodeContext *s)
                index, s->qscale[index]);
         len -= 1 + 64 * (1+pr);
     }
+
+    ffe_mjpeg_dqt_term(s, &dctx);
+
     return 0;
 }
 
@@ -2908,6 +2917,7 @@ AVCodec ff_mjpeg_decoder = {
     .ffedit_features = (1 << FFEDIT_FEAT_INFO)
                      | (1 << FFEDIT_FEAT_Q_DCT)
                      | (1 << FFEDIT_FEAT_Q_DC)
+                     | (1 << FFEDIT_FEAT_DQT)
 };
 #endif
 #if CONFIG_THP_DECODER
