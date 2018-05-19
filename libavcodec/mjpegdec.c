@@ -59,6 +59,8 @@
 
 #include "mjpegenc_common.h"
 
+#include "ffedit_mjpeg.c"
+
 
 static int init_default_huffman_tables(MJpegDecodeContext *s)
 {
@@ -754,7 +756,7 @@ int ff_mjpeg_decode_sof(MJpegDecodeContext *s)
             return 0;
         }
 
-        av_frame_unref(s->picture_ptr);
+        ffe_mjpeg_frame_unref(s->picture_ptr);
         if (ff_get_buffer(s->avctx, s->picture_ptr, AV_GET_BUFFER_FLAG_REF) < 0)
             return -1;
         s->picture_ptr->pict_type = AV_PICTURE_TYPE_I;
@@ -2365,6 +2367,8 @@ int ff_mjpeg_decode_frame_from_buf(AVCodecContext *avctx, AVFrame *frame,
     if (s->iccnum != 0)
         reset_icc_profile(s);
 
+    ffe_mjpeg_prepare_frame(avctx, s, avpkt);
+
     if ( (avctx->ffedit_apply & (1 << FFEDIT_FEAT_LAST)) != 0 )
     {
         ret = ffe_transplicate_init(avctx, &s->ffe_xp, avpkt->size);
@@ -3026,6 +3030,7 @@ const FFCodec ff_mjpeg_decoder = {
 #endif
                         NULL
                     },
+    .p.ffedit_features = (1 << FFEDIT_FEAT_INFO)
 };
 #endif
 #if CONFIG_THP_DECODER
