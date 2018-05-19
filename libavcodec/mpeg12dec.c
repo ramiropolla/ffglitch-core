@@ -138,7 +138,7 @@ static int mpeg_decode_motion(MpegEncContext *s, int fcode, int pred)
     } while (0)
 
 static inline int mpeg1_decode_block_inter(MpegEncContext *s,
-                                           int16_t *block, int n)
+                                           int16_t *block, int16_t *qblock, int n)
 {
     int level, i, j, run;
     RLTable *rl                  = &ff_rl_mpeg1;
@@ -147,15 +147,21 @@ static inline int mpeg1_decode_block_inter(MpegEncContext *s,
     const int qscale             = s->qscale;
 
     {
+        int qlevel;
         i = -1;
         // special case for first coefficient, no need to add second VLC table
-        if ( show_bits1(&s->gb) ) {
+        qlevel = show_bits1(&s->gb);
+        if ( qlevel ) {
             skip_bits1(&s->gb);
             level = (3 * qscale * quant_matrix[0]) >> 5;
             level = (level - 1) | 1;
             if ( get_bits1(&s->gb) )
+            {
                 level = -level;
+                qlevel = -qlevel;
+            }
             block[0] = level;
+            qblock[0] = qlevel;
             i++;
             if ( show_bits(&s->gb, 2) == 2 )
                 goto end;
@@ -170,10 +176,14 @@ static inline int mpeg1_decode_block_inter(MpegEncContext *s,
                 if (i > MAX_INDEX)
                     break;
                 j = scantable[i];
+                qlevel = level;
                 level = ((level * 2 + 1) * qscale * quant_matrix[j]) >> 5;
                 level = (level - 1) | 1;
                 if ( get_bits1(&s->gb) )
+                {
                     level = -level;
+                    qlevel = -qlevel;
+                }
             } else {
                 /* escape */
                 run = get_bits(&s->gb, 6) + 1;
@@ -187,6 +197,7 @@ static inline int mpeg1_decode_block_inter(MpegEncContext *s,
                 if (i > MAX_INDEX)
                     break;
                 j = scantable[i];
+                qlevel = level;
                 if (level < 0) {
                     level = -level;
                     level = ((level * 2 + 1) * qscale * quant_matrix[j]) >> 5;
@@ -199,6 +210,7 @@ static inline int mpeg1_decode_block_inter(MpegEncContext *s,
             }
 
             block[j] = level;
+            qblock[j] = qlevel;
             if ( show_bits(&s->gb, 2) == 2 )
                 break;
         }
@@ -213,7 +225,7 @@ end:
 }
 
 static inline int mpeg2_decode_block_non_intra(MpegEncContext *s,
-                                               int16_t *block, int n)
+                                               int16_t *block, int16_t *qblock, int n)
 {
     int level, i, j, run;
     RLTable *rl = &ff_rl_mpeg1;
@@ -225,6 +237,8 @@ static inline int mpeg2_decode_block_non_intra(MpegEncContext *s,
     mismatch = 1;
 
     {
+        int qlevel;
+
         i = -1;
         if (n < 4)
             quant_matrix = s->inter_matrix;
@@ -232,12 +246,17 @@ static inline int mpeg2_decode_block_non_intra(MpegEncContext *s,
             quant_matrix = s->chroma_inter_matrix;
 
         // Special case for first coefficient, no need to add second VLC table.
-        if ( show_bits1(&s->gb) ) {
+        qlevel = show_bits1(&s->gb);
+        if ( qlevel ) {
             skip_bits1(&s->gb);
             level = (3 * qscale * quant_matrix[0]) >> 5;
             if ( get_bits1(&s->gb) )
+            {
                 level = -level;
+                qlevel = -qlevel;
+            }
             block[0]  = level;
+            qblock[0] = qlevel;
             mismatch ^= level;
             i++;
             if ( show_bits(&s->gb, 2) == 2 )
@@ -254,9 +273,13 @@ static inline int mpeg2_decode_block_non_intra(MpegEncContext *s,
                 if (i > MAX_INDEX)
                     break;
                 j = scantable[i];
+                qlevel = level;
                 level = ((level * 2 + 1) * qscale * quant_matrix[j]) >> 5;
                 if ( get_bits1(&s->gb) )
+                {
                     level = -level;
+                    qlevel = -qlevel;
+                }
             } else {
                 /* escape */
                 run = get_bits(&s->gb, 6) + 1;
@@ -266,6 +289,7 @@ static inline int mpeg2_decode_block_non_intra(MpegEncContext *s,
                 if (i > MAX_INDEX)
                     break;
                 j = scantable[i];
+                qlevel = level;
                 if (level < 0) {
                     level = ((-level * 2 + 1) * qscale * quant_matrix[j]) >> 5;
                     level = -level;
@@ -276,6 +300,7 @@ static inline int mpeg2_decode_block_non_intra(MpegEncContext *s,
 
             mismatch ^= level;
             block[j]  = level;
+            qblock[j] = qlevel;
             if ( show_bits(&s->gb, 2) == 2 )
                 break;
         }
@@ -291,7 +316,7 @@ end:
 }
 
 static inline int mpeg2_decode_block_intra(MpegEncContext *s,
-                                           int16_t *block, int n)
+                                           int16_t *block, int16_t *qblock, int n)
 {
     int level, dc, diff, i, j, run;
     int component;
@@ -316,6 +341,7 @@ static inline int mpeg2_decode_block_intra(MpegEncContext *s,
     dc += diff;
     s->last_dc[component] = dc;
     block[0] = dc * (1 << (3 - s->intra_dc_precision));
+    qblock[0] = dc;
     ff_tlog(s->avctx, "dc=%d\n", block[0]);
     mismatch = block[0] ^ 1;
     i = 0;
@@ -327,6 +353,7 @@ static inline int mpeg2_decode_block_intra(MpegEncContext *s,
     {
         /* now quantify & encode AC coefficients */
         for (;;) {
+            int qlevel;
             get_rl_vlc2(&level, &run, &s->gb, rl->rl_vlc[0],
                         TEX_VLC_BITS, 2, 0);
 
@@ -337,9 +364,13 @@ static inline int mpeg2_decode_block_intra(MpegEncContext *s,
                 if (i > MAX_INDEX)
                     break;
                 j = scantable[i];
+                qlevel = level;
                 level = (level * qscale * quant_matrix[j]) >> 4;
                 if ( get_bits1(&s->gb) )
+                {
                     level = -level;
+                    qlevel = -qlevel;
+                }
             } else {
                 /* escape */
                 run = get_bits(&s->gb, 6) + 1;
@@ -348,6 +379,7 @@ static inline int mpeg2_decode_block_intra(MpegEncContext *s,
                 if (i > MAX_INDEX)
                     break;
                 j = scantable[i];
+                qlevel = level;
                 if (level < 0) {
                     level = (-level * qscale * quant_matrix[j]) >> 4;
                     level = -level;
@@ -358,6 +390,7 @@ static inline int mpeg2_decode_block_intra(MpegEncContext *s,
 
             mismatch ^= level;
             block[j]  = level;
+            qblock[j] = qlevel;
         }
     }
     block[63] ^= mismatch & 1;
@@ -504,15 +537,11 @@ static int mpeg_decode_mb(MpegEncContext *s, int16_t block[12][64])
 
         if (s->codec_id == AV_CODEC_ID_MPEG2VIDEO) {
             for (i = 0; i < mb_block_count; i++)
-                if ((ret = mpeg2_decode_block_intra(s, *s->pblocks[i], i)) < 0)
+                if ((ret = ffe_mpeg2_decode_block_intra(s, *s->pblocks[i], i)) < 0)
                     return ret;
         } else {
             for (i = 0; i < 6; i++) {
-                ret = ff_mpeg1_decode_block_intra(&s->gb,
-                                                  s->intra_matrix,
-                                                  s->intra_scantable.permutated,
-                                                  s->last_dc, *s->pblocks[i],
-                                                  i, s->qscale);
+                ret = ffe_mpeg1_decode_block_intra(s, *s->pblocks[i], i);
                 if (ret < 0) {
                     av_log(s->avctx, AV_LOG_ERROR, "ac-tex damaged at %d %d\n",
                            s->mb_x, s->mb_y);
@@ -744,7 +773,7 @@ static int mpeg_decode_mb(MpegEncContext *s, int16_t block[12][64])
 
                 for (i = 0; i < mb_block_count; i++) {
                     if (cbp & (1 << 11)) {
-                        if ((ret = mpeg2_decode_block_non_intra(s, *s->pblocks[i], i)) < 0)
+                        if ((ret = ffe_mpeg2_decode_block_non_intra(s, *s->pblocks[i], i)) < 0)
                             return ret;
                     } else {
                         s->block_last_index[i] = -1;
@@ -754,7 +783,7 @@ static int mpeg_decode_mb(MpegEncContext *s, int16_t block[12][64])
             } else {
                 for (i = 0; i < 6; i++) {
                     if (cbp & 32) {
-                        if ((ret = mpeg1_decode_block_inter(s, *s->pblocks[i], i)) < 0)
+                        if ((ret = ffe_mpeg1_decode_block_inter(s, *s->pblocks[i], i)) < 0)
                             return ret;
                     } else {
                         s->block_last_index[i] = -1;
@@ -2695,6 +2724,7 @@ AVCodec ff_mpeg1video_decoder = {
     .ffedit_features = (1 << FFEDIT_FEAT_INFO)
                      | (1 << FFEDIT_FEAT_MV)
                      | (1 << FFEDIT_FEAT_QSCALE)
+                     | (1 << FFEDIT_FEAT_Q_DCT)
 };
 
 AVCodec ff_mpeg2video_decoder = {
@@ -2744,6 +2774,7 @@ AVCodec ff_mpeg2video_decoder = {
     .ffedit_features = (1 << FFEDIT_FEAT_INFO)
                      | (1 << FFEDIT_FEAT_MV)
                      | (1 << FFEDIT_FEAT_QSCALE)
+                     | (1 << FFEDIT_FEAT_Q_DCT)
 };
 
 //legacy decoder
@@ -2766,4 +2797,5 @@ AVCodec ff_mpegvideo_decoder = {
     .ffedit_features = (1 << FFEDIT_FEAT_INFO)
                      | (1 << FFEDIT_FEAT_MV)
                      | (1 << FFEDIT_FEAT_QSCALE)
+                     | (1 << FFEDIT_FEAT_Q_DCT)
 };

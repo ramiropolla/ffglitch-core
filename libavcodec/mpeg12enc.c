@@ -745,6 +745,11 @@ next_coef:
     put_bits(&s->pb, table_vlc[112][1], table_vlc[112][0]);
 }
 
+void ffe_mpeg1_encode_block(MpegEncContext *s, int16_t *block, int n)
+{
+    mpeg1_encode_block(s, block, n);
+}
+
 static av_always_inline void mpeg1_encode_mb_internal(MpegEncContext *s,
                                                       int16_t block[8][64],
                                                       int motion_x, int motion_y,
