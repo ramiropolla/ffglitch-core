@@ -36,6 +36,8 @@
 #include "profiles.h"
 #include "thread.h"
 #include "xvididct.h"
+#include "ffedit.h"
+#include "ffedit_json.h"
 
 /* The defines below define the number of bits that are read at once for
  * reading vlc values. Changing these may improve speed and data cache needs
@@ -58,6 +60,26 @@ static const int mb_type_b_map[4] = {
     MB_TYPE_L1      | MB_TYPE_16x16,
     MB_TYPE_L0      | MB_TYPE_16x16,
 };
+
+static void ffe_mb_type_str(char *buf, int mb_type)
+{
+    *buf++ = (mb_type & MB_TYPE_INTRA)      ? 'I'
+           : (mb_type & MB_TYPE_DIRECT2)    ? 'D'
+           :                                  ' ';
+    *buf++ = (mb_type & MB_TYPE_CBP)        ? 'c' : ' ';
+    *buf++ = (mb_type & MB_TYPE_QUANT)      ? 'q' : ' ';
+    *buf++ = (mb_type & MB_TYPE_16x16)      ? 'F'
+           : (mb_type & MB_TYPE_16x8)       ? 'H'
+           : (mb_type & MB_TYPE_8x8)        ? '4'
+           :                                  ' ';
+    *buf++ = (mb_type & MB_TYPE_GMC)        ? 'G' : ' ';
+    *buf++ = (mb_type & MB_TYPE_L0)         ? 'f' : ' ';
+    *buf++ = (mb_type & MB_TYPE_L1)         ? 'b' : ' ';
+    *buf++ = (mb_type & MB_TYPE_ACPRED)     ? 'a' : ' ';
+    *buf++ = (mb_type & MB_TYPE_INTERLACED) ? 'i' : ' ';
+    *buf++ = (mb_type & MB_TYPE_SKIP)       ? 'S' : ' ';
+    *buf = '\0';
+}
 
 /**
  * Predict the ac.
@@ -1730,6 +1752,21 @@ intra:
     }
 
 end:
+    if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_INFO)) != 0 )
+    {
+        char buf[16];
+        AVFrame *f = s->current_picture_ptr->f;
+        json_object *jframe = f->ffedit_sd[FFEDIT_FEAT_INFO];
+        json_object *jmb_type;
+        json_object *jso;
+
+        json_object_object_get_ex(jframe, "mb_type", &jmb_type);
+
+        ffe_mb_type_str(buf, s->current_picture.mb_type[xy]);
+        jso = json_object_new_string(buf);
+        ffe_jmb_set(jmb_type, 0, s->mb_y, s->mb_x, 0, jso);
+    }
+
     /* per-MB end of slice check */
     if (s->codec_id == AV_CODEC_ID_MPEG4) {
         int next = mpeg4_is_resync(ctx);
@@ -3472,4 +3509,5 @@ AVCodec ff_mpeg4_decoder = {
 #endif
                                NULL
                            },
+    .ffedit_features = (1 << FFEDIT_FEAT_INFO)
 };
