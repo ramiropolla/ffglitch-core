@@ -754,6 +754,7 @@ static av_always_inline void mpeg1_encode_mb_internal(MpegEncContext *s,
     const int mb_x     = s->mb_x;
     const int mb_y     = s->mb_y;
     const int first_mb = mb_x == s->resync_mb_x && mb_y == s->resync_mb_y;
+    int force_mv = (s->mpv_flags & FF_MPV_FLAG_FORCE_MV) != 0;
 
     /* compute cbp */
     cbp = 0;
@@ -764,7 +765,7 @@ static av_always_inline void mpeg1_encode_mb_internal(MpegEncContext *s,
     if (cbp == 0 && !first_mb && s->mv_type == MV_TYPE_16X16 &&
         (mb_x != s->mb_width - 1 ||
          (mb_y != s->end_mb_y - 1 && s->codec_id == AV_CODEC_ID_MPEG1VIDEO)) &&
-        ((s->pict_type == AV_PICTURE_TYPE_P && (motion_x | motion_y) == 0) ||
+        ((s->pict_type == AV_PICTURE_TYPE_P && !force_mv && (motion_x | motion_y) == 0) ||
          (s->pict_type == AV_PICTURE_TYPE_B && s->mv_dir == s->last_mv_dir &&
           (((s->mv_dir & MV_DIR_FORWARD)
             ? ((s->mv[0][0][0] - s->last_mv[0][0][0]) |
@@ -817,7 +818,7 @@ static av_always_inline void mpeg1_encode_mb_internal(MpegEncContext *s,
         } else if (s->pict_type == AV_PICTURE_TYPE_P) {
             if (s->mv_type == MV_TYPE_16X16) {
                 if (cbp != 0) {
-                    if ((motion_x | motion_y) == 0) {
+                    if (!force_mv && (motion_x | motion_y) == 0) {
                         if (s->dquant) {
                             /* macroblock_pattern & quant */
                             put_mb_modes(s, 5, 1, 0, 0);
