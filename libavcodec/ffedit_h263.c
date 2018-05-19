@@ -2,6 +2,7 @@
 /* This file is included by h263dec.c */
 
 #include "ffedit_json.h"
+#include "ffedit_mv.h"
 
 #include "ffedit_mpegvideo.c"
 
@@ -69,6 +70,28 @@ ffe_h263_export_init(MpegEncContext *s)
 
     if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_INFO)) != 0 )
         ffe_h263_export_info_init(s, f);
+
+    if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_MV)) != 0 )
+    {
+        ffe_mv_export_init(s->jctx, f, s->mb_height, s->mb_width, 1, 4);
+        ffe_mv_export_fcode(s->jctx, f, 0, 0, s->f_code);
+        ffe_mv_export_fcode(s->jctx, f, 1, 0, s->b_code);
+    }
+    else if ( (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_MV)) != 0 )
+    {
+        ffe_mv_import_init(s->jctx, f);
+    }
+
+    if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_MV_DELTA)) != 0 )
+    {
+        ffe_mv_delta_export_init(s->jctx, f, s->mb_height, s->mb_width, 1, 4);
+        ffe_mv_delta_export_fcode(s->jctx, f, 0, 0, s->f_code);
+        ffe_mv_delta_export_fcode(s->jctx, f, 1, 0, s->b_code);
+    }
+    else if ( (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_MV_DELTA)) != 0 )
+    {
+        ffe_mv_delta_import_init(s->jctx, f);
+    }
 }
 
 //---------------------------------------------------------------------
@@ -77,4 +100,10 @@ ffe_h263_export_cleanup(MpegEncContext *s, AVFrame *f)
 {
     if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_INFO)) != 0 )
         ffe_h263_export_info_cleanup(s, f);
+
+    if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_MV)) != 0 )
+        ffe_mv_export_cleanup(s->jctx, f);
+
+    if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_MV_DELTA)) != 0 )
+        ffe_mv_delta_export_cleanup(s->jctx, f);
 }

@@ -1,0 +1,317 @@
+{
+  "filename":"libxvid_prepared_128_9_mv4_aif_bf_gmc.rawvideo",
+  "sha1sum":"9fa3778196775557e10a5de9b0521b700c1e9ace",
+  "features":[
+    "info",
+    "mv"
+  ],
+  "streams":[
+    {
+      "codec":"mpeg4",
+      "frames":[
+        {
+          "pkt_pos":0,
+          "pts":0,
+          "dts":0,
+          "info":{
+            "pict_type":"I",
+            "mb_type":[
+              [ "I        1234  ", "I        12 4  ", "I        12    ", "I         234  ", "Ia       1234  ", "I        1234  ", "I          34  ", "I        1 34  " ],
+              [ "I        123456", "I        1234  ", "I        1234  ", "I        1234  ", "I        1234  ", "I        1234  ", "I        1234  ", "I        1234  " ],
+              [ "I        12345 ", "I        12345 ", "I        12345 ", "I        1234  ", "I        1234  ", "I        1234  ", "I        1234  ", "I        1234  " ],
+              [ "I        1234  ", "I        1234  ", "I        12345 ", "I        12345 ", "Ia       1234  ", "I        1234  ", "I        1234  ", "I        12345 " ],
+              [ "I        1234  ", "I        12345 ", "I        12345 ", "I        123456", "I        1234  ", "I        12345 ", "I        1234  ", "I        1234  " ],
+              [ "I        12345 ", "I        12345 ", "I        1234  ", "I        1234 6", "Ia       123456", "I        12345 ", "I        12345 ", "I        12345 " ],
+              [ "I        12345 ", "I        12345 ", "I        1234  ", "I        1234  ", "I        12345 ", "I        123456", "I        123456", "I        123456" ],
+              [ "I        12345 ", "I        12345 ", "I        12345 ", "I        123456", "I        1234 6", "I        123456", "I        12345 ", "I        123456" ]
+            ]
+          },
+          "mv":{
+          }
+        },
+        {
+          "pkt_pos":4427,
+          "pts":120120,
+          "dts":120120,
+          "info":{
+            "pict_type":"S",
+            "mb_type":[
+              [ "   f           ", "   f           ", "   f           ", "   f           ", "   f           ", "   f           ", "   f           ", "   f        4  " ],
+              [ "   f     1234  ", "   f     1234  ", "   f     1234  ", "   f     1234  ", "   f     1234  ", "   f     1 34  ", "   f     1234  ", "   f     1234  " ],
+              [ "   f     1234  ", "   f     1234  ", "   f     1234  ", "   f     1234  ", "   f     1234  ", "   f     1234  ", "   f     1234  ", "   f     1234  " ],
+              [ "   f      234  ", "   f     1234  ", "   f     1234  ", "   f     1234  ", "   f   4 1234  ", "   f     1234  ", "   f   4 1234  ", "   f     1 34  " ],
+              [ "   f     1234  ", "   f     1234  ", "   f     1234  ", "   f     1234  ", "   f     1234  ", "   f   4 1234  ", "   f     1234  ", "   f   4 123   " ],
+              [ "   f     1234  ", "   f   4 1234  ", "   f   4 1234  ", "   f   4 1234  ", "   f     1234  ", "   f     1234  ", "   f   4 1 34  ", "   f      2 4  " ],
+              [ "   f   4 1234  ", "   f     1234  ", "   f   4 1234  ", "   f   4  234  ", "   f     123   ", "   f     1234  ", "   f     1234  ", "   f       3   " ],
+              [ "   f   4 1234  ", "   f   4 1234  ", "   f     1234  ", "   f   4 1234  ", "   f      234  ", "   f   4 1234  ", "   f   4 12 4  ", "   f   4  234  " ]
+            ]
+          },
+          "mv":{
+            "forward":[
+              [ [0,-1], [0,-1], [1,-1], [1,-1], [-1,-1], [-1,-1], [1,-1], [-1,-1] ],
+              [ [0,-1], [0,0], [0,-1], [0,-1], [0,-1], [0,-1], [0,0], [0,-1] ],
+              [ [0,0], [0,0], [0,0], [0,0], [0,0], [0,0], [0,0], [0,0] ],
+              [ [0,0], [0,0], [0,0], [0,0], [[0,-1],[0,0],[0,-1],[0,-1]], [1,0], [[1,0],[0,0],[1,0],[1,0]], [0,0] ],
+              [ [0,0], [0,0], [0,-1], [0,-1], [0,-1], [[0,0],[1,0],[0,-1],[0,-1]], [1,0], [[1,0],[1,0],[2,1],[1,0]] ],
+              [ [0,0], [[0,0],[0,-1],[0,-1],[1,-2]], [[0,-1],[0,-1],[0,-1],[0,-2]], [[0,-1],[0,-1],[0,-2],[0,-1]], [0,-1], [0,-1], [[0,0],[1,0],[-1,-2],[1,0]], [2,1] ],
+              [ [[0,0],[0,0],[0,0],[2,-3]], [1,-2], [[0,-1],[0,-2],[0,-1],[0,-2]], [[0,-2],[0,-1],[0,-3],[0,-1]], [0,-2], [-1,-2], [-1,-2], [0,-1] ],
+              [ [[2,-3],[2,-3],[2,-3],[2,-4]], [[1,-3],[0,0],[1,-4],[0,-1]], [1,-3], [[0,-3],[0,-1],[0,-3],[0,-2]], [0,-3], [[0,-3],[-1,-3],[-1,-3],[0,-1]], [[-1,-3],[-1,-3],[-1,-3],[-2,-3]], [[0,-1],[0,0],[-1,-4],[-3,-5]] ]
+            ],
+            "fcode":[ 1 ],
+            "overflow":"warn"
+          }
+        },
+        {
+          "pkt_pos":5588,
+          "pts":40040,
+          "dts":40040,
+          "info":{
+            "pict_type":"B",
+            "mb_type":[
+              [ "               ", "     d         ", "    b          ", "    b          ", "               ", "               ", "    b          ", "               " ],
+              [ "               ", "    b          ", "               ", "               ", "               ", "               ", "    b          ", "               " ],
+              [ "    b          ", "    b          ", "    b          ", "    b          ", "    b          ", "               ", "    b          ", "               " ],
+              [ "    b          ", "    b          ", "    b          ", "    b          ", "               ", "               ", "               ", "               " ],
+              [ "    b          ", "   fb          ", "               ", "               ", "               ", "               ", "               ", "     d     3   " ],
+              [ "    b          ", "  qfb     2 4  ", "     d      4  ", "     d     3   ", "               ", "               ", "   fb          ", "  qfb     2    " ],
+              [ "  qfb       4  ", "     d   1234  ", "     d    2 4  ", "  qfb    1 3   ", "     d     34  ", "  qfb     2 4  ", "     d   1 34  ", "               " ],
+              [ "  qfb    12 4  ", "               ", "   fb          ", "  qfb      3   ", "  qfb       4  ", "  qfb    1 3   ", "  qfb       4  ", "     d     34  " ]
+            ]
+          },
+          "mv":{
+            "forward":[
+              [ null, null, null, null, null, null, null, null ],
+              [ null, null, null, null, null, null, null, null ],
+              [ null, null, null, null, null, null, null, null ],
+              [ null, null, null, null, null, null, null, null ],
+              [ null, [-1,0], null, null, null, null, null, null ],
+              [ null, [0,0], null, null, null, null, [0,0], [1,0] ],
+              [ [0,0], null, null, [0,-1], null, [0,-1], null, null ],
+              [ [1,-2], null, [0,-2], [0,-1], [0,-2], [0,-1], [0,-2], null ]
+            ],
+            "backward":[
+              [ null, null, [0,0], [0,1], null, null, [-1,-1], null ],
+              [ null, [0,0], null, null, null, null, [0,0], null ],
+              [ [0,0], [0,0], [0,0], [0,0], [0,0], null, [0,0], null ],
+              [ [0,0], [0,0], [0,0], [0,0], null, null, null, null ],
+              [ [0,0], [0,0], null, null, null, null, null, null ],
+              [ [0,0], [0,0], null, null, null, null, [0,0], [-2,-1] ],
+              [ [0,0], null, null, [0,1], null, [0,1], null, null ],
+              [ [-1,2], null, [0,2], [0,1], [0,2], [0,1], [0,2], null ]
+            ],
+            "direct":[
+              [ null, [-1,0], null, null, null, null, null, null ],
+              [ null, null, null, null, null, null, null, null ],
+              [ null, null, null, null, null, null, null, null ],
+              [ null, null, null, null, null, null, null, null ],
+              [ null, null, null, null, null, null, null, [0,0] ],
+              [ null, null, [0,0], [0,0], null, null, null, null ],
+              [ null, [0,-1], [0,-1], null, [0,-1], null, [0,-1], null ],
+              [ null, null, null, null, null, null, null, [0,0] ]
+            ],
+            "fcode":[ 1 ],
+            "bcode":[ 1 ],
+            "overflow":"warn"
+          }
+        },
+        {
+          "pkt_pos":5795,
+          "pts":80080,
+          "dts":80080,
+          "info":{
+            "pict_type":"B",
+            "mb_type":[
+              [ "               ", "               ", "    b          ", "    b          ", "               ", "               ", "    b          ", "     d         " ],
+              [ "               ", "    b          ", "               ", "               ", "               ", "               ", "   fb          ", "               " ],
+              [ "   fb          ", "    b          ", "    b          ", "    b          ", "    b          ", "  q b      3   ", "    b          ", "    b          " ],
+              [ "    b          ", "    b          ", "    b          ", "    b          ", "               ", "               ", "               ", "   fb          " ],
+              [ "    b          ", "    b          ", "     d     3   ", "               ", "     d     3   ", "               ", "     d    2    ", "   fb          " ],
+              [ "    b          ", "     d    234  ", "  qfb    1  4  ", "     d     3   ", "  q b    1 3   ", "     d      4  ", "               ", "  qfb     2    " ],
+              [ "               ", "     d    23   ", "     d    2 4  ", "     d   1     ", "     d   1     ", "     d    2    ", "     d   1 3   ", "   fb          " ],
+              [ "     d   1     ", "               ", "               ", "               ", "  qf        4  ", "     d     3   ", "   fb          ", "     d      4  " ]
+            ]
+          },
+          "mv":{
+            "forward":[
+              [ null, null, null, null, null, null, null, null ],
+              [ null, null, null, null, null, null, [0,-1], null ],
+              [ [0,-1], null, null, null, null, null, null, null ],
+              [ null, null, null, null, null, null, null, [0,-1] ],
+              [ null, null, null, null, null, null, null, [1,0] ],
+              [ null, null, [0,-1], null, null, null, null, [1,0] ],
+              [ null, null, null, null, null, null, null, [-1,-1] ],
+              [ null, null, null, null, [0,-2], null, [0,-2], null ]
+            ],
+            "backward":[
+              [ null, null, [0,0], [0,1], null, null, [0,-1], null ],
+              [ null, [0,0], null, null, null, null, [0,0], null ],
+              [ [0,0], [0,0], [0,0], [0,0], [0,0], [0,0], [0,0], [0,0] ],
+              [ [0,0], [0,0], [0,0], [0,0], null, null, null, [0,0] ],
+              [ [0,0], [0,0], null, null, null, null, null, [0,0] ],
+              [ [0,0], null, [0,0], null, [0,0], null, null, [-1,0] ],
+              [ null, null, null, null, null, null, null, [0,0] ],
+              [ null, null, null, null, null, null, [0,1], null ]
+            ],
+            "direct":[
+              [ null, null, null, null, null, null, null, [-1,0] ],
+              [ null, null, null, null, null, null, null, null ],
+              [ null, null, null, null, null, null, null, null ],
+              [ null, null, null, null, null, null, null, null ],
+              [ null, null, [0,0], null, [0,0], null, [0,0], null ],
+              [ null, [0,0], null, [0,0], null, [0,0], null, null ],
+              [ null, [0,0], [0,0], [0,0], [0,0], [0,0], [0,0], null ],
+              [ [0,0], null, null, null, null, [0,0], null, [0,0] ]
+            ],
+            "fcode":[ 1 ],
+            "bcode":[ 1 ],
+            "overflow":"warn"
+          }
+        },
+        {
+          "pkt_pos":5942
+        },
+        {
+          "pkt_pos":5949,
+          "pts":240240,
+          "dts":null,
+          "info":{
+            "pict_type":"S",
+            "mb_type":[
+              [ "   f     1  4  ", "   f           ", "      G   2    ", "      G  1234  ", "   f      23  6", "      G  1  4 6", "   f           ", "      G        " ],
+              [ "   f     1 34  ", "      G  1234  ", "   f     1 3   ", "   f     1 34  ", "   f     1 34  ", "   f     1234  ", "   f     1234 6", "   f     1234 6" ],
+              [ "   f     1234  ", "   f     1234  ", "      G  1234  ", "      G  1234  ", "      G  1234  ", "   f   4 1234  ", "   f     1234  ", "   f     1234  " ],
+              [ "   f     12 4  ", "   f   4 1234  ", "   f   4 1234  ", "   f     1234  ", "   f     1234  ", "   f     1234  ", "   f   4 1234  ", "   f   4 1234  " ],
+              [ "   f      234  ", "   f     1234  ", "   f   4 1234  ", "   f     12345 ", "   f   4 1234  ", "   f   4 1234  ", "      G  1234  ", "      G  12345 " ],
+              [ "   f     1234  ", "   f   4 1234  ", "   f   4 1234  ", "   f     1234  ", "   f     1234  ", "   f     1234  ", "      G  1 34  ", "      G  12 4  " ],
+              [ "   f   4 1234  ", "   f     1234  ", "   f     1234  ", "   f   4 1234  ", "   f   4 1234  ", "   f   4 1234  ", "   f   4 1234  ", "   f     1234  " ],
+              [ "   f   4 1234  ", "   f   4 1234  ", "   f     1234  ", "   f   4 1234  ", "   f      234  ", "   f   4 1234  ", "   f     1234 6", "   f   4 123456" ]
+            ]
+          },
+          "mv":{
+            "forward":[
+              [ [1,0], [-1,0], null, null, [0,0], null, [0,-1], null ],
+              [ [0,0], null, [0,0], [0,0], [0,0], [0,0], [0,-1], [0,0] ],
+              [ [0,-1], [0,0], null, null, null, [[0,-1],[0,-1],[0,0],[1,0]], [0,0], [0,0] ],
+              [ [0,-1], [[0,-1],[-1,0],[0,-1],[0,0]], [[0,0],[0,-1],[0,0],[0,-1]], [0,-1], [0,0], [0,0], [[0,0],[0,-1],[1,0],[1,0]], [[0,-1],[0,-1],[1,0],[1,0]] ],
+              [ [0,0], [-1,0], [[0,0],[0,-1],[1,-1],[1,-1]], [0,-1], [[0,0],[0,-1],[0,-1],[0,-1]], [[0,-1],[1,1],[0,-1],[0,0]], null, null ],
+              [ [0,0], [[0,0],[1,-1],[0,0],[1,-2]], [[1,-1],[0,-1],[1,-2],[1,-2]], [0,-1], [0,-1], [0,-1], null, null ],
+              [ [[0,0],[0,0],[0,0],[3,-3]], [1,-2], [1,-2], [[0,-2],[0,-1],[0,-2],[0,0]], [[0,-2],[-1,-2],[0,-2],[-1,-2]], [[0,-1],[0,-2],[0,-1],[0,-2]], [[0,-2],[1,1],[-1,-2],[-1,-2]], [0,0] ],
+              [ [[2,-3],[2,-3],[2,-4],[2,-4]], [[2,-3],[0,-1],[2,-4],[0,0]], [1,-3], [[1,-2],[0,0],[0,-3],[0,-2]], [0,-3], [[0,-3],[0,-1],[-1,-3],[0,-1]], [-1,-3], [[0,0],[0,0],[-1,-4],[-2,-4]] ]
+            ],
+            "fcode":[ 1 ],
+            "overflow":"warn"
+          }
+        },
+        {
+          "pkt_pos":7840,
+          "pts":160160,
+          "dts":160160,
+          "info":{
+            "pict_type":"B",
+            "mb_type":[
+              [ "               ", "               ", "   fb          ", "     d         ", "               ", "               ", "   fb          ", "               " ],
+              [ "               ", "               ", "    b          ", "               ", "               ", "               ", "               ", "               " ],
+              [ "               ", "               ", "               ", "               ", "     d      4  ", "     d     3   ", "               ", "               " ],
+              [ "               ", "               ", "               ", "               ", "               ", "               ", "               ", "               " ],
+              [ "               ", "               ", "  qf        4  ", "   fb          ", "   f           ", "               ", "  qf     12 4  ", "               " ],
+              [ "               ", "  qf      2 4  ", "  qf     1     ", "  qf     1  4  ", "  qfb    1 34  ", "  qfb    1     ", "  qfb    1     ", "  qfb     2    " ],
+              [ "     d      4  ", "  qfb    1 34  ", "     d    2 4  ", "  qfb     2    ", "               ", "  qfb       4  ", "  qfb    1     ", "   fb          " ],
+              [ "  qfb    1 34  ", "  qfb     23   ", "   fb          ", "  qfb      3   ", "  qfb       4  ", "   fb          ", "  qfb       4  ", "     d     34  " ]
+            ]
+          },
+          "mv":{
+            "forward":[
+              [ null, null, [0,0], null, null, null, [-1,-3], null ],
+              [ null, null, null, null, null, null, null, null ],
+              [ null, null, null, null, null, null, null, null ],
+              [ null, null, null, null, null, null, null, null ],
+              [ null, null, [0,0], [0,0], [0,0], null, [0,0], null ],
+              [ null, [0,0], [0,0], [0,0], [0,0], [0,0], [0,0], [0,0] ],
+              [ null, [0,0], null, [0,0], null, [0,0], [0,0], [0,0] ],
+              [ [0,0], [0,0], [0,0], [0,0], [0,0], [0,0], [0,0], null ]
+            ],
+            "backward":[
+              [ null, null, [0,1], null, null, null, [-1,1], null ],
+              [ null, null, [0,0], null, null, null, null, null ],
+              [ null, null, null, null, null, null, null, null ],
+              [ null, null, null, null, null, null, null, null ],
+              [ null, null, null, [0,1], null, null, null, null ],
+              [ null, null, null, null, [0,1], [0,1], [0,1], [-2,-1] ],
+              [ null, [-1,1], null, [0,2], null, [0,1], [0,2], [-1,0] ],
+              [ [-2,2], [-1,2], [-1,2], [0,2], [0,2], [0,2], [0,2], null ]
+            ],
+            "direct":[
+              [ null, null, null, [1,0], null, null, null, null ],
+              [ null, null, null, null, null, null, null, null ],
+              [ null, null, null, null, [0,0], [0,0], null, null ],
+              [ null, null, null, null, null, null, null, null ],
+              [ null, null, null, null, null, null, null, null ],
+              [ null, null, null, null, null, null, null, null ],
+              [ [0,0], null, [0,0], null, null, null, null, null ],
+              [ null, null, null, null, null, null, null, [0,0] ]
+            ],
+            "fcode":[ 1 ],
+            "bcode":[ 1 ],
+            "overflow":"warn"
+          }
+        },
+        {
+          "pkt_pos":8026,
+          "pts":200200,
+          "dts":200200,
+          "info":{
+            "pict_type":"B",
+            "mb_type":[
+              [ "               ", "     d         ", "    b          ", "    b          ", "     d         ", "               ", "    b          ", "   fb          " ],
+              [ "     d     3   ", "               ", "    b          ", "  q b     2    ", "               ", "               ", "               ", "               " ],
+              [ "     d   1     ", "               ", "               ", "     d     3   ", "               ", "               ", "               ", "               " ],
+              [ "               ", "    b          ", "     d   1     ", "               ", "               ", "               ", "   fb          ", "     d   1     " ],
+              [ "    b          ", "    b          ", "     d    23   ", "               ", "   fb          ", "     d     3   ", "   fb          ", "   fb          " ],
+              [ "     d   1     ", "  qfb     2 4  ", "  qfb    1     ", "     d   1  4  ", "  qfb    1 34  ", "  qfb    1     ", "               ", "  qfb     2    " ],
+              [ "  qfb       4  ", "  qfb    1234  ", "  qfb     2 4  ", "  qfb    1 3   ", "  q b    1234  ", "  q b    12 4  ", "  q b    1 34  ", "   fb          " ],
+              [ "  qf     1234  ", "     d   1 3   ", "   fb          ", "  qfb      3   ", "  qfb     23   ", "  q b    1 3   ", "  qfb    12    ", "               " ]
+            ]
+          },
+          "mv":{
+            "forward":[
+              [ null, null, null, null, null, null, null, [0,0] ],
+              [ null, null, null, null, null, null, null, null ],
+              [ null, null, null, null, null, null, null, null ],
+              [ null, null, null, null, null, null, [0,0], null ],
+              [ null, null, null, null, [-1,0], null, [0,0], [0,0] ],
+              [ null, [0,0], [0,0], null, [-1,0], [-1,0], null, [2,1] ],
+              [ [-1,0], [0,0], [0,0], [0,-1], null, null, null, [0,0] ],
+              [ [1,-2], null, [0,-2], [0,-1], [-1,-2], null, [-1,-2], null ]
+            ],
+            "backward":[
+              [ null, null, [-1,1], [1,0], null, null, [-1,0], [-1,0] ],
+              [ null, null, [0,0], [0,0], null, null, null, null ],
+              [ null, null, null, null, null, null, null, null ],
+              [ null, [0,0], null, null, null, null, [-1,0], null ],
+              [ [0,0], [0,0], null, null, [0,0], null, [-1,0], [-1,0] ],
+              [ null, [-1,0], [0,0], null, [0,0], [0,0], null, [-2,-1] ],
+              [ [0,0], [0,0], [0,0], [0,1], [0,1], [0,1], [0,1], [-1,0] ],
+              [ null, null, [0,2], [0,1], [0,2], [0,1], [0,2], null ]
+            ],
+            "direct":[
+              [ null, [-1,0], null, null, [-1,0], null, null, null ],
+              [ [0,0], null, null, null, null, null, null, null ],
+              [ [0,0], null, null, [0,0], null, null, null, null ],
+              [ null, null, [0,0], null, null, null, null, [0,0] ],
+              [ null, null, [0,0], null, null, [0,0], null, null ],
+              [ [0,0], null, null, [0,0], null, null, null, null ],
+              [ null, null, null, null, null, null, null, null ],
+              [ null, [0,0], null, null, null, null, null, null ]
+            ],
+            "fcode":[ 1 ],
+            "bcode":[ 1 ],
+            "overflow":"warn"
+          }
+        },
+        {
+          "pkt_pos":8311
+        }
+      ]
+    }
+  ]
+}

@@ -39,6 +39,7 @@ extern VLCElem ff_h263_cbpy_vlc[];
 extern VLCElem ff_h263_mv_vlc[];
 
 int ff_h263_decode_motion(MpegEncContext * s, int pred, int f_code);
+int ff_h263_decode_motion_delta(MpegEncContext * s, int f_code);
 int ff_h263_decode_init(AVCodecContext *avctx);
 int ff_h263_decode_frame(AVCodecContext *avctx, AVFrame *frame,
                          int *got_frame, AVPacket *avpkt);

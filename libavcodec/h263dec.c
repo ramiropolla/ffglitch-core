@@ -457,6 +457,7 @@ int ff_h263_decode_frame(AVCodecContext *avctx, AVFrame *pict,
 
             s->next_picture_ptr = NULL;
 
+            ffe_h263_export_cleanup(s, pict);
             *got_frame = 1;
         } else if (s->skipped_last_frame && s->current_picture_ptr) {
 

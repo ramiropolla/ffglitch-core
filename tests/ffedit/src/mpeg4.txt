@@ -1,2 +1,5 @@
 ffgac -flags +bitexact -fflags +bitexact -idct simple -i ~/public_domain/CEP00109.mpg -c:v mpeg4 -an -f rawvideo -mpv_flags +nopimb+forcemv -g max -s 128x128 -vframes 5 -y mpeg4_prepared_128_5.rawvideo
 ffgac -flags +bitexact -fflags +bitexact -idct simple -i ~/public_domain/CEP00109.mpg -c:v mpeg4 -an -f rawvideo -mpv_flags +nopimb+forcemv -g max -s 128x128 -vframes 5 -flags +mv4 -y mpeg4_prepared_128_5_mv4.rawvideo
+ffgac -flags +bitexact -fflags +bitexact -idct simple -i ~/public_domain/CEP00109.mpg -c:v libxvid -an -f rawvideo -intra_penalty max -g max -s 128x128 -vframes 5 -flags +mv4 -y libxvid_prepared_128_5_mv4_null.rawvideo
+ffgac -flags +bitexact -fflags +bitexact -idct simple -i ~/public_domain/CEP00109.mpg -c:v libxvid -an -f rawvideo -intra_penalty max -g max -s 128x128 -vframes 9 -flags +mv4+aic -gmc 1 -y libxvid_prepared_128_5_mv4_aif_gmc.rawvideo
+ffgac -flags +bitexact -fflags +bitexact -idct simple -i ~/public_domain/CEP00109.mpg -c:v libxvid -an -f rawvideo -intra_penalty max -g max -s 128x128 -vframes 9 -flags +mv4+aic -bf 4 -gmc 1 -y libxvid_prepared_128_5_mv4_aif_bf_gmc.rawvideo

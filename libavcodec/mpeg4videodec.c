@@ -42,6 +42,7 @@
 #include "h263.h"
 #include "h263data.h"
 #include "h263dec.h"
+#include "h263enc.h"
 #include "internal.h"
 #include "profiles.h"
 #include "qpeldsp.h"
@@ -1073,6 +1074,8 @@ try_again:
                     if ((cbpc & 16) == 0) {
                         /* 16x16 motion prediction */
 
+                        ffe_mpeg4_mv_not_supported(s);
+
                         ff_h263_pred_motion(s, 0, 0, &pred_x, &pred_y);
                         if (!s->mcsel) {
                             mx = ff_h263_decode_motion(s, pred_x, s->f_code);
@@ -1104,6 +1107,8 @@ try_again:
                         int i;
                         s->current_picture.mb_type[xy] = MB_TYPE_8x8 |
                                                          MB_TYPE_L0;
+                        ffe_mpeg4_mv_not_supported(s);
+
                         for (i = 0; i < 4; i++) {
                             int16_t *mot_val = ff_h263_pred_motion(s, i, 0, &pred_x, &pred_y);
                             mx = ff_h263_decode_motion(s, pred_x, s->f_code);
@@ -1639,6 +1644,8 @@ static int mpeg4_decode_mb(MpegEncContext *s, int16_t block[6][64])
     int ffe_mb_type = 0;
     int ffe_mb_cbp = 0;
     int next;
+    ffe_mv_mb_ctx mbctx;
+    ffe_mv_mb_ctx mbctx_delta;
 
     av_assert2(s ==  (void*)ctx);
     av_assert2(s->h263_pred);
@@ -1744,14 +1751,20 @@ static int mpeg4_decode_mb(MpegEncContext *s, int16_t block[6][64])
                 s->field_select[0][0] = get_bits1(&s->gb);
                 s->field_select[0][1] = get_bits1(&s->gb);
 
+                ffe_mpeg4_mv_init_mb(&mbctx, s, 1, 2);
+                ffe_mpeg4_mv_delta_init_mb(&mbctx_delta, s, 1, 2);
+
                 ff_h263_pred_motion(s, 0, 0, &pred_x, &pred_y);
 
                 for (i = 0; i < 2; i++) {
-                    mx = ff_h263_decode_motion(s, pred_x, s->f_code);
+                    ffe_mpeg4_mv_select(&mbctx, s, 0, i);
+                    ffe_mpeg4_mv_delta_select(&mbctx_delta, s, 0, i);
+
+                    mx = ffe_mpeg4_decode_motion(&mbctx, &mbctx_delta, s, pred_x, s->f_code, 0);
                     if (mx >= 0xffff)
                         return AVERROR_INVALIDDATA;
 
-                    my = ff_h263_decode_motion(s, pred_y / 2, s->f_code);
+                    my = ffe_mpeg4_decode_motion(&mbctx, &mbctx_delta, s, pred_y / 2, s->f_code, 1);
                     if (my >= 0xffff)
                         return AVERROR_INVALIDDATA;
 
@@ -1764,13 +1777,15 @@ static int mpeg4_decode_mb(MpegEncContext *s, int16_t block[6][64])
                 s->current_picture.mb_type[xy] = MB_TYPE_16x16 | MB_TYPE_L0;
                 /* 16x16 motion prediction */
                 s->mv_type = MV_TYPE_16X16;
-                ff_h263_pred_motion(s, 0, 0, &pred_x, &pred_y);
-                mx = ff_h263_decode_motion(s, pred_x, s->f_code);
+                ffe_mpeg4_mv_init_mb(&mbctx, s, 1, 1);
+                ffe_mpeg4_mv_delta_init_mb(&mbctx_delta, s, 1, 1);
+                ffe_h263_pred_motion(&mbctx, &mbctx_delta, s, 0, 0, &pred_x, &pred_y);
+                mx = ffe_mpeg4_decode_motion(&mbctx, &mbctx_delta, s, pred_x, s->f_code, 0);
 
                 if (mx >= 0xffff)
                     return AVERROR_INVALIDDATA;
 
-                my = ff_h263_decode_motion(s, pred_y, s->f_code);
+                my = ffe_mpeg4_decode_motion(&mbctx, &mbctx_delta, s, pred_y, s->f_code, 1);
 
                 if (my >= 0xffff)
                     return AVERROR_INVALIDDATA;
@@ -1783,13 +1798,15 @@ static int mpeg4_decode_mb(MpegEncContext *s, int16_t block[6][64])
 
             s->current_picture.mb_type[xy] = MB_TYPE_8x8 | MB_TYPE_L0;
             s->mv_type                     = MV_TYPE_8X8;
+            ffe_mpeg4_mv_init_mb(&mbctx, s, 1, 4);
+            ffe_mpeg4_mv_delta_init_mb(&mbctx_delta, s, 1, 4);
             for (i = 0; i < 4; i++) {
-                mot_val = ff_h263_pred_motion(s, i, 0, &pred_x, &pred_y);
-                mx      = ff_h263_decode_motion(s, pred_x, s->f_code);
+                mot_val = ffe_h263_pred_motion(&mbctx, &mbctx_delta, s, i, 0, &pred_x, &pred_y);
+                mx      = ffe_mpeg4_decode_motion(&mbctx, &mbctx_delta, s, pred_x, s->f_code, 0);
                 if (mx >= 0xffff)
                     return AVERROR_INVALIDDATA;
 
-                my = ff_h263_decode_motion(s, pred_y, s->f_code);
+                my = ffe_mpeg4_decode_motion(&mbctx, &mbctx_delta, s, pred_y, s->f_code, 1);
                 if (my >= 0xffff)
                     return AVERROR_INVALIDDATA;
                 s->mv[0][i][0] = mx;
@@ -1887,6 +1904,8 @@ static int mpeg4_decode_mb(MpegEncContext *s, int16_t block[6][64])
 
             s->mv_dir = 0;
             if ((mb_type & (MB_TYPE_DIRECT2 | MB_TYPE_INTERLACED)) == 0) {
+                ffe_mpeg4_mv_init_mb(&mbctx, s, 2, 1);
+                ffe_mpeg4_mv_delta_init_mb(&mbctx_delta, s, 2, 1);
                 s->mv_type = MV_TYPE_16X16;
 
                 if (USES_LIST(mb_type, 0)) {
@@ -1894,8 +1913,10 @@ static int mpeg4_decode_mb(MpegEncContext *s, int16_t block[6][64])
 
                     s->mv_dir = MV_DIR_FORWARD;
 
-                    mx = ff_h263_decode_motion(s, s->last_mv[0][0][0], s->f_code);
-                    my = ff_h263_decode_motion(s, s->last_mv[0][0][1], s->f_code);
+                    ffe_mpeg4_mv_select(&mbctx, s, 0, 0);
+                    ffe_mpeg4_mv_delta_select(&mbctx_delta, s, 0, 0);
+                    mx = ffe_mpeg4_decode_motion(&mbctx, &mbctx_delta, s, s->last_mv[0][0][0], s->f_code, 0);
+                    my = ffe_mpeg4_decode_motion(&mbctx, &mbctx_delta, s, s->last_mv[0][0][1], s->f_code, 1);
                     s->last_mv[0][1][0] =
                     s->last_mv[0][0][0] =
                     s->mv[0][0][0]      = mx;
@@ -1909,8 +1930,10 @@ static int mpeg4_decode_mb(MpegEncContext *s, int16_t block[6][64])
 
                     s->mv_dir |= MV_DIR_BACKWARD;
 
-                    mx = ff_h263_decode_motion(s, s->last_mv[1][0][0], s->b_code);
-                    my = ff_h263_decode_motion(s, s->last_mv[1][0][1], s->b_code);
+                    ffe_mpeg4_mv_select(&mbctx, s, 1, 0);
+                    ffe_mpeg4_mv_delta_select(&mbctx_delta, s, 1, 0);
+                    mx = ffe_mpeg4_decode_motion(&mbctx, &mbctx_delta, s, s->last_mv[1][0][0], s->b_code, 0);
+                    my = ffe_mpeg4_decode_motion(&mbctx, &mbctx_delta, s, s->last_mv[1][0][1], s->b_code, 1);
                     s->last_mv[1][1][0] =
                     s->last_mv[1][0][0] =
                     s->mv[1][0][0]      = mx;
@@ -1919,6 +1942,8 @@ static int mpeg4_decode_mb(MpegEncContext *s, int16_t block[6][64])
                     s->mv[1][0][1]      = my;
                 }
             } else if (!IS_DIRECT(mb_type)) {
+                ffe_mpeg4_mv_init_mb(&mbctx, s, 2, 2);
+                ffe_mpeg4_mv_delta_init_mb(&mbctx_delta, s, 2, 2);
                 s->mv_type = MV_TYPE_FIELD;
 
                 if (USES_LIST(mb_type, 0)) {
@@ -1928,8 +1953,10 @@ static int mpeg4_decode_mb(MpegEncContext *s, int16_t block[6][64])
                     s->mv_dir = MV_DIR_FORWARD;
 
                     for (i = 0; i < 2; i++) {
-                        mx = ff_h263_decode_motion(s, s->last_mv[0][i][0], s->f_code);
-                        my = ff_h263_decode_motion(s, s->last_mv[0][i][1] / 2, s->f_code);
+                        ffe_mpeg4_mv_select(&mbctx, s, 0, i);
+                        ffe_mpeg4_mv_delta_select(&mbctx_delta, s, 0, i);
+                        mx = ffe_mpeg4_decode_motion(&mbctx, &mbctx_delta, s, s->last_mv[0][i][0], s->f_code, 0);
+                        my = ffe_mpeg4_decode_motion(&mbctx, &mbctx_delta, s, s->last_mv[0][i][1] / 2, s->f_code, 1);
                         s->last_mv[0][i][0] =
                         s->mv[0][i][0]      = mx;
                         s->last_mv[0][i][1] = (s->mv[0][i][1] = my) * 2;
@@ -1943,8 +1970,10 @@ static int mpeg4_decode_mb(MpegEncContext *s, int16_t block[6][64])
                     s->mv_dir |= MV_DIR_BACKWARD;
 
                     for (i = 0; i < 2; i++) {
-                        mx = ff_h263_decode_motion(s, s->last_mv[1][i][0], s->b_code);
-                        my = ff_h263_decode_motion(s, s->last_mv[1][i][1] / 2, s->b_code);
+                        ffe_mpeg4_mv_select(&mbctx, s, 1, i);
+                        ffe_mpeg4_mv_delta_select(&mbctx_delta, s, 1, i);
+                        mx = ffe_mpeg4_decode_motion(&mbctx, &mbctx_delta, s, s->last_mv[1][i][0], s->b_code, 0);
+                        my = ffe_mpeg4_decode_motion(&mbctx, &mbctx_delta, s, s->last_mv[1][i][1] / 2, s->b_code, 1);
                         s->last_mv[1][i][0] =
                         s->mv[1][i][0]      = mx;
                         s->last_mv[1][i][1] = (s->mv[1][i][1] = my) * 2;
@@ -1967,8 +1996,12 @@ static int mpeg4_decode_mb(MpegEncContext *s, int16_t block[6][64])
             } else {
                 ffe_mb_type |= FFE_MB_TYPE_DIRECT;
 
-                mx = ff_h263_decode_motion(s, 0, 1);
-                my = ff_h263_decode_motion(s, 0, 1);
+                ffe_mpeg4_mv_init_mb(&mbctx, s, 3, 1);
+                ffe_mpeg4_mv_delta_init_mb(&mbctx_delta, s, 3, 1);
+                ffe_mpeg4_mv_select(&mbctx, s, 2, 0);
+                ffe_mpeg4_mv_delta_select(&mbctx_delta, s, 2, 0);
+                mx = ffe_mpeg4_decode_motion(&mbctx, &mbctx_delta, s, 0, 1, 0);
+                my = ffe_mpeg4_decode_motion(&mbctx, &mbctx_delta, s, 0, 1, 1);
             }
 
             s->mv_dir = MV_DIR_FORWARD | MV_DIR_BACKWARD | MV_DIRECT;
@@ -3928,5 +3961,7 @@ const FFCodec ff_mpeg4_decoder = {
                                NULL
                            },
     .p.ffedit_features = (1 << FFEDIT_FEAT_INFO)
+                       | (1 << FFEDIT_FEAT_MV)
+                       | (1 << FFEDIT_FEAT_MV_DELTA)
 };
 #endif /* CONFIG_MPEG4_DECODER */
