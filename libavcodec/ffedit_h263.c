@@ -2,6 +2,7 @@
 /* This file is included by h263dec.c */
 
 #include "ffedit_json.h"
+#include "ffedit_mv.h"
 
 //---------------------------------------------------------------------
 // info
@@ -58,10 +59,17 @@ ffe_h263_export_init(MpegEncContext *s)
 
     if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_INFO)) != 0 )
         ffe_h263_export_info_init(s);
+
+    if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_MV)) != 0 )
+        ffe_mv_export_init(f->jctx, f, s->mb_height, s->mb_width);
+    else if ( (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_MV)) != 0 )
+        ffe_mv_import_init(f->jctx, f);
 }
 
 //---------------------------------------------------------------------
 static void
 ffe_h263_export_cleanup(MpegEncContext *s, AVFrame *f)
 {
+    if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_MV)) != 0 )
+        ffe_mv_export_cleanup(f->jctx, f);
 }
