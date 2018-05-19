@@ -51,6 +51,8 @@
 #include "wmv2dec.h"
 #include "ffedit.h"
 
+#include "ffedit_h263.c"
+
 static const enum AVPixelFormat h263_hwaccel_pixfmt_list_420[] = {
 #if CONFIG_H263_VAAPI_HWACCEL || CONFIG_MPEG4_VAAPI_HWACCEL
     AV_PIX_FMT_VAAPI,
@@ -437,6 +439,8 @@ int ff_h263_decode_frame(AVCodecContext *avctx, AVFrame *pict,
     PutBitContext *transplicate_pb;
     PutBitContext retry_pb;
 
+    ffe_h263_prepare_frame(avctx, s, avpkt);
+
     /* no supplementary picture */
     if (buf_size == 0) {
         /* special case for last picture */
@@ -626,6 +630,8 @@ retry:
     if ((ret = ff_mpv_frame_start(s, avctx)) < 0)
         return ret;
 
+    ffe_h263_export_init(s);
+
     if (!s->divx_packed && !avctx->hwaccel)
         ff_thread_finish_setup(avctx);
 
@@ -738,6 +744,9 @@ frame_end:
         ret = get_consumed_bytes(s, buf_size);
 
 the_end:
+    if ( *got_frame )
+        ffe_h263_export_cleanup(s, pict);
+
     if ( (avctx->ffedit_apply & (1 << FFEDIT_FEAT_LAST)) != 0 )
         ffe_transplicate_flush(avctx, &s->ffe_xp, avpkt);
 

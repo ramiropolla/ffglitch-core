@@ -1,6 +1,8 @@
 Files without standard license headers:
 fftools/ffedit_common.c
+libavcodec/ffedit_h263.c
 libavcodec/ffedit_mpeg12.c
+libavcodec/ffedit_mpeg4.c
 libavcodec/ffedit_mpegvideo.c
 libavcodec/file_open.c
 libavcodec/ilbcdata.h

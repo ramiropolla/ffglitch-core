@@ -48,6 +48,9 @@
 #include "threadframe.h"
 #include "xvididct.h"
 #include "unary.h"
+#include "ffedit.h"
+
+#include "ffedit_mpeg4.c"
 
 /* The defines below define the number of bits that are read at once for
  * reading vlc values. Changing these may improve speed and data cache needs
@@ -1633,6 +1636,8 @@ static int mpeg4_decode_mb(MpegEncContext *s, int16_t block[6][64])
     int16_t *mot_val;
     static const int8_t quant_tab[4] = { -1, -2, 1, 2 };
     const int xy = s->mb_x + s->mb_y * s->mb_stride;
+    int ffe_mb_type = 0;
+    int ffe_mb_cbp = 0;
     int next;
 
     av_assert2(s ==  (void*)ctx);
@@ -1650,6 +1655,7 @@ static int mpeg4_decode_mb(MpegEncContext *s, int16_t block[6][64])
                 s->mv_type = MV_TYPE_16X16;
                 if (s->pict_type == AV_PICTURE_TYPE_S &&
                     ctx->vol_sprite_usage == GMC_SPRITE) {
+                    ffe_mb_type |= FFE_MB_TYPE_GMC;
                     s->current_picture.mb_type[xy] = MB_TYPE_SKIP  |
                                                      MB_TYPE_GMC   |
                                                      MB_TYPE_16x16 |
@@ -1659,6 +1665,8 @@ static int mpeg4_decode_mb(MpegEncContext *s, int16_t block[6][64])
                     s->mv[0][0][1] = get_amv(ctx, 1);
                     s->mb_skipped  = 0;
                 } else {
+                    ffe_mb_type = -1;
+
                     s->current_picture.mb_type[xy] = MB_TYPE_SKIP  |
                                                      MB_TYPE_16x16 |
                                                      MB_TYPE_L0;
@@ -1702,9 +1710,18 @@ static int mpeg4_decode_mb(MpegEncContext *s, int16_t block[6][64])
             (cbp || (s->workaround_bugs & FF_BUG_XVID_ILACE)))
             s->interlaced_dct = get_bits1(&s->gb);
 
+        /* FFEdit info */
+        if ( dquant )
+            ffe_mb_type |= FFE_MB_TYPE_QUANT;
+        if ( s->interlaced_dct )
+            ffe_mb_type |= FFE_MB_TYPE_INTERLACED_DCT;
+        ffe_mb_cbp = cbp;
+
         s->mv_dir = MV_DIR_FORWARD;
         if ((cbpc & 16) == 0) {
             if (s->mcsel) {
+                ffe_mb_type |= FFE_MB_TYPE_GMC;
+
                 s->current_picture.mb_type[xy] = MB_TYPE_GMC   |
                                                  MB_TYPE_16x16 |
                                                  MB_TYPE_L0;
@@ -1715,6 +1732,9 @@ static int mpeg4_decode_mb(MpegEncContext *s, int16_t block[6][64])
                 s->mv[0][0][0] = mx;
                 s->mv[0][0][1] = my;
             } else if ((!s->progressive_sequence) && get_bits1(&s->gb)) {
+                ffe_mb_type |= FFE_MB_TYPE_FORWARD;
+                ffe_mb_type |= FFE_MB_TYPE_INTERLACED;
+
                 s->current_picture.mb_type[xy] = MB_TYPE_16x8 |
                                                  MB_TYPE_L0   |
                                                  MB_TYPE_INTERLACED;
@@ -1739,6 +1759,8 @@ static int mpeg4_decode_mb(MpegEncContext *s, int16_t block[6][64])
                     s->mv[0][i][1] = my;
                 }
             } else {
+                ffe_mb_type |= FFE_MB_TYPE_FORWARD;
+
                 s->current_picture.mb_type[xy] = MB_TYPE_16x16 | MB_TYPE_L0;
                 /* 16x16 motion prediction */
                 s->mv_type = MV_TYPE_16X16;
@@ -1756,6 +1778,9 @@ static int mpeg4_decode_mb(MpegEncContext *s, int16_t block[6][64])
                 s->mv[0][0][1] = my;
             }
         } else {
+            ffe_mb_type |= FFE_MB_TYPE_FORWARD;
+            ffe_mb_type |= FFE_MB_TYPE_MV4;
+
             s->current_picture.mb_type[xy] = MB_TYPE_8x8 | MB_TYPE_L0;
             s->mv_type                     = MV_TYPE_8X8;
             for (i = 0; i < 4; i++) {
@@ -1796,6 +1821,8 @@ static int mpeg4_decode_mb(MpegEncContext *s, int16_t block[6][64])
         s->mb_skipped = s->next_picture.mbskip_table[s->mb_y * s->mb_stride + s->mb_x];  // Note, skiptab=0 if last was GMC
 
         if (s->mb_skipped) {
+            ffe_mb_type = -1;
+
             /* skip mb */
             for (i = 0; i < 6; i++)
                 s->block_last_index[i] = -1;
@@ -1817,6 +1844,7 @@ static int mpeg4_decode_mb(MpegEncContext *s, int16_t block[6][64])
             // like MB_TYPE_B_DIRECT but no vectors coded
             mb_type = MB_TYPE_DIRECT2 | MB_TYPE_SKIP | MB_TYPE_L0L1;
             cbp     = 0;
+            dquant  = 0;
         } else {
             modb2   = get_bits1(&s->gb);
             mb_type = get_vlc2(&s->gb, mb_type_b_vlc, MB_TYPE_B_VLC_BITS, 1);
@@ -1832,6 +1860,7 @@ static int mpeg4_decode_mb(MpegEncContext *s, int16_t block[6][64])
                 cbp = get_bits(&s->gb, 6);
             }
 
+            dquant = (!IS_DIRECT(mb_type)) && cbp;
             if ((!IS_DIRECT(mb_type)) && cbp) {
                 if (get_bits1(&s->gb))
                     ff_set_qscale(s, s->qscale + get_bits1(&s->gb) * 4 - 2);
@@ -1861,6 +1890,8 @@ static int mpeg4_decode_mb(MpegEncContext *s, int16_t block[6][64])
                 s->mv_type = MV_TYPE_16X16;
 
                 if (USES_LIST(mb_type, 0)) {
+                    ffe_mb_type |= FFE_MB_TYPE_FORWARD;
+
                     s->mv_dir = MV_DIR_FORWARD;
 
                     mx = ff_h263_decode_motion(s, s->last_mv[0][0][0], s->f_code);
@@ -1874,6 +1905,8 @@ static int mpeg4_decode_mb(MpegEncContext *s, int16_t block[6][64])
                 }
 
                 if (USES_LIST(mb_type, 1)) {
+                    ffe_mb_type |= FFE_MB_TYPE_BACKWARD;
+
                     s->mv_dir |= MV_DIR_BACKWARD;
 
                     mx = ff_h263_decode_motion(s, s->last_mv[1][0][0], s->b_code);
@@ -1889,6 +1922,9 @@ static int mpeg4_decode_mb(MpegEncContext *s, int16_t block[6][64])
                 s->mv_type = MV_TYPE_FIELD;
 
                 if (USES_LIST(mb_type, 0)) {
+                    ffe_mb_type |= FFE_MB_TYPE_INTERLACED;
+                    ffe_mb_type |= FFE_MB_TYPE_FORWARD;
+
                     s->mv_dir = MV_DIR_FORWARD;
 
                     for (i = 0; i < 2; i++) {
@@ -1901,6 +1937,9 @@ static int mpeg4_decode_mb(MpegEncContext *s, int16_t block[6][64])
                 }
 
                 if (USES_LIST(mb_type, 1)) {
+                    ffe_mb_type |= FFE_MB_TYPE_INTERLACED;
+                    ffe_mb_type |= FFE_MB_TYPE_BACKWARD;
+
                     s->mv_dir |= MV_DIR_BACKWARD;
 
                     for (i = 0; i < 2; i++) {
@@ -1914,11 +1953,20 @@ static int mpeg4_decode_mb(MpegEncContext *s, int16_t block[6][64])
             }
         }
 
+        /* FFEdit info */
+        if ( dquant )
+            ffe_mb_type |= FFE_MB_TYPE_QUANT;
+        if ( s->interlaced_dct )
+            ffe_mb_type |= FFE_MB_TYPE_INTERLACED_DCT;
+        ffe_mb_cbp = cbp;
+
         if (IS_DIRECT(mb_type)) {
             if (IS_SKIP(mb_type)) {
                 mx =
                 my = 0;
             } else {
+                ffe_mb_type |= FFE_MB_TYPE_DIRECT;
+
                 mx = ff_h263_decode_motion(s, 0, 1);
                 my = ff_h263_decode_motion(s, 0, 1);
             }
@@ -1965,6 +2013,16 @@ intra:
         if (!s->progressive_sequence)
             s->interlaced_dct = get_bits1(&s->gb);
 
+        /* FFEdit info */
+        ffe_mb_type |= FFE_MB_TYPE_INTRA;
+        if ( s->ac_pred )
+            ffe_mb_type |= FFE_MB_TYPE_ACPRED;
+        if ( dquant )
+            ffe_mb_type |= FFE_MB_TYPE_QUANT;
+        if ( s->interlaced_dct )
+            ffe_mb_type |= FFE_MB_TYPE_INTERLACED_DCT;
+        ffe_mb_cbp = cbp;
+
         s->bdsp.clear_blocks(s->block[0]);
         /* decode each block */
         for (i = 0; i < 6; i++) {
@@ -1984,6 +2042,8 @@ intra:
     }
 
 end:
+    ffe_mpeg4_export_info(s, ffe_mb_type, ffe_mb_cbp);
+
     /* per-MB end of slice check */
     next = mpeg4_is_resync(ctx);
     if (next) {
@@ -3867,5 +3927,6 @@ const FFCodec ff_mpeg4_decoder = {
 #endif
                                NULL
                            },
+    .p.ffedit_features = (1 << FFEDIT_FEAT_INFO)
 };
 #endif /* CONFIG_MPEG4_DECODER */
