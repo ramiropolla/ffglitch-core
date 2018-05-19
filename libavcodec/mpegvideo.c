@@ -461,6 +461,7 @@ static void backup_duplicate_context(MpegEncContext *bak, MpegEncContext *src)
     COPY(ac_val[0]);
     COPY(ac_val[1]);
     COPY(ac_val[2]);
+    COPY(ffe_xp);
 #undef COPY
 }
 
@@ -973,6 +974,7 @@ av_cold int ff_mpv_common_init(MpegEncContext *s)
             s->thread_context[i] = av_memdup(s, sizeof(MpegEncContext));
         if (!s->thread_context[i])
             goto fail;
+        memset(&s->thread_context[i]->ffe_xp, 0, sizeof(s->thread_context[i]->ffe_xp));
         if (init_duplicate_context(s->thread_context[i]) < 0)
             goto fail;
         s->thread_context[i]->start_mb_y =
@@ -1101,6 +1103,7 @@ int ff_mpv_common_frame_size_change(MpegEncContext *s)
                 err = AVERROR(ENOMEM);
                 goto fail;
             }
+            memset(&s->thread_context[i]->ffe_xp, 0, sizeof(s->thread_context[i]->ffe_xp));
             if ((err = init_duplicate_context(s->thread_context[i])) < 0)
                 goto fail;
             s->thread_context[i]->start_mb_y =

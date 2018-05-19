@@ -1,0 +1,3 @@
+$ wget https://archive.org/download/CEP00109/CEP00109.mpg
+$ ffmpeg -flags +bitexact -fflags +bitexact -idct simple -i CEP00109.mpg -c:v mpeg2video -an -f rawvideo -intra_penalty max -mpv_flags +forcemv -g 1000 -s 128x128 -vframes 5 -y mpeg2video_prepared_128_5.rawvideo
+$ ffmpeg -flags +bitexact -fflags +bitexact -idct simple -i CEP00109.mpg -c:v mpeg2video -an -f rawvideo -g 2 -s 128x128 -vframes 5 -y mpeg2video_traffic_128_5.rawvideo
