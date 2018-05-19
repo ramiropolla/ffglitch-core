@@ -445,6 +445,7 @@ int ff_h263_decode_frame(AVCodecContext *avctx, void *data, int *got_frame,
                 return ret;
             s->next_picture_ptr = NULL;
 
+            ffe_h263_export_cleanup(s, pict);
             *got_frame = 1;
         }
 
