@@ -476,6 +476,258 @@ static int ffe_get_qscale(MpegEncContext *s, int mb_y, int is_mb)
 }
 
 /*-------------------------------------------------------------------*/
+/* dct                                                               */
+/*-------------------------------------------------------------------*/
+
+//---------------------------------------------------------------------
+static enum FFEditFeature
+e_which_dct_feat(MpegEncContext *s)
+{
+    return (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_Q_DCT))       != 0 ? FFEDIT_FEAT_Q_DCT
+         : (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_Q_DCT_DELTA)) != 0 ? FFEDIT_FEAT_Q_DCT_DELTA
+         :                                                                   FFEDIT_FEAT_LAST;
+}
+
+//---------------------------------------------------------------------
+static enum FFEditFeature
+i_which_dct_feat(MpegEncContext *s)
+{
+    return (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_Q_DCT))       != 0 ? FFEDIT_FEAT_Q_DCT
+         : (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_Q_DCT_DELTA)) != 0 ? FFEDIT_FEAT_Q_DCT_DELTA
+         :                                                                   FFEDIT_FEAT_LAST;
+}
+
+//---------------------------------------------------------------------
+static enum FFEditFeature
+a_which_dct_feat(MpegEncContext *s)
+{
+    return (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_Q_DCT))       != 0 ? FFEDIT_FEAT_Q_DCT
+         : (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_Q_DCT_DELTA)) != 0 ? FFEDIT_FEAT_Q_DCT_DELTA
+         :                                                                  FFEDIT_FEAT_LAST;
+}
+
+static void
+ffe_mpeg12_export_dct_init(MpegEncContext *s, AVFrame *f)
+{
+    enum FFEditFeature e_dct_feat = e_which_dct_feat(s);
+    json_t *jframe;
+    int nb_components = 3;
+    int h_count[3] = { 2, 1, 1 };
+    int v_count[3] = { 2, 1, 1 };
+    int pflags = 0;
+
+    if ( !s->chroma_y_shift )
+        v_count[1] = v_count[2] = 2;
+
+    jframe = ffe_jmb_new(s->jctx,
+                         s->mb_width, s->mb_height,
+                         nb_components,
+                         v_count, h_count,
+                         NULL,
+                         pflags);
+
+    f->ffedit_sd[e_dct_feat] = jframe;
+}
+
+static void
+ffe_mpeg12_import_dct_init(MpegEncContext *s, AVFrame *f)
+{
+    enum FFEditFeature i_dct_feat = i_which_dct_feat(s);
+    json_t *jframe = f->ffedit_sd[i_dct_feat];
+    int nb_components = 3;
+    int h_count[3] = { 2, 1, 1 };
+    int v_count[3] = { 2, 1, 1 };
+
+    if ( !s->chroma_y_shift )
+        v_count[1] = v_count[2] = 2;
+
+    ffe_jmb_set_context(jframe, nb_components, v_count, h_count);
+}
+
+typedef struct {
+    int16_t qblock[64];
+    int last_dc[3];
+} ffe_mpeg12_block;
+
+static void ffe_mpeg12_init_block(
+        MpegEncContext *s,
+        ffe_mpeg12_block *ctx)
+{
+    memset(ctx->qblock, 0x00, sizeof(ctx->qblock));
+    memcpy(ctx->last_dc, s->last_dc, sizeof(ctx->last_dc));
+    if ( a_which_dct_feat(s) != FFEDIT_FEAT_LAST )
+        s->pb = *ffe_transplicate_save(&s->ffe_xp);
+}
+
+static void ffe_mpeg12_use_block(
+        MpegEncContext *s,
+        ffe_mpeg12_block *ctx,
+        int i,
+        int is_intra)
+{
+    enum FFEditFeature e_dct_feat = e_which_dct_feat(s);
+    enum FFEditFeature i_dct_feat = i_which_dct_feat(s);
+    enum FFEditFeature a_dct_feat = a_which_dct_feat(s);
+
+    AVFrame *f = s->current_picture_ptr->f;
+    int component = (i < 4) ? 0 : (1 + ((i - 4) & 1));
+    int blockn = (i < 4) ? i : ((i - 4) >> 1);
+    int j;
+
+    if ( e_dct_feat != FFEDIT_FEAT_LAST )
+    {
+        json_t *jframe = f->ffedit_sd[e_dct_feat];
+        json_t *jso;
+
+        if ( is_intra
+          && e_dct_feat == FFEDIT_FEAT_Q_DCT_DELTA )
+        {
+            ctx->qblock[0] -= ctx->last_dc[component];
+        }
+
+        {
+            jso = json_array_of_ints_new(s->jctx, 64);
+            json_set_pflags(jso, JSON_PFLAGS_NO_LF);
+            for ( j = 0; j < 64; j++ )
+            {
+                int k = s->intra_scantable.permutated[j];
+                jso->array_of_ints[j] = ctx->qblock[k];
+            }
+        }
+
+        ffe_jmb_set(jframe, component, s->mb_y, s->mb_x, blockn, jso);
+    }
+    else if ( i_dct_feat != FFEDIT_FEAT_LAST )
+    {
+        json_t *jframe = f->ffedit_sd[i_dct_feat];
+        {
+            json_t *jso = ffe_jmb_get(jframe, component, s->mb_y, s->mb_x, blockn);
+            for ( j = 0; j < 64; j++ )
+            {
+                int k = s->intra_scantable.permutated[j];
+                ctx->qblock[k] = jso->array_of_ints[j];
+            }
+        }
+        if ( is_intra
+          && i_dct_feat == FFEDIT_FEAT_Q_DCT_DELTA )
+        {
+            ctx->qblock[0] += ctx->last_dc[component];
+        }
+        for ( j = 63; j > 0; j-- )
+            if ( ctx->qblock[s->intra_scantable.permutated[j]] )
+                break;
+        s->block_last_index[i] = j;
+
+        // Unquantize ctx->qblock into s->block[i]
+        memcpy(s->block[i], ctx->qblock, sizeof(s->block[i]));
+        if ( s->mb_intra )
+            s->dct_unquantize_intra(s, s->block[i], i, s->qscale >> 1);
+        else
+            s->dct_unquantize_inter(s, s->block[i], i, s->qscale >> 1);
+        if ( s->codec_id == AV_CODEC_ID_MPEG2VIDEO )
+        {
+            int mismatch = 1;
+            for ( j = 0; j < 64; j++ )
+                mismatch ^= s->block[i][j];
+            s->block[i][63] ^= (mismatch & 1);
+        }
+    }
+
+    if ( a_dct_feat != FFEDIT_FEAT_LAST )
+    {
+        memcpy(s->last_dc, ctx->last_dc, sizeof(s->last_dc));
+        ffe_mpeg1_encode_block(s, ctx->qblock, i);
+        ffe_transplicate_restore(&s->ffe_xp, &s->pb);
+    }
+}
+
+static inline int
+mpeg1_decode_block_inter(
+        MpegEncContext *s,
+        int16_t *block,
+        int16_t *qblock,
+        int n);
+
+static int
+ffe_mpeg1_decode_block_inter(
+        MpegEncContext *s,
+        int16_t *block,
+        int n)
+{
+    int ret;
+    ffe_mpeg12_block bctx;
+    ffe_mpeg12_init_block(s, &bctx);
+    ret = mpeg1_decode_block_inter(s, block, bctx.qblock, n);
+    if (ret >= 0)
+        ffe_mpeg12_use_block(s, &bctx, n, 0);
+    return ret;
+}
+
+static int
+ffe_mpeg1_decode_block_intra(
+        MpegEncContext *s,
+        int16_t *block,
+        int n)
+{
+    int ret;
+    ffe_mpeg12_block bctx;
+    ffe_mpeg12_init_block(s, &bctx);
+    ret = ff_mpeg1_decode_block_intra(&s->gb,
+                                      s->intra_matrix,
+                                      s->intra_scantable.permutated,
+                                      s->last_dc, block,
+                                      bctx.qblock,
+                                      n, s->qscale);
+    if (ret >= 0)
+        ffe_mpeg12_use_block(s, &bctx, n, 1);
+    return ret;
+}
+
+static inline int
+mpeg2_decode_block_non_intra(
+        MpegEncContext *s,
+        int16_t *block,
+        int16_t *qblock,
+        int n);
+
+static int
+ffe_mpeg2_decode_block_non_intra(
+        MpegEncContext *s,
+        int16_t *block,
+        int n)
+{
+    int ret;
+    ffe_mpeg12_block bctx;
+    ffe_mpeg12_init_block(s, &bctx);
+    ret = mpeg2_decode_block_non_intra(s, block, bctx.qblock, n);
+    if (ret >= 0)
+        ffe_mpeg12_use_block(s, &bctx, n, 0);
+    return ret;
+}
+
+static inline int
+mpeg2_decode_block_intra(
+        MpegEncContext *s,
+        int16_t *block,
+        int16_t *qblock,
+        int n);
+
+static int
+ffe_mpeg2_decode_block_intra(
+        MpegEncContext *s,
+        int16_t *block,
+        int n)
+{
+    int ret;
+    ffe_mpeg12_block bctx;
+    ffe_mpeg12_init_block(s, &bctx);
+    ret = mpeg2_decode_block_intra(s, block, bctx.qblock, n);
+    if (ret >= 0)
+        ffe_mpeg12_use_block(s, &bctx, n, 1);
+    return ret;
+}
+
+/*-------------------------------------------------------------------*/
 /* common                                                            */
 /*-------------------------------------------------------------------*/
 
@@ -515,6 +767,11 @@ ffe_mpeg12_init(MpegEncContext *s)
         ffe_mpeg12_export_qscale_init(s, f);
     else if ( (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_QSCALE)) != 0 )
         ffe_mpeg12_import_qscale_init(s, f);
+
+    if ( e_which_dct_feat(s) != FFEDIT_FEAT_LAST )
+        ffe_mpeg12_export_dct_init(s, f);
+    else if ( i_which_dct_feat(s) != FFEDIT_FEAT_LAST )
+        ffe_mpeg12_import_dct_init(s, f);
 }
 
 static void

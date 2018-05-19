@@ -33,4 +33,6 @@ void ff_mpeg1_encode_mb(MpegEncContext *s, int16_t block[8][64],
 void ff_mpeg1_encode_init(MpegEncContext *s);
 void ff_mpeg1_encode_slice_header(MpegEncContext *s);
 
+void ffe_mpeg1_encode_block(MpegEncContext *s, int16_t *block, int n);
+
 #endif /* AVCODEC_MPEG12ENC_H */

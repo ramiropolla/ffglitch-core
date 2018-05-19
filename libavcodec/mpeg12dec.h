@@ -45,6 +45,6 @@ static inline int decode_dc(GetBitContext *gb, int component)
 int ff_mpeg1_decode_block_intra(GetBitContext *gb,
                                 const uint16_t *quant_matrix,
                                 const uint8_t *scantable, int last_dc[3],
-                                int16_t *block, int index, int qscale);
+                                int16_t *block, int16_t *qblock, int index, int qscale);
 
 #endif /* AVCODEC_MPEG12DEC_H */
