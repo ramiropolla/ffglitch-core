@@ -3774,6 +3774,7 @@ static int encode_picture(MpegEncContext *s, int picture_number)
 
     if(!s->umvplus){
         if(s->pict_type==AV_PICTURE_TYPE_P || s->pict_type==AV_PICTURE_TYPE_S) {
+            int truncate = s->mpv_flags & FF_MPV_FLAG_NOPIMB;
             s->f_code= ff_get_best_fcode(s, s->p_mv_table, CANDIDATE_MB_TYPE_INTER);
 
             if (s->avctx->flags & AV_CODEC_FLAG_INTERLACED_ME) {
@@ -3784,13 +3785,13 @@ static int encode_picture(MpegEncContext *s, int picture_number)
             }
 
             ff_fix_long_p_mvs(s);
-            ff_fix_long_mvs(s, NULL, 0, s->p_mv_table, s->f_code, CANDIDATE_MB_TYPE_INTER, 0);
+            ff_fix_long_mvs(s, NULL, 0, s->p_mv_table, s->f_code, CANDIDATE_MB_TYPE_INTER, truncate);
             if (s->avctx->flags & AV_CODEC_FLAG_INTERLACED_ME) {
                 int j;
                 for(i=0; i<2; i++){
                     for(j=0; j<2; j++)
                         ff_fix_long_mvs(s, s->p_field_select_table[i], j,
-                                        s->p_field_mv_table[i][j], s->f_code, CANDIDATE_MB_TYPE_INTER_I, 0);
+                                        s->p_field_mv_table[i][j], s->f_code, CANDIDATE_MB_TYPE_INTER_I, truncate);
                 }
             }
         }
