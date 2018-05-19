@@ -528,6 +528,204 @@ ffe_mpeg2_decode_block_intra(
     return ret;
 }
 
+//---------------------------------------------------------------------
+// mb
+
+typedef struct
+{
+    json_t *jsizes;
+    json_t *jdatas;
+    GetBitContext saved;
+    PutBitContext pb;
+    uint8_t *data;
+    int idx;
+} mb_ctx;
+
+static void
+ffe_mb_export_init(MpegEncContext *s)
+{
+    AVFrame *f = s->current_picture_ptr->f;
+    json_t *jframe = f->ffedit_sd[FFEDIT_FEAT_MB];
+    mb_ctx *ctx = json_userdata_get(jframe);
+    int size = (get_bits_left(&s->gb) + 7) >> 3; // in bytes
+
+    ctx->data = av_malloc(size);
+
+    init_put_bits(&ctx->pb, ctx->data, size);
+
+    s->gb.pb = &ctx->pb;
+}
+
+static char
+hexchar(uint8_t nibble)
+{
+    if ( nibble <= 9 )
+        return '0' + nibble;
+    return 'A' + nibble - 10;
+}
+
+static void
+ffe_mb_export_flush(MpegEncContext *s)
+{
+    AVFrame *f = s->current_picture_ptr->f;
+    json_t *jframe = f->ffedit_sd[FFEDIT_FEAT_MB];
+    mb_ctx *ctx = json_userdata_get(jframe);
+    int size = put_bits_count(&ctx->pb); // in bits
+    int i;
+
+    json_t *jsize = json_int_new(f->jctx, size);
+    json_t *jdata;
+    char *str;
+
+    size = (size + 7) >> 3; // in bytes
+    str = av_malloc(size*2 + 1);
+    str[size*2] = '\0';
+
+    flush_put_bits(&ctx->pb);
+    for ( i = 0; i < size; i++ )
+    {
+        str[i*2+0] = hexchar(ctx->pb.buf[i] >> 4);
+        str[i*2+1] = hexchar(ctx->pb.buf[i] & 0x0F);
+    }
+
+    jdata = json_string_new(f->jctx, str);
+
+    json_array_add(ctx->jsizes, jsize);
+    json_array_add(ctx->jdatas, jdata);
+
+    av_free(ctx->data);
+    s->gb.pb = NULL;
+}
+
+static int
+hexval(char c)
+{
+    if ( c >= '0' && c <= '9' )
+        return c - '0';
+    return c - 'A' + 10;
+}
+
+static void
+ffe_mb_import_init(MpegEncContext *s)
+{
+    AVFrame *f = s->current_picture_ptr->f;
+    json_t *jframe = f->ffedit_sd[FFEDIT_FEAT_MB];
+    mb_ctx *ctx = json_userdata_get(jframe);
+
+    json_t *jdata = json_array_get(ctx->jdatas, ctx->idx);
+    const char *str = json_string_get(jdata);
+    int size = strlen(str) / 2;
+    int i;
+
+    ctx->data = av_mallocz(size + 4);
+
+    for ( i = 0; i < size; i++ )
+    {
+        int c1 = hexval(str[i*2+0]);
+        int c2 = hexval(str[i*2+1]);
+        ctx->data[i] = (c1 << 4) | c2;
+    }
+
+    ctx->saved = s->gb;
+    init_get_bits(&s->gb, ctx->data, (size + 4) * 8);
+
+    if ( (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_MB)) != 0 )
+        s->gb.pb = ffe_transplicate_pb(&s->ffe_xp);
+}
+
+static void
+ffe_mb_import_flush(MpegEncContext *s)
+{
+    AVFrame *f = s->current_picture_ptr->f;
+    json_t *jframe = f->ffedit_sd[FFEDIT_FEAT_MB];
+    mb_ctx *ctx = json_userdata_get(jframe);
+
+    int size = json_array_get_int(ctx->jsizes, ctx->idx); // in bits
+
+    av_free(ctx->data);
+    s->gb = ctx->saved;
+
+    if ( (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_MB)) != 0 )
+        s->gb.pb = NULL;
+
+    while ( size > 32 )
+    {
+        skip_bits_long(&s->gb, 32);
+        size -= 32;
+    }
+    if ( size > 0 )
+        skip_bits_long(&s->gb, size);
+
+    if ( (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_MB)) != 0 )
+        s->gb.pb = ffe_transplicate_pb(&s->ffe_xp);
+
+    ctx->idx++;
+}
+
+static void
+ffe_mpeg12_export_mb_cleanup(MpegEncContext *s, AVFrame *f)
+{
+    json_t *jframe = f->ffedit_sd[FFEDIT_FEAT_MB];
+    mb_ctx *ctx = json_userdata_get(jframe);
+    json_array_done(f->jctx, ctx->jdatas);
+    json_array_done(f->jctx, ctx->jsizes);
+    json_object_done(f->jctx, jframe);
+}
+
+static void
+ffe_mpeg12_export_mb_init(MpegEncContext *s, AVFrame *f)
+{
+    // {
+    //  "sizes": [ ] # MUST NOT CHANGE!
+    //  "data": [ ]
+    //  ]
+    // }
+
+    json_t *jframe = json_object_new(f->jctx);
+    mb_ctx *ctx = av_mallocz(sizeof(mb_ctx));
+    json_userdata_set(jframe, ctx);
+
+    ctx->jdatas = json_array_new(f->jctx);
+    ctx->jsizes = json_array_new(f->jctx);
+    json_object_add(jframe, "data", ctx->jdatas);
+    json_object_add(jframe, "sizes", ctx->jsizes);
+    json_set_pflags(ctx->jsizes, JSON_PFLAGS_NO_LF);
+
+    f->ffedit_sd[FFEDIT_FEAT_MB] = jframe;
+}
+
+static void
+ffe_mpeg12_import_mb_init(MpegEncContext *s, AVFrame *f)
+{
+    json_t *jframe = f->ffedit_sd[FFEDIT_FEAT_MB];
+    mb_ctx *ctx = json_allocator_get0(f->jctx, sizeof(mb_ctx));
+    json_userdata_set(jframe, ctx);
+    ctx->jsizes = json_object_get(jframe, "sizes");
+    ctx->jdatas = json_object_get(jframe, "data");
+}
+
+static int mpeg_decode_mb(MpegEncContext *s, int16_t block[12][64]);
+
+static int
+ffe_mpeg_decode_mb(MpegEncContext *s, int16_t block[12][64])
+{
+    int ret;
+
+    if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_MB)) != 0 )
+        ffe_mb_export_init(s);
+    else if ( (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_MB)) != 0 )
+        ffe_mb_import_init(s);
+
+    ret = mpeg_decode_mb(s, s->block);
+
+    if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_MB)) != 0 )
+        ffe_mb_export_flush(s);
+    else if ( (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_MB)) != 0 )
+        ffe_mb_import_flush(s);
+
+    return ret;
+}
+
 /*-------------------------------------------------------------------*/
 /* common                                                            */
 /*-------------------------------------------------------------------*/
@@ -563,6 +761,11 @@ ffe_mpeg12_init(MpegEncContext *s)
         ffe_mpeg12_export_dct_init(s, f);
     else if ( (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_Q_DCT)) != 0 )
         ffe_mpeg12_import_dct_init(s, f);
+
+    if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_MB)) != 0 )
+        ffe_mpeg12_export_mb_init(s, f);
+    else if ( (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_MB)) != 0 )
+        ffe_mpeg12_import_mb_init(s, f);
 }
 
 static void
@@ -576,4 +779,7 @@ ffe_mpeg12_export_cleanup(MpegEncContext *s, AVFrame *f)
 
     if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_QSCALE)) != 0 )
         ffe_mpeg12_export_qscale_cleanup(s, f);
+
+    if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_MB)) != 0 )
+        ffe_mpeg12_export_mb_cleanup(s, f);
 }
