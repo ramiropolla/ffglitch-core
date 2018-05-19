@@ -971,7 +971,7 @@ void ff_estimate_p_frame_motion(MpegEncContext * s,
         int i_score= varc-500+(s->lambda2>>FF_LAMBDA_SHIFT)*20;
         c->scene_change_score+= ff_sqrt(p_score) - ff_sqrt(i_score);
 
-        if (vard*2 + 200*256 > varc)
+        if (vard*2 + 200*256 > varc && !(s->mpv_flags & FF_MPV_FLAG_NOPIMB))
             mb_type|= CANDIDATE_MB_TYPE_INTRA;
         if (varc*2 + 200*256 > vard || s->qscale > 24){
 //        if (varc*2 + 200*256 + 50*(s->lambda2>>FF_LAMBDA_SHIFT) > vard){
@@ -1042,7 +1042,7 @@ void ff_estimate_p_frame_motion(MpegEncContext * s,
         }
         intra_score += c->mb_penalty_factor*16;
 
-        if(intra_score < dmin){
+        if(intra_score < dmin && !(s->mpv_flags & FF_MPV_FLAG_NOPIMB)){
             mb_type= CANDIDATE_MB_TYPE_INTRA;
             s->current_picture.mb_type[mb_y*s->mb_stride + mb_x] = CANDIDATE_MB_TYPE_INTRA; //FIXME cleanup
         }else
