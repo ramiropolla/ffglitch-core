@@ -56,6 +56,8 @@
 #include "thread.h"
 #include "videodsp.h"
 
+#include "ffedit_xp.h"
+
 #include "libavutil/opt.h"
 #include "libavutil/timecode.h"
 
@@ -584,6 +586,10 @@ typedef struct MpegEncContext {
     int noise_reduction;
 
     int intra_penalty;
+
+    /* ffedit bitstream */
+    FFEditTransplicateContext ffe_xp;
+
 } MpegEncContext;
 
 /* mpegvideo_enc common options */
