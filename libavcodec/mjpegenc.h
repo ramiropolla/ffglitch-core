@@ -62,6 +62,7 @@ int  ff_mjpeg_encode_stuffing(MpegEncContext *s);
 typedef struct MJpegContext MJpegContext;
 
 void ff_mjpeg_encode_block(
+        void *ctx,
         PutBitContext *pb,
         MJpegContext *m,
         uint8_t permutated_scantable[64],

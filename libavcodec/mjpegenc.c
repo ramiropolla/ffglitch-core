@@ -463,6 +463,7 @@ static void record_block(MpegEncContext *s, int16_t *block, int n)
 }
 
 void ff_mjpeg_encode_block(
+        void *ctx,
         PutBitContext *pb,
         MJpegContext *m,
         uint8_t permutated_scantable[64],
@@ -514,6 +515,16 @@ void ff_mjpeg_encode_block(
             nbits= av_log2_16bit(val) + 1;
             code = (run << 4) | nbits;
 
+            if ( ctx != NULL && huff_size_ac[code] == 0 )
+            {
+                av_log(ctx, AV_LOG_ERROR,
+                       "FFedit tried to write a huffman code not "
+                       "available in huffman table. The output file "
+                       "will be corrupted.\n"
+                       "Try encoding the original file again with "
+                       "-huffman default.\n");
+            }
+
             put_bits(pb, huff_size_ac[code], huff_code_ac[code]);
 
             put_sbits(pb, nbits, mant);
@@ -528,7 +539,7 @@ void ff_mjpeg_encode_block(
 
 static void encode_block(MpegEncContext *s, int16_t *block, int n)
 {
-    ff_mjpeg_encode_block(&s->pb, s->mjpeg_ctx, s->intra_scantable.permutated,
+    ff_mjpeg_encode_block(NULL, &s->pb, s->mjpeg_ctx, s->intra_scantable.permutated,
                           s->last_dc, s->block_last_index, block, n);
 }
 
