@@ -55,6 +55,9 @@
 #include "exif.h"
 #include "bytestream.h"
 #include "tiff_common.h"
+#include "ffedit.h"
+
+#include "mjpegenc_common.h"
 
 
 static int init_default_huffman_tables(MJpegDecodeContext *s)
@@ -2362,10 +2365,19 @@ int ff_mjpeg_decode_frame_from_buf(AVCodecContext *avctx, AVFrame *frame,
     if (s->iccnum != 0)
         reset_icc_profile(s);
 
+    if ( (avctx->ffedit_apply & (1 << FFEDIT_FEAT_LAST)) != 0 )
+    {
+        ret = ffe_transplicate_init(avctx, &s->ffe_xp, avpkt->size);
+        if ( ret < 0 )
+            return ret;
+    }
+
 redo_for_pal8:
     buf_ptr = buf;
     buf_end = buf + buf_size;
     while (buf_ptr < buf_end) {
+        int start_escape;
+
         /* find start next marker */
         start_code = ff_mjpeg_find_marker(s, &buf_ptr, buf_end,
                                           &unescaped_buf_ptr,
@@ -2387,6 +2399,17 @@ redo_for_pal8:
         if (ret < 0) {
             av_log(avctx, AV_LOG_ERROR, "invalid buffer\n");
             goto fail;
+        }
+
+        if ( (avctx->ffedit_apply & (1 << FFEDIT_FEAT_LAST)) != 0 )
+        {
+            PutBitContext *opb = ffe_transplicate_pb(&s->ffe_xp);
+            flush_put_bits(opb);
+            put_bits(opb, 8, 0xff);
+            put_bits(opb, 8, start_code);
+            flush_put_bits(opb);
+            start_escape = opb->buf_ptr - opb->buf;
+            s->gb.pb = opb;
         }
 
         s->start_code = start_code;
@@ -2572,6 +2595,12 @@ eoi_parser:
         }
 
 skip:
+        if ( start_code == SOS
+          && (avctx->ffedit_apply & (1 << FFEDIT_FEAT_LAST)) != 0 )
+        {
+            PutBitContext *opb = ffe_transplicate_pb(&s->ffe_xp);
+            ff_mjpeg_escape_FF(opb, start_escape);
+        }
         /* eof process start code */
         buf_ptr += (get_bits_count(&s->gb) + 7) / 8;
         av_log(avctx, AV_LOG_DEBUG,
@@ -2588,6 +2617,9 @@ fail:
     s->got_picture = 0;
     return ret;
 the_end:
+
+    if ( (avctx->ffedit_apply & (1 << FFEDIT_FEAT_LAST)) != 0 )
+        ffe_transplicate_flush(avctx, &s->ffe_xp, avpkt);
 
     is16bit = av_pix_fmt_desc_get(avctx->pix_fmt)->comp[0].step > 1;
 
@@ -2938,6 +2970,8 @@ av_cold int ff_mjpeg_decode_end(AVCodecContext *avctx)
     av_freep(&s->hwaccel_picture_private);
     av_freep(&s->jls_state);
 
+    ffe_transplicate_free(&s->ffe_xp);
+
     return 0;
 }
 
@@ -2976,7 +3010,7 @@ const FFCodec ff_mjpeg_decoder = {
     .close          = ff_mjpeg_decode_end,
     FF_CODEC_DECODE_CB(ff_mjpeg_decode_frame),
     .flush          = decode_flush,
-    .p.capabilities = AV_CODEC_CAP_DR1,
+    .p.capabilities = AV_CODEC_CAP_DR1 | AV_CODEC_CAP_FFEDIT_BITSTREAM,
     .p.max_lowres   = 3,
     .p.priv_class   = &mjpegdec_class,
     .p.profiles     = NULL_IF_CONFIG_SMALL(ff_mjpeg_profiles),
