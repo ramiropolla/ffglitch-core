@@ -92,6 +92,7 @@ void ff_mjpeg_encode_dc(PutBitContext *pb, int val,
                         uint8_t *huff_size, uint16_t *huff_code);
 
 void ff_mjpeg_encode_block(
+        void *ctx,
         PutBitContext *pb,
         MJpegContext *m,
         ScanTable *scantable,
