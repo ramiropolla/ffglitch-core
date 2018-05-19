@@ -41,6 +41,7 @@
 #include "mpeg_er.h"
 #include "mpeg4video.h"
 #include "mpeg4videodec.h"
+#include "mpeg4videoenc.h"
 #include "mpeg4videodefs.h"
 #include "mpegutils.h"
 #include "mpegvideo.h"
@@ -48,6 +49,7 @@
 #include "msmpeg4dec.h"
 #include "thread.h"
 #include "wmv2dec.h"
+#include "ffedit.h"
 
 static const enum AVPixelFormat h263_hwaccel_pixfmt_list_420[] = {
 #if CONFIG_H263_VAAPI_HWACCEL || CONFIG_MPEG4_VAAPI_HWACCEL
@@ -165,6 +167,9 @@ av_cold int ff_h263_decode_end(AVCodecContext *avctx)
     MpegEncContext *s = avctx->priv_data;
 
     ff_mpv_common_end(s);
+
+    ffe_transplicate_free(&s->ffe_xp);
+
     return 0;
 }
 
@@ -429,6 +434,8 @@ int ff_h263_decode_frame(AVCodecContext *avctx, AVFrame *pict,
     MpegEncContext *s  = avctx->priv_data;
     int ret;
     int slice_ret = 0;
+    PutBitContext *transplicate_pb;
+    PutBitContext retry_pb;
 
     /* no supplementary picture */
     if (buf_size == 0) {
@@ -436,10 +443,28 @@ int ff_h263_decode_frame(AVCodecContext *avctx, AVFrame *pict,
         if (s->low_delay == 0 && s->next_picture_ptr) {
             if ((ret = av_frame_ref(pict, s->next_picture_ptr->f)) < 0)
                 return ret;
+
+            /* FFglitch: update s->jctx to point to next_picture_ptr
+             *           instead of current_picture_ptr (this context
+             *           was already initialized for that frame in
+             *           ffe_mpegvideo_jctx_init() and ffedit_sd was
+             *           filled while decoding). */
+            s->jctx = s->next_picture_ptr->f->jctx;
+
             s->next_picture_ptr = NULL;
 
             *got_frame = 1;
         } else if (s->skipped_last_frame && s->current_picture_ptr) {
+
+            /* FFglitch: ignore NVOPs (but still enable them for FFmpeg
+             *           in order to pass FATE) */
+            if ( s->avctx->ffedit_import != 0
+              || s->avctx->ffedit_export != 0
+              || s->avctx->ffedit_apply != 0 )
+            {
+                return 0;
+            }
+
             /* Output the last picture we decoded again if the stream ended with
              * an NVOP */
             if ((ret = av_frame_ref(pict, s->current_picture_ptr->f)) < 0)
@@ -480,6 +505,19 @@ retry:
     if (ret < 0)
         return ret;
 
+    if ( (avctx->ffedit_apply & (1 << FFEDIT_FEAT_LAST)) != 0 )
+    {
+        ret = ffe_transplicate_init(avctx, &s->ffe_xp, buf_size);
+        if ( ret < 0 )
+            return ret;
+        s->gb.pb = ffe_transplicate_pb(&s->ffe_xp);
+    }
+
+    retry_pb.buf = NULL;
+    transplicate_pb = ffe_transplicate_pb(&s->ffe_xp);
+    if ( transplicate_pb != NULL )
+        retry_pb = *transplicate_pb;
+
     /* let's go :-) */
     if (CONFIG_WMV2_DECODER && s->msmpeg4_version == 5) {
         ret = ff_wmv2_decode_picture_header(s);
@@ -505,7 +543,10 @@ retry:
         }
     }
     if (ret == FRAME_SKIPPED)
-        return get_consumed_bytes(s, buf_size);
+    {
+        ret = get_consumed_bytes(s, buf_size);
+        goto the_end;
+    }
 
     /* skip if the header was thrashed */
     if (ret < 0) {
@@ -525,7 +566,11 @@ retry:
         if (s->pict_type != AV_PICTURE_TYPE_B && s->mb_num/2 > get_bits_left(&s->gb))
             return AVERROR_INVALIDDATA;
         if (ff_mpeg4_workaround_bugs(avctx) == 1)
+        {
+            if ( retry_pb.buf != NULL )
+                ffe_transplicate_restore(&s->ffe_xp, &retry_pb);
             goto retry;
+        }
         if (s->studio_profile != (s->idsp.idct == NULL))
             ff_mpv_idct_init(s);
     }
@@ -564,13 +609,19 @@ retry:
     /* skip B-frames if we don't have reference frames */
     if (!s->last_picture_ptr &&
         (s->pict_type == AV_PICTURE_TYPE_B || s->droppable))
-        return get_consumed_bytes(s, buf_size);
+    {
+        ret = get_consumed_bytes(s, buf_size);
+        goto the_end;
+    }
     if ((avctx->skip_frame >= AVDISCARD_NONREF &&
          s->pict_type == AV_PICTURE_TYPE_B)    ||
         (avctx->skip_frame >= AVDISCARD_NONKEY &&
          s->pict_type != AV_PICTURE_TYPE_I)    ||
         avctx->skip_frame >= AVDISCARD_ALL)
-        return get_consumed_bytes(s, buf_size);
+    {
+        ret = get_consumed_bytes(s, buf_size);
+        goto the_end;
+    }
 
     if ((ret = ff_mpv_frame_start(s, avctx)) < 0)
         return ret;
@@ -631,6 +682,12 @@ retry:
 
     av_assert1(s->bitstream_buffer_size == 0);
 frame_end:
+    if ( s->codec_id == AV_CODEC_ID_MPEG4
+      && s->avctx->ffedit_apply != 0 )
+    {
+        PutBitContext *opb = ffe_transplicate_pb(&s->ffe_xp);
+        ff_mpeg4_stuffing(opb);
+    }
     if (!s->studio_profile)
         ff_er_frame_end(&s->er, NULL);
 
@@ -676,9 +733,15 @@ frame_end:
     }
 
     if (slice_ret < 0 && (avctx->err_recognition & AV_EF_EXPLODE))
-        return slice_ret;
+        ret = slice_ret;
     else
-        return get_consumed_bytes(s, buf_size);
+        ret = get_consumed_bytes(s, buf_size);
+
+the_end:
+    if ( (avctx->ffedit_apply & (1 << FFEDIT_FEAT_LAST)) != 0 )
+        ffe_transplicate_flush(avctx, &s->ffe_xp, avpkt);
+
+    return ret;
 }
 
 static const AVCodecHWConfigInternal *const h263_hw_config_list[] = {
@@ -707,6 +770,8 @@ const FFCodec ff_h263_decoder = {
     .close          = ff_h263_decode_end,
     FF_CODEC_DECODE_CB(ff_h263_decode_frame),
     .p.capabilities = AV_CODEC_CAP_DRAW_HORIZ_BAND | AV_CODEC_CAP_DR1 |
+                      AV_CODEC_CAP_FFEDIT_BITSTREAM |
+                      AV_CODEC_CAP_FFEDIT_SLICE_THREADS |
                       AV_CODEC_CAP_DELAY,
     .caps_internal  = FF_CODEC_CAP_SKIP_FRAME_FILL_PARAM,
     .flush          = ff_mpeg_flush,
@@ -724,6 +789,8 @@ const FFCodec ff_h263p_decoder = {
     .close          = ff_h263_decode_end,
     FF_CODEC_DECODE_CB(ff_h263_decode_frame),
     .p.capabilities = AV_CODEC_CAP_DRAW_HORIZ_BAND | AV_CODEC_CAP_DR1 |
+                      AV_CODEC_CAP_FFEDIT_BITSTREAM |
+                      AV_CODEC_CAP_FFEDIT_SLICE_THREADS |
                       AV_CODEC_CAP_DELAY,
     .caps_internal  = FF_CODEC_CAP_SKIP_FRAME_FILL_PARAM,
     .flush          = ff_mpeg_flush,

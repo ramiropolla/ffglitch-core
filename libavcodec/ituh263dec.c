@@ -50,6 +50,7 @@
 #include "mpegvideodata.h"
 #include "mpegvideodec.h"
 #include "mpeg4videodec.h"
+#include "mpeg4videoenc.h"
 #include "mpeg4videodefs.h"
 
 // The defines below define the number of bits that are read at once for
@@ -232,8 +233,16 @@ int ff_h263_resync(MpegEncContext *s){
     }
 
     if(s->codec_id==AV_CODEC_ID_MPEG4){
+        PutBitContext saved;
+        if ( s->avctx->ffedit_apply != 0 )
+            saved = *ffe_transplicate_save(&s->ffe_xp);
         skip_bits1(&s->gb);
         align_get_bits(&s->gb);
+        if ( s->avctx->ffedit_apply != 0 )
+        {
+            ff_mpeg4_stuffing(&saved);
+            ffe_transplicate_restore(&s->ffe_xp, &saved);
+        }
     }
 
     if(show_bits(&s->gb, 16)==0){

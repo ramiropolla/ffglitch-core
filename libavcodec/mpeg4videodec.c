@@ -401,6 +401,7 @@ static inline int mpeg4_is_resync(Mpeg4DecContext *ctx)
             int mb_num_bits = av_log2(s->mb_num - 1) + 1;
             GetBitContext gb = s->gb;
 
+            s->gb.pb = NULL;
             skip_bits(&s->gb, 1);
             align_get_bits(&s->gb);
 
@@ -3840,6 +3841,8 @@ const FFCodec ff_mpeg4_decoder = {
     .close                 = ff_h263_decode_end,
     FF_CODEC_DECODE_CB(ff_h263_decode_frame),
     .p.capabilities        = AV_CODEC_CAP_DRAW_HORIZ_BAND | AV_CODEC_CAP_DR1 |
+                             AV_CODEC_CAP_FFEDIT_BITSTREAM |
+                             AV_CODEC_CAP_FFEDIT_SLICE_THREADS |
                              AV_CODEC_CAP_DELAY | AV_CODEC_CAP_FRAME_THREADS,
     .caps_internal         = FF_CODEC_CAP_SKIP_FRAME_FILL_PARAM |
                              FF_CODEC_CAP_ALLOCATE_PROGRESS,
