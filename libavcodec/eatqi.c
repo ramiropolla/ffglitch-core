@@ -72,6 +72,7 @@ static av_cold int tqi_decode_init(AVCodecContext *avctx)
 
 static int tqi_decode_mb(TqiContext *t, int16_t (*block)[64])
 {
+    int16_t qblock[64];
     int n;
 
     t->bdsp.clear_blocks(block[0]);
@@ -79,7 +80,7 @@ static int tqi_decode_mb(TqiContext *t, int16_t (*block)[64])
         int ret = ff_mpeg1_decode_block_intra(&t->gb,
                                               t->intra_matrix,
                                               t->intra_scantable.permutated,
-                                              t->last_dc, block[n], n, 1);
+                                              t->last_dc, block[n], qblock, n, 1);
         if (ret < 0) {
             av_log(t->avctx, AV_LOG_ERROR, "ac-tex damaged at %d %d\n",
                    t->mb_x, t->mb_y);
