@@ -802,10 +802,18 @@ static int decode_block(MJpegDecodeContext *s, int16_t *block, int component,
     ffe_q_dct_ctx_t qctx;
     int16_t qblock[64];
 
+    /* FFedit: FFEDIT_FEAT_Q_DC is processed inside ffe_mjpeg_decode_dc()
+     *         at the same time the value is being read.
+     *         FFEDIT_FEAT_Q_DCT, on the other hand, is processed as
+     *         a block after all values have been read. It is done this
+     *         way because of the run-length encoding, which would make
+     *         it harder to process the values at the same time they
+     *         are being read.
+     */
     ffe_mjpeg_dct_init(s, &qctx, qblock, component);
 
     /* DC coef */
-    val = mjpeg_decode_dc(s, dc_index);
+    val = ffe_mjpeg_decode_dc(s, dc_index, component, mb_y, mb_x, blockn);
     if (val == 0xfffff) {
         av_log(s->avctx, AV_LOG_ERROR, "error dc\n");
         return AVERROR_INVALIDDATA;
@@ -2899,6 +2907,7 @@ AVCodec ff_mjpeg_decoder = {
                     },
     .ffedit_features = (1 << FFEDIT_FEAT_INFO)
                      | (1 << FFEDIT_FEAT_Q_DCT)
+                     | (1 << FFEDIT_FEAT_Q_DC)
 };
 #endif
 #if CONFIG_THP_DECODER

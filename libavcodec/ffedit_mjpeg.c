@@ -17,6 +17,24 @@ typedef struct {
     int last_dc_component;
 } ffe_q_dct_ctx_t;
 
+//---------------------------------------------------------------------
+static enum FFEditFeature
+i_dc_or_dct(MJpegDecodeContext *s)
+{
+    return (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_Q_DCT)) != 0
+         ? FFEDIT_FEAT_Q_DCT
+         : FFEDIT_FEAT_Q_DC;
+}
+
+//---------------------------------------------------------------------
+static enum FFEditFeature
+e_dc_or_dct(MJpegDecodeContext *s)
+{
+    return (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_Q_DCT)) != 0
+         ? FFEDIT_FEAT_Q_DCT
+         : FFEDIT_FEAT_Q_DC;
+}
+
 /* init */
 
 //---------------------------------------------------------------------
@@ -35,18 +53,29 @@ ffe_dct_scan_new(MJpegDecodeContext *s)
     json_t *jscan;
     int pflags = 0;
 
+    if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_Q_DC)) != 0 )
+        pflags = JSON_PFLAGS_NO_LF;
+
     jscan = ffe_jmb_new(f->jctx,
                         s->mb_width, s->mb_height,
                         s->nb_components,
                         s->v_scount, s->h_scount,
                         pflags);
 
-    json_object_add(jscan, "dc_luma_max", jluma_max);
-    json_object_add(jscan, "dc_chroma_max", jchroma_max);
-    jluma_max = json_int_new(f->jctx, s->huff_max_ac_luminance);
-    jchroma_max = json_int_new(f->jctx, s->huff_max_ac_chrominance);
-    json_object_add(jscan, "ac_luma_max", jluma_max);
-    json_object_add(jscan, "ac_chroma_max", jchroma_max);
+    if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_Q_DC)) != 0 )
+    {
+        json_object_add(jscan, "luma_max", jluma_max);
+        json_object_add(jscan, "chroma_max", jchroma_max);
+    }
+    else
+    {
+        json_object_add(jscan, "dc_luma_max", jluma_max);
+        json_object_add(jscan, "dc_chroma_max", jchroma_max);
+        jluma_max = json_int_new(f->jctx, s->huff_max_ac_luminance);
+        jchroma_max = json_int_new(f->jctx, s->huff_max_ac_chrominance);
+        json_object_add(jscan, "ac_luma_max", jluma_max);
+        json_object_add(jscan, "ac_chroma_max", jchroma_max);
+    }
 
     return jscan;
 }
@@ -55,17 +84,19 @@ ffe_dct_scan_new(MJpegDecodeContext *s)
 static void
 ffe_dct_export_scan(MJpegDecodeContext *s)
 {
+    enum FFEditFeature feature = e_dc_or_dct(s);
     AVFrame *f = s->picture_ptr;
     json_t *jframe = ffe_dct_scan_new(s);
-    f->ffedit_sd[FFEDIT_FEAT_Q_DCT] = jframe;
+    f->ffedit_sd[feature] = jframe;
 }
 
 //---------------------------------------------------------------------
 static void
 ffe_dct_import_scan(MJpegDecodeContext *s, int nb_components)
 {
+    enum FFEditFeature feature = i_dc_or_dct(s);
     AVFrame *f = s->picture_ptr;
-    json_t *jframe = f->ffedit_sd[FFEDIT_FEAT_Q_DCT];
+    json_t *jframe = f->ffedit_sd[feature];
     ffe_jmb_set_context(jframe, nb_components, s->v_scount, s->h_scount);
 }
 
@@ -97,10 +128,13 @@ ffe_dct_get(
         int block,
         int i)
 {
+    enum FFEditFeature feature = i_dc_or_dct(s);
     AVFrame *f = s->picture_ptr;
-    json_t *jframe = f->ffedit_sd[FFEDIT_FEAT_Q_DCT];
+    json_t *jframe = f->ffedit_sd[feature];
     json_t *jso = jframe;
     json_t *jval = ffe_jmb_get(jso, component, mb_y, mb_x, block);
+    if ( feature == FFEDIT_FEAT_Q_DC )
+        return (int) jval;
     return json_array_get_int(jval, i);
 }
 
@@ -115,17 +149,60 @@ ffe_dct_set(
         int i,
         int code)
 {
+    enum FFEditFeature feature = e_dc_or_dct(s);
     AVFrame *f = s->picture_ptr;
-    json_t *jframe = f->ffedit_sd[FFEDIT_FEAT_Q_DCT];
+    json_t *jframe = f->ffedit_sd[feature];
     json_t *jso = jframe;
-    json_t *jmb = ffe_jmb_get(jso, component, mb_y, mb_x, block);
-    if ( jmb == NULL )
+    if ( feature == FFEDIT_FEAT_Q_DCT )
     {
-        jmb = json_array_of_ints_new(f->jctx, 64);
-        json_set_pflags(jmb, JSON_PFLAGS_NO_LF);
-        ffe_jmb_set(jso, component, mb_y, mb_x, block, jmb);
+        json_t *jmb = ffe_jmb_get(jso, component, mb_y, mb_x, block);
+        if ( jmb == NULL )
+        {
+            jmb = json_array_of_ints_new(f->jctx, 64);
+            json_set_pflags(jmb, JSON_PFLAGS_NO_LF);
+            ffe_jmb_set(jso, component, mb_y, mb_x, block, jmb);
+        }
+        json_array_set_int(f->jctx, jmb, i, code);
     }
-    json_array_set_int(f->jctx, jmb, i, code);
+    else
+    {
+        json_t *jval = json_int_new(f->jctx, code);
+        ffe_jmb_set(jso, component, mb_y, mb_x, block, jval);
+    }
+}
+
+//---------------------------------------------------------------------
+static inline int mjpeg_decode_dc(MJpegDecodeContext *s, int dc_index);
+static inline int ffe_mjpeg_decode_dc(
+        MJpegDecodeContext *s,
+        int dc_index,
+        int component,
+        int mb_y,
+        int mb_x,
+        int block)
+{
+    PutBitContext *saved = NULL;
+    int code;
+
+    if ( (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_Q_DC)) != 0 )
+        saved = ffe_transplicate_save(&s->ffe_xp);
+
+    code = mjpeg_decode_dc(s, dc_index);
+
+    if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_Q_DC)) != 0 )
+        ffe_dct_set(s, component, mb_y, mb_x, block, 0, code);
+    else if ( (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_Q_DC)) != 0 )
+        code = ffe_dct_get(s, component, mb_y, mb_x, block, 0);
+    if ( (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_Q_DC)) != 0 )
+    {
+        if ( dc_index == 0 )
+            ff_mjpeg_encode_dc(saved, code, s->m.huff_size_dc_luminance, s->m.huff_code_dc_luminance);
+        else
+            ff_mjpeg_encode_dc(saved, code, s->m.huff_size_dc_chrominance, s->m.huff_code_dc_chrominance);
+        ffe_transplicate_restore(&s->ffe_xp, saved);
+    }
+
+    return code;
 }
 
 /* cleanup */
@@ -139,8 +216,9 @@ ffe_dct_zero_fill(
         int mb_x,
         int block)
 {
+    enum FFEditFeature feature = e_dc_or_dct(s);
     AVFrame *f = s->picture_ptr;
-    json_t *jframe = f->ffedit_sd[FFEDIT_FEAT_Q_DCT];
+    json_t *jframe = f->ffedit_sd[feature];
     json_t *jso = jframe;
     json_t *jarr = ffe_jmb_get(jso, component, mb_y, mb_x, block);
     ffe_json_array_zero_fill(f->jctx, jarr, 64);
@@ -287,7 +365,10 @@ ffe_mjpeg_scan_init(
         int chroma_v_shift)
 {
     if ( s->progressive
-      && ((s->avctx->ffedit_import & (1 << FFEDIT_FEAT_Q_DCT)) != 0
+      && ((s->avctx->ffedit_import & (1 << FFEDIT_FEAT_Q_DC)) != 0
+       || (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_Q_DC)) != 0
+       || (s->avctx->ffedit_apply  & (1 << FFEDIT_FEAT_Q_DC)) != 0
+       || (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_Q_DCT)) != 0
        || (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_Q_DCT)) != 0
        || (s->avctx->ffedit_apply  & (1 << FFEDIT_FEAT_Q_DCT)) != 0) )
     {
@@ -298,11 +379,13 @@ ffe_mjpeg_scan_init(
 
     s->chroma_h_shift = chroma_h_shift;
     s->chroma_v_shift = chroma_v_shift;
-    if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_Q_DCT)) != 0 )
+    if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_Q_DCT)) != 0
+      || (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_Q_DC)) != 0 )
     {
         ffe_dct_export_scan(s);
     }
-    else if ( (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_Q_DCT)) != 0 )
+    else if ( (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_Q_DCT)) != 0
+           || (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_Q_DC)) != 0 )
     {
         ffe_dct_import_scan(s, nb_components);
     }
