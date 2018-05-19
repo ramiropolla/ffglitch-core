@@ -1,0 +1,68 @@
+{
+  "filename":"mpeg2video_traffic_128_5.rawvideo",
+  "sha1sum":"5cf0c9ea976b8bbbb337fadb183de710ce68dffa",
+  "features":[
+    "mv"
+  ],
+  "streams":[
+    {
+      "frames":[
+        {
+          "pkt_pos":0,
+          "pts":null,
+          "dts":40040,
+          "mv":{
+          }
+        },
+        {
+          "pkt_pos":6839,
+          "pts":null,
+          "dts":80080,
+          "mv":{
+            "forward":[
+              [ null, null, null, null, null, null, [2,0], null ],
+              [ null, null, null, null, null, null, null, null ],
+              [ null, null, null, null, null, null, null, null ],
+              [ null, null, null, null, null, null, null, null ],
+              [ null, null, null, null, null, null, null, null ],
+              [ null, [0,-1], [0,-1], [0,-1], [0,-1], [0,-1], null, null ],
+              [ null, [0,-1], [0,-1], [0,-1], [0,-1], [0,-1], [0,-1], null ],
+              [ [0,-2], [0,-1], [0,-2], [0,-1], [0,-2], [0,-1], [0,-2], [0,-2] ]
+            ]
+          }
+        },
+        {
+          "pkt_pos":14140,
+          "pts":null,
+          "dts":120120,
+          "mv":{
+          }
+        },
+        {
+          "pkt_pos":24735,
+          "pts":null,
+          "dts":160160,
+          "mv":{
+            "forward":[
+              [ null, null, null, null, null, null, null, null ],
+              [ null, null, null, null, null, null, null, null ],
+              [ null, null, null, null, null, null, null, null ],
+              [ null, null, null, null, null, null, null, null ],
+              [ null, null, null, null, null, null, null, null ],
+              [ null, null, null, null, null, null, null, null ],
+              [ null, [0,-1], [0,-1], [0,-1], [0,-1], null, [0,-1], null ],
+              [ null, null, null, null, [0,-1], null, null, null ]
+            ]
+          }
+        },
+        {
+          "pkt_pos":29371,
+          "pts":null,
+          "dts":null,
+          "mv":{
+          }
+        }
+      ]
+    }
+  ]
+}
