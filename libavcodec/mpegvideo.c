@@ -486,6 +486,7 @@ static void backup_duplicate_context(MpegEncContext *bak, MpegEncContext *src)
     COPY(ac_val[1]);
     COPY(ac_val[2]);
     COPY(ffe_xp);
+    COPY(jctx);
 #undef COPY
 }
 

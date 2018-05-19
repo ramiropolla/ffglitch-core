@@ -97,6 +97,8 @@ typedef struct Mpeg1Context {
 
 #define MB_TYPE_ZERO_MV   0x20000000
 
+#include "ffedit_mpeg12.c"
+
 static const uint32_t ptype2mb_type[7] = {
                     MB_TYPE_INTRA,
                     MB_TYPE_L0 | MB_TYPE_CBP | MB_TYPE_ZERO_MV | MB_TYPE_16x16,
@@ -119,6 +121,30 @@ static const uint32_t btype2mb_type[11] = {
     MB_TYPE_QUANT | MB_TYPE_L1   | MB_TYPE_CBP,
     MB_TYPE_QUANT | MB_TYPE_L0   | MB_TYPE_CBP,
     MB_TYPE_QUANT | MB_TYPE_L0L1 | MB_TYPE_CBP,
+};
+
+static const uint32_t ffe_ptype2mb_type[7] = {
+    FFE_MB_TYPE_INTRA,
+    FFE_MB_TYPE_CBP,
+    FFE_MB_TYPE_FORWARD,
+    FFE_MB_TYPE_FORWARD | FFE_MB_TYPE_CBP,
+    FFE_MB_TYPE_QUANT | FFE_MB_TYPE_INTRA,
+    FFE_MB_TYPE_QUANT | FFE_MB_TYPE_CBP,
+    FFE_MB_TYPE_QUANT | FFE_MB_TYPE_FORWARD | FFE_MB_TYPE_CBP,
+};
+
+static const uint32_t ffe_btype2mb_type[11] = {
+    FFE_MB_TYPE_INTRA,
+    FFE_MB_TYPE_BACKWARD,
+    FFE_MB_TYPE_BACKWARD | FFE_MB_TYPE_CBP,
+    FFE_MB_TYPE_FORWARD,
+    FFE_MB_TYPE_FORWARD | FFE_MB_TYPE_CBP,
+    FFE_MB_TYPE_FORWARD | FFE_MB_TYPE_BACKWARD,
+    FFE_MB_TYPE_FORWARD | FFE_MB_TYPE_BACKWARD | FFE_MB_TYPE_CBP,
+    FFE_MB_TYPE_QUANT | FFE_MB_TYPE_INTRA,
+    FFE_MB_TYPE_QUANT | FFE_MB_TYPE_BACKWARD | FFE_MB_TYPE_CBP,
+    FFE_MB_TYPE_QUANT | FFE_MB_TYPE_FORWARD | FFE_MB_TYPE_CBP,
+    FFE_MB_TYPE_QUANT | FFE_MB_TYPE_FORWARD | FFE_MB_TYPE_BACKWARD | FFE_MB_TYPE_CBP,
 };
 
 /* as H.263, but only 17 codes */
@@ -406,6 +432,7 @@ static int mpeg_decode_mb(MpegEncContext *s, int16_t block[12][64])
 {
     int i, j, k, cbp, val, mb_type, motion_type;
     const int mb_block_count = 4 + (1 << s->chroma_format);
+    int ffe_mb_type = 0;
     int ret;
 
     ff_tlog(s->avctx, "decode_mb: x=%d y=%d\n", s->mb_x, s->mb_y);
@@ -450,8 +477,10 @@ static int mpeg_decode_mb(MpegEncContext *s, int16_t block[12][64])
                 return AVERROR_INVALIDDATA;
             }
             mb_type = MB_TYPE_QUANT | MB_TYPE_INTRA;
+            ffe_mb_type = FFE_MB_TYPE_INTRA | FFE_MB_TYPE_QUANT;
         } else {
             mb_type = MB_TYPE_INTRA;
+            ffe_mb_type = FFE_MB_TYPE_INTRA;
         }
         break;
     case AV_PICTURE_TYPE_P:
@@ -461,6 +490,7 @@ static int mpeg_decode_mb(MpegEncContext *s, int16_t block[12][64])
                    "Invalid mb type in P-frame at %d %d\n", s->mb_x, s->mb_y);
             return AVERROR_INVALIDDATA;
         }
+        ffe_mb_type = ffe_ptype2mb_type[mb_type];
         mb_type = ptype2mb_type[mb_type];
         break;
     case AV_PICTURE_TYPE_B:
@@ -470,10 +500,12 @@ static int mpeg_decode_mb(MpegEncContext *s, int16_t block[12][64])
                    "Invalid mb type in B-frame at %d %d\n", s->mb_x, s->mb_y);
             return AVERROR_INVALIDDATA;
         }
+        ffe_mb_type = ffe_btype2mb_type[mb_type];
         mb_type = btype2mb_type[mb_type];
         break;
     }
     ff_tlog(s->avctx, "mb_type=%x\n", mb_type);
+    ffe_mpeg12_export_info(s, ffe_mb_type);
 //    motion_type = 0; /* avoid warning */
     if (IS_INTRA(mb_type)) {
         s->bdsp.clear_blocks(s->block[0]);
@@ -1319,6 +1351,8 @@ static int mpeg_field_start(MpegEncContext *s, const uint8_t *buf, int buf_size)
 
         if ((ret = ff_mpv_frame_start(s, avctx)) < 0)
             return ret;
+
+        ffe_mpeg12_init(s);
 
         ff_mpeg_er_frame_start(s);
 
@@ -2586,6 +2620,8 @@ static int mpeg_decode_frame(AVCodecContext *avctx, AVFrame *picture,
     Mpeg1Context *s = avctx->priv_data;
     MpegEncContext *s2 = &s->mpeg_enc_ctx;
 
+    ffe_mpeg12_prepare_frame(avctx, s2, avpkt);
+
     if (buf_size == 0 || (buf_size == 4 && AV_RB32(buf) == SEQ_END_CODE)) {
         /* special case for last picture */
         if (s2->low_delay == 0 && s2->next_picture_ptr) {
@@ -2654,6 +2690,9 @@ the_end:
     if ( (avctx->ffedit_apply & (1 << FFEDIT_FEAT_LAST)) != 0 )
         ffe_transplicate_flush(avctx, &s2->ffe_xp, avpkt);
 
+    if ( *got_output )
+        ffe_mpeg12_export_cleanup(s2, picture);
+
     return ret;
 }
 
@@ -2711,6 +2750,7 @@ const FFCodec ff_mpeg1video_decoder = {
 #endif
                                NULL
                            },
+    .p.ffedit_features = (1 << FFEDIT_FEAT_INFO)
 };
 
 #define M2V_OFFSET(x) offsetof(Mpeg1Context, x)
@@ -2785,6 +2825,7 @@ const FFCodec ff_mpeg2video_decoder = {
 #endif
                         NULL
                     },
+    .p.ffedit_features = (1 << FFEDIT_FEAT_INFO)
 };
 
 //legacy decoder
@@ -2804,6 +2845,7 @@ const FFCodec ff_mpegvideo_decoder = {
     .caps_internal  = FF_CODEC_CAP_SKIP_FRAME_FILL_PARAM,
     .flush          = flush,
     .p.max_lowres   = 3,
+    .p.ffedit_features = (1 << FFEDIT_FEAT_INFO)
 };
 
 typedef struct IPUContext {

@@ -40,6 +40,19 @@
 #define MAX_MB_BYTES    (30 * 16 * 16 * 3 / 8 + 120)
 #define MAX_FCODE        7
 
+/* FFEdit MB types */
+#define FFE_MB_TYPE_INTRA           (1 <<  0)
+#define FFE_MB_TYPE_ACPRED          (1 <<  1)
+#define FFE_MB_TYPE_QUANT           (1 <<  2)
+#define FFE_MB_TYPE_CBP             (1 <<  3)
+#define FFE_MB_TYPE_DIRECT          (1 <<  4)
+#define FFE_MB_TYPE_FORWARD         (1 <<  5)
+#define FFE_MB_TYPE_BACKWARD        (1 <<  6)
+#define FFE_MB_TYPE_GMC             (1 <<  7)
+#define FFE_MB_TYPE_MV4             (1 <<  8)
+#define FFE_MB_TYPE_INTERLACED      (1 <<  9)
+#define FFE_MB_TYPE_INTERLACED_DCT  (1 << 10)
+
 /* MB types */
 #define MB_TYPE_INTRA4x4   (1 <<  0)
 #define MB_TYPE_INTRA16x16 (1 <<  1) // FIXME H.264-specific
