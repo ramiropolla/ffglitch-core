@@ -240,7 +240,7 @@ int ff_mpeg1_find_frame_end(ParseContext *pc, const uint8_t *buf, int buf_size, 
 int ff_mpeg1_decode_block_intra(GetBitContext *gb,
                                 const uint16_t *quant_matrix,
                                 uint8_t *const scantable, int last_dc[3],
-                                int16_t *block, int index, int qscale)
+                                int16_t *block, int16_t *qblock, int index, int qscale)
 {
     int dc, diff, i = 0, component;
     RLTable *rl = &ff_rl_mpeg1;
@@ -257,6 +257,7 @@ int ff_mpeg1_decode_block_intra(GetBitContext *gb,
     last_dc[component] = dc;
 
     block[0] = dc * quant_matrix[0];
+    qblock[0] = dc;
 
     {
         if ( show_bits(gb, 2) == 2 )
@@ -265,6 +266,7 @@ int ff_mpeg1_decode_block_intra(GetBitContext *gb,
         /* now quantify & encode AC coefficients */
         while (1) {
             int level, run, j;
+            int qlevel;
 
             get_rl_vlc2(&level, &run, gb, rl->rl_vlc[0],
                         TEX_VLC_BITS, 2, 0);
@@ -275,10 +277,14 @@ int ff_mpeg1_decode_block_intra(GetBitContext *gb,
                     break;
 
                 j = scantable[i];
+                qlevel = level;
                 level = (level * qscale * quant_matrix[j]) >> 4;
                 level = (level - 1) | 1;
                 if ( get_bits1(gb) )
+                {
                     level = -level;
+                    qlevel = -qlevel;
+                }
             } else {
                 /* escape */
                 run = get_bits(gb, 6) + 1;
@@ -295,6 +301,7 @@ int ff_mpeg1_decode_block_intra(GetBitContext *gb,
                     break;
 
                 j = scantable[i];
+                qlevel = level;
                 if (level < 0) {
                     level = -level;
                     level = (level * qscale * quant_matrix[j]) >> 4;
@@ -307,6 +314,7 @@ int ff_mpeg1_decode_block_intra(GetBitContext *gb,
             }
 
             block[j] = level;
+            qblock[j] = qlevel;
             if ( show_bits(gb, 2) == 2 )
                break;
         }
