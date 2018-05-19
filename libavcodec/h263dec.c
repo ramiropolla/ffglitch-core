@@ -48,6 +48,7 @@
 #include "wmv2.h"
 #include "ffedit.h"
 #include "ffedit_json.h"
+#include "ffedit_mv.h"
 
 static enum AVPixelFormat h263_get_format(AVCodecContext *avctx)
 {
@@ -453,11 +454,18 @@ ffe_h263_export_init(MpegEncContext *s)
 
         f->ffedit_sd[FFEDIT_FEAT_INFO] = jframe;
     }
+
+    if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_MV)) != 0 )
+        ffe_mv_export_init(f, s->mb_height, s->mb_width);
+    else if ( (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_MV)) != 0 )
+        ffe_mv_import_init(f);
 }
 
 static void
 ffe_h263_export_cleanup(MpegEncContext *s, AVFrame *f)
 {
+    if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_MV)) != 0 )
+        ffe_mv_export_cleanup(f);
 }
 
 int ff_h263_decode_frame(AVCodecContext *avctx, void *data, int *got_frame,
@@ -852,6 +860,7 @@ AVCodec ff_h263_decoder = {
     .max_lowres     = 3,
     .pix_fmts       = ff_h263_hwaccel_pixfmt_list_420,
     .ffedit_features = (1 << FFEDIT_FEAT_INFO)
+                    | (1 << FFEDIT_FEAT_MV)
 };
 
 AVCodec ff_h263p_decoder = {
@@ -883,4 +892,5 @@ AVCodec ff_h263p_decoder = {
                         NULL
                     },
     .ffedit_features = (1 << FFEDIT_FEAT_INFO)
+                    | (1 << FFEDIT_FEAT_MV)
 };
