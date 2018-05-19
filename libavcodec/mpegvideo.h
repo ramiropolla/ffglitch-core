@@ -590,6 +590,12 @@ typedef struct MpegEncContext {
     /* ffedit bitstream */
     FFEditTransplicateContext ffe_xp;
 
+    /* ffedit JSON context */
+    void *jctx;
+
+    /* ffedit sidedata (for importing) */
+    void *ffedit_sd[32]; // should be at least [FFEDIT_FEAT_LAST]
+
 } MpegEncContext;
 
 /* mpegvideo_enc common options */

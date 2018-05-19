@@ -6,6 +6,7 @@ libavcodec/ffedit.c
 libavcodec/ffedit.h
 libavcodec/ffedit_json.c
 libavcodec/ffedit_json.h
+libavcodec/ffedit_mpeg12.c
 libavcodec/ffedit_mv.c
 libavcodec/ffedit_mv.h
 libavcodec/ffedit_xp.c

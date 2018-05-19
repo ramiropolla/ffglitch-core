@@ -74,6 +74,8 @@ typedef struct Mpeg1Context {
 
 #define MB_TYPE_ZERO_MV   0x20000000
 
+#include "ffedit_mpeg12.c"
+
 static const uint32_t ptype2mb_type[7] = {
                     MB_TYPE_INTRA,
                     MB_TYPE_L0 | MB_TYPE_CBP | MB_TYPE_ZERO_MV | MB_TYPE_16x16,
@@ -455,6 +457,7 @@ static int mpeg_decode_mb(MpegEncContext *s, int16_t block[12][64])
         break;
     }
     ff_tlog(s->avctx, "mb_type=%x\n", mb_type);
+    ffe_mpeg12_export_info(s, mb_type);
 //    motion_type = 0; /* avoid warning */
     if (IS_INTRA(mb_type)) {
         s->bdsp.clear_blocks(s->block[0]);
@@ -1310,6 +1313,8 @@ static int mpeg_field_start(MpegEncContext *s, const uint8_t *buf, int buf_size)
 
         if ((ret = ff_mpv_frame_start(s, avctx)) < 0)
             return ret;
+
+        ffe_mpeg12_init(s);
 
         ff_mpeg_er_frame_start(s);
 
@@ -2521,6 +2526,8 @@ static int mpeg_decode_frame(AVCodecContext *avctx, void *data,
     AVFrame *picture = data;
     MpegEncContext *s2 = &s->mpeg_enc_ctx;
 
+    ffe_mpeg12_prepare_frame(s2, avpkt);
+
     if (buf_size == 0 || (buf_size == 4 && AV_RB32(buf) == SEQ_END_CODE)) {
         /* special case for last picture */
         if (s2->low_delay == 0 && s2->next_picture_ptr) {
@@ -2598,6 +2605,9 @@ the_end:
     if ( (avctx->ffedit_apply & (1 << FFEDIT_FEAT_LAST)) != 0 )
         ffe_transplicate_flush(avctx, &s2->ffe_xp, avpkt);
 
+    if ( *got_output )
+        ffe_mpeg12_export_cleanup(s2, picture);
+
     return ret;
 }
 
@@ -2656,6 +2666,7 @@ AVCodec ff_mpeg1video_decoder = {
 #endif
                                NULL
                            },
+    .ffedit_features = (1 << FFEDIT_FEAT_INFO)
 };
 
 AVCodec ff_mpeg2video_decoder = {
@@ -2702,6 +2713,7 @@ AVCodec ff_mpeg2video_decoder = {
 #endif
                         NULL
                     },
+    .ffedit_features = (1 << FFEDIT_FEAT_INFO)
 };
 
 //legacy decoder
@@ -2721,4 +2733,5 @@ AVCodec ff_mpegvideo_decoder = {
     .caps_internal  = FF_CODEC_CAP_SKIP_FRAME_FILL_PARAM,
     .flush          = flush,
     .max_lowres     = 3,
+    .ffedit_features = (1 << FFEDIT_FEAT_INFO)
 };
