@@ -1619,7 +1619,7 @@ static int mpeg_decode_slice(MpegEncContext *s, int mb_y,
         if ((CONFIG_MPEG1_XVMC_HWACCEL || CONFIG_MPEG2_XVMC_HWACCEL) && s->pack_pblocks)
             ff_xvmc_init_block(s); // set s->block
 
-        if ((ret = mpeg_decode_mb(s, s->block)) < 0)
+        if ((ret = ffe_mpeg_decode_mb(s, s->block)) < 0)
             return ret;
 
         // Note motion_val is normally NULL unless we want to extract the MVs.
@@ -2791,6 +2791,7 @@ AVCodec ff_mpeg1video_decoder = {
                      | (1 << FFEDIT_FEAT_MV)
                      | (1 << FFEDIT_FEAT_QSCALE)
                      | (1 << FFEDIT_FEAT_Q_DCT)
+                     | (1 << FFEDIT_FEAT_MB)
 };
 
 AVCodec ff_mpeg2video_decoder = {
@@ -2842,6 +2843,7 @@ AVCodec ff_mpeg2video_decoder = {
                      | (1 << FFEDIT_FEAT_MV)
                      | (1 << FFEDIT_FEAT_QSCALE)
                      | (1 << FFEDIT_FEAT_Q_DCT)
+                     | (1 << FFEDIT_FEAT_MB)
 };
 
 //legacy decoder
@@ -2866,4 +2868,5 @@ AVCodec ff_mpegvideo_decoder = {
                      | (1 << FFEDIT_FEAT_MV)
                      | (1 << FFEDIT_FEAT_QSCALE)
                      | (1 << FFEDIT_FEAT_Q_DCT)
+                     | (1 << FFEDIT_FEAT_MB)
 };

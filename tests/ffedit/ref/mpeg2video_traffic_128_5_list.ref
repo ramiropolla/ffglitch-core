@@ -4,3 +4,4 @@ FFEdit support for codec 'MPEG-2 video':
 	[q_dct     ]: quantized DCT coefficients
 	[mv        ]: motion vectors
 	[qscale    ]: quantization scale
+	[mb        ]: macroblock
