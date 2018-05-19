@@ -37,6 +37,7 @@
 #include "mpegutils.h"
 #include "flv.h"
 #include "mpeg4video.h"
+#include "ffedit_mv.h"
 
 
 void ff_h263_update_motion_val(MpegEncContext * s){
@@ -307,9 +308,12 @@ void ff_h263_pred_acdc(MpegEncContext * s, int16_t *block, int n)
 int16_t *ff_h263_pred_motion(MpegEncContext * s, int block, int dir,
                              int *px, int *py)
 {
+    AVFrame *f = s->current_picture_ptr->f;
     int wrap;
     int16_t *A, *B, *C, (*mot_val)[2];
     static const int off[4]= {2, 1, 1, -1};
+
+    ffe_mv_select(f, dir, block);
 
     wrap = s->b8_stride;
     mot_val = s->current_picture.motion_val[dir] + s->block_index[block];

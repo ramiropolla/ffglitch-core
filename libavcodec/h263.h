@@ -47,6 +47,15 @@ extern VLC ff_h263_cbpy_vlc;
 
 extern const enum AVPixelFormat ff_h263_hwaccel_pixfmt_list_420[];
 
+void ffe_h263_mv_init_mb(
+        MpegEncContext *s,
+        int nb_directions,
+        int nb_blocks);
+int ffe_h263_decode_motion(
+        MpegEncContext *s,
+        int pred,
+        int fcode,
+        int x_or_y);
 
 int ff_h263_decode_motion(MpegEncContext * s, int pred, int f_code);
 av_const int ff_h263_aspect_to_info(AVRational aspect);
