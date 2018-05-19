@@ -1,0 +1,2 @@
+ffmpeg -flags +bitexact -fflags +bitexact -idct simple -i ~/public_domain/CEP00109.mpg -c:v mpeg4 -an -f rawvideo -mpv_flags +nopimb+forcemv -g 1000 -s 128x128 -vframes 5 -y mpeg4_prepared_128_5.rawvideo
+ffmpeg -flags +bitexact -fflags +bitexact -idct simple -i ~/public_domain/CEP00109.mpg -c:v mpeg4 -an -f rawvideo -mpv_flags +nopimb+forcemv -g 1000 -s 128x128 -vframes 5 -flags +mv4 -y mpeg4_prepared_128_5_mv4.rawvideo
