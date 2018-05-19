@@ -156,6 +156,12 @@ typedef struct MJpegDecodeContext {
 
     /* ffedit bitstream */
     FFEditTransplicateContext ffe_xp;
+
+    /* ffedit JSON context */
+    void *jctx; // json_ctx_t *
+
+    /* ffedit sidedata (for importing) */
+    void *ffedit_sd[32]; // should be at least [FFEDIT_FEAT_LAST]
 } MJpegDecodeContext;
 
 int ff_mjpeg_decode_init(AVCodecContext *avctx);
