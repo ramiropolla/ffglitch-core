@@ -315,6 +315,107 @@ ffe_mjpeg_dct_term(
     }
 }
 
+//---------------------------------------------------------------------
+// dqt
+
+//---------------------------------------------------------------------
+typedef struct {
+    PutBitContext *saved;
+    json_t *jdata;
+    json_t *jcur;
+    int max_index;
+} ffe_dqt_ctx_t;
+
+/* init */
+
+//---------------------------------------------------------------------
+static void
+ffe_mjpeg_dqt_init(MJpegDecodeContext *s, ffe_dqt_ctx_t *dctx)
+{
+    dctx->saved = NULL;
+    dctx->jdata = NULL;
+    dctx->jcur = NULL;
+    dctx->max_index = -1;
+
+    if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_DQT)) != 0 )
+    {
+        // {
+        //  "tables": [ ] # plane
+        //            [ ] # dqt
+        // }
+        AVFrame *f = s->picture_ptr;
+        json_t *jframe = json_object_new(s->jctx);
+        dctx->jdata = json_array_new(s->jctx, 4);
+        json_object_add(jframe, "tables", dctx->jdata);
+        f->ffedit_sd[FFEDIT_FEAT_DQT] = jframe;
+    }
+    else if ( (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_DQT)) != 0 )
+    {
+        AVFrame *f = s->picture_ptr;
+        json_t *jframe = f->ffedit_sd[FFEDIT_FEAT_DQT];
+        dctx->jdata = json_object_get(jframe, "tables");
+    }
+}
+
+/* export */
+
+//---------------------------------------------------------------------
+static void
+ffe_mjpeg_dqt_table(MJpegDecodeContext *s, ffe_dqt_ctx_t *dctx, int index)
+{
+    if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_DQT)) != 0 )
+    {
+        json_t *jvals = json_array_of_ints_new(s->jctx, 64);
+        json_set_pflags(jvals, JSON_PFLAGS_SPLIT8);
+        if ( dctx->max_index < index )
+            dctx->max_index = index;
+        json_array_set(dctx->jdata, index, jvals);
+        dctx->jcur = jvals;
+    }
+    else if ( (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_DQT)) != 0 )
+    {
+        dctx->jcur = json_array_get(dctx->jdata, index);
+    }
+
+    if ( (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_DQT)) != 0 )
+        dctx->saved = ffe_transplicate_save(&s->ffe_xp);
+}
+
+//---------------------------------------------------------------------
+static int
+ffe_mjpeg_dqt_val(
+        MJpegDecodeContext *s,
+        ffe_dqt_ctx_t *dctx,
+        int precision,
+        int i)
+{
+    int code = get_bits(&s->gb, precision);
+
+    if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_DQT)) != 0 )
+        dctx->jcur->array_of_ints[ff_zigzag_direct[i]] = code;
+    else if ( (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_DQT)) != 0 )
+        code = dctx->jcur->array_of_ints[ff_zigzag_direct[i]];
+
+    if ( (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_DQT)) != 0 )
+        put_bits(dctx->saved, precision, code);
+
+    return code;
+}
+
+/* cleanup */
+
+//---------------------------------------------------------------------
+static void
+ffe_mjpeg_dqt_term(
+        MJpegDecodeContext *s,
+        ffe_dqt_ctx_t *dctx)
+{
+    if ( (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_DQT)) != 0 )
+        ffe_transplicate_restore(&s->ffe_xp, dctx->saved);
+    if ( dctx->max_index >= 0 )
+        json_set_len(dctx->jdata, dctx->max_index+1);
+}
+
 /*-------------------------------------------------------------------*/
 /* common                                                            */
 /*-------------------------------------------------------------------*/
