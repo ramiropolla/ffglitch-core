@@ -603,7 +603,7 @@ AVInputFormat ff_image2_demuxer = {
     .read_packet    = ff_img_read_packet,
     .read_close     = img_read_close,
     .read_seek      = img_read_seek,
-    .flags          = AVFMT_NOFILE,
+    .flags          = AVFMT_NOFILE | AVFMT_FFEDIT_BITSTREAM,
     .priv_class     = &img2_class,
 };
 #endif

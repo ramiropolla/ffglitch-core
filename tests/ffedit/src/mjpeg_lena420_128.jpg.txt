@@ -1,0 +1,2 @@
+$ wget http://ffglitch.org/pub/testdata/Lenna.png
+$ ffmpeg-ffedit-0.1.016 -flags +bitexact -fflags +bitexact -i Lenna.png -huffman default -pix_fmt yuvj420p -s 128x128 -y mjpeg_lena420_128.jpg

@@ -38,6 +38,7 @@
 #include "get_bits.h"
 #include "hpeldsp.h"
 #include "idctdsp.h"
+#include "ffedit_xp.h"
 
 #undef near /* This file uses struct member 'near' which in windows.h is defined as empty. */
 
@@ -152,6 +153,9 @@ typedef struct MJpegDecodeContext {
     enum AVPixelFormat hwaccel_sw_pix_fmt;
     enum AVPixelFormat hwaccel_pix_fmt;
     void *hwaccel_picture_private;
+
+    /* ffedit bitstream */
+    FFEditTransplicateContext ffe_xp;
 } MJpegDecodeContext;
 
 int ff_mjpeg_decode_init(AVCodecContext *avctx);
