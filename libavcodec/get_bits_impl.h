@@ -454,3 +454,246 @@ int skip_1stop_8data_bits(GetBitContext *gb)
 }
 
 #include "get_bits_undef.h"
+
+#if CONFIG_FFEDIT_XP_DEBUG
+int AV_JOIN(dbg_, get_bits_count)(const GetBitContext *s, const char *file, int line, const char *func);
+int AV_JOIN(dbg_, get_bits_count)(const GetBitContext *s, const char *file, int line, const char *func)
+{
+    return get_bits_count(s);
+}
+
+void AV_JOIN(dbg_, skip_bits_long)(GetBitContext *s, int n, const char *file, int line, const char *func);
+void AV_JOIN(dbg_, skip_bits_long)(GetBitContext *s, int n, const char *file, int line, const char *func)
+{
+    GB_DEBUG_LOG("[%s][%d][%s] %s(%d)\n", file, line, func, __func__, n);
+    return skip_bits_long(s, n);
+}
+
+int AV_JOIN(dbg_, get_xbits)(GetBitContext *s, int n, const char *file, int line, const char *func);
+int AV_JOIN(dbg_, get_xbits)(GetBitContext *s, int n, const char *file, int line, const char *func)
+{
+    GB_DEBUG_LOG("[%s][%d][%s] %s(%d)\n", file, line, func, __func__, n);
+    return get_xbits(s, n);
+}
+
+int AV_JOIN(dbg_, get_xbits_le)(GetBitContext *s, int n, const char *file, int line, const char *func);
+int AV_JOIN(dbg_, get_xbits_le)(GetBitContext *s, int n, const char *file, int line, const char *func)
+{
+    GB_DEBUG_LOG("[%s][%d][%s] %s(%d)\n", file, line, func, __func__, n);
+    return get_xbits_le(s, n);
+}
+
+int AV_JOIN(dbg_, get_sbits)(GetBitContext *s, int n, const char *file, int line, const char *func);
+int AV_JOIN(dbg_, get_sbits)(GetBitContext *s, int n, const char *file, int line, const char *func)
+{
+    GB_DEBUG_LOG("[%s][%d][%s] %s(%d)\n", file, line, func, __func__, n);
+    return get_sbits(s, n);
+}
+
+unsigned int AV_JOIN(dbg_, get_bits)(GetBitContext *s, int n, const char *file, int line, const char *func);
+unsigned int AV_JOIN(dbg_, get_bits)(GetBitContext *s, int n, const char *file, int line, const char *func)
+{
+    GB_DEBUG_LOG("[%s][%d][%s] %s(%d)\n", file, line, func, __func__, n);
+    return get_bits(s, n);
+}
+
+int AV_JOIN(dbg_, get_bitsz)(GetBitContext *s, int n, const char *file, int line, const char *func);
+int AV_JOIN(dbg_, get_bitsz)(GetBitContext *s, int n, const char *file, int line, const char *func)
+{
+    GB_DEBUG_LOG("[%s][%d][%s] %s(%d)\n", file, line, func, __func__, n);
+    return get_bitsz(s, n);
+}
+
+unsigned int AV_JOIN(dbg_, get_bits_le)(GetBitContext *s, int n, const char *file, int line, const char *func);
+unsigned int AV_JOIN(dbg_, get_bits_le)(GetBitContext *s, int n, const char *file, int line, const char *func)
+{
+    GB_DEBUG_LOG("[%s][%d][%s] %s(%d)\n", file, line, func, __func__, n);
+    return get_bits_le(s, n);
+}
+
+unsigned int AV_JOIN(dbg_, show_bits)(GetBitContext *s, int n, const char *file, int line, const char *func);
+unsigned int AV_JOIN(dbg_, show_bits)(GetBitContext *s, int n, const char *file, int line, const char *func)
+{
+    GB_DEBUG_LOG("[%s][%d][%s] %s(%d)\n", file, line, func, __func__, n);
+    return show_bits(s, n);
+}
+
+void AV_JOIN(dbg_, skip_bits)(GetBitContext *s, int n, const char *file, int line, const char *func);
+void AV_JOIN(dbg_, skip_bits)(GetBitContext *s, int n, const char *file, int line, const char *func)
+{
+    GB_DEBUG_LOG("[%s][%d][%s] %s(%d)\n", file, line, func, __func__, n);
+    return skip_bits(s, n);
+}
+
+unsigned int AV_JOIN(dbg_, get_bits1)(GetBitContext *s, const char *file, int line, const char *func);
+unsigned int AV_JOIN(dbg_, get_bits1)(GetBitContext *s, const char *file, int line, const char *func)
+{
+    GB_DEBUG_LOG("[%s][%d][%s] %s()\n", file, line, func, __func__);
+    return get_bits1(s);
+}
+
+unsigned int AV_JOIN(dbg_, show_bits1)(GetBitContext *s, const char *file, int line, const char *func);
+unsigned int AV_JOIN(dbg_, show_bits1)(GetBitContext *s, const char *file, int line, const char *func)
+{
+    GB_DEBUG_LOG("[%s][%d][%s] %s()\n", file, line, func, __func__);
+    return show_bits1(s);
+}
+
+void AV_JOIN(dbg_, skip_bits1)(GetBitContext *s, const char *file, int line, const char *func);
+void AV_JOIN(dbg_, skip_bits1)(GetBitContext *s, const char *file, int line, const char *func)
+{
+    GB_DEBUG_LOG("[%s][%d][%s] %s()\n", file, line, func, __func__);
+    return skip_bits1(s);
+}
+
+unsigned int AV_JOIN(dbg_, get_bits_long)(GetBitContext *s, int n, const char *file, int line, const char *func);
+unsigned int AV_JOIN(dbg_, get_bits_long)(GetBitContext *s, int n, const char *file, int line, const char *func)
+{
+    GB_DEBUG_LOG("[%s][%d][%s] %s(%d)\n", file, line, func, __func__, n);
+    return get_bits_long(s, n);
+}
+
+uint64_t AV_JOIN(dbg_, get_bits64)(GetBitContext *s, int n, const char *file, int line, const char *func);
+uint64_t AV_JOIN(dbg_, get_bits64)(GetBitContext *s, int n, const char *file, int line, const char *func)
+{
+    GB_DEBUG_LOG("[%s][%d][%s] %s(%d)\n", file, line, func, __func__, n);
+    return get_bits64(s, n);
+}
+
+int AV_JOIN(dbg_, get_sbits_long)(GetBitContext *s, int n, const char *file, int line, const char *func);
+int AV_JOIN(dbg_, get_sbits_long)(GetBitContext *s, int n, const char *file, int line, const char *func)
+{
+    GB_DEBUG_LOG("[%s][%d][%s] %s(%d)\n", file, line, func, __func__, n);
+    return get_sbits_long(s, n);
+}
+
+unsigned int AV_JOIN(dbg_, show_bits_long)(GetBitContext *s, int n, const char *file, int line, const char *func);
+unsigned int AV_JOIN(dbg_, show_bits_long)(GetBitContext *s, int n, const char *file, int line, const char *func)
+{
+    GB_DEBUG_LOG("[%s][%d][%s] %s(%d)\n", file, line, func, __func__, n);
+    return show_bits_long(s, n);
+}
+
+int AV_JOIN(dbg_, check_marker)(void *logctx, GetBitContext *s, const char *msg, const char *file, int line, const char *func);
+int AV_JOIN(dbg_, check_marker)(void *logctx, GetBitContext *s, const char *msg, const char *file, int line, const char *func)
+{
+    GB_DEBUG_LOG("[%s][%d][%s] %s()\n", file, line, func, __func__);
+    return check_marker(logctx, s, msg);
+}
+
+int AV_JOIN(dbg_, init_get_bits)(GetBitContext *s, const uint8_t *buffer, int bit_size, const char *file, int line, const char *func);
+int AV_JOIN(dbg_, init_get_bits)(GetBitContext *s, const uint8_t *buffer, int bit_size, const char *file, int line, const char *func)
+{
+    GB_DEBUG_LOG("[%s][%d][%s] %s()\n", file, line, func, __func__);
+    return init_get_bits(s, buffer, bit_size);
+}
+
+int AV_JOIN(dbg_, init_get_bits8)(GetBitContext *s, const uint8_t *buffer, int byte_size, const char *file, int line, const char *func);
+int AV_JOIN(dbg_, init_get_bits8)(GetBitContext *s, const uint8_t *buffer, int byte_size, const char *file, int line, const char *func)
+{
+    GB_DEBUG_LOG("[%s][%d][%s] %s()\n", file, line, func, __func__);
+    return init_get_bits8(s, buffer, byte_size);
+}
+
+int AV_JOIN(dbg_, init_get_bits8_le)(GetBitContext *s, const uint8_t *buffer, int byte_size, const char *file, int line, const char *func);
+int AV_JOIN(dbg_, init_get_bits8_le)(GetBitContext *s, const uint8_t *buffer, int byte_size, const char *file, int line, const char *func)
+{
+    GB_DEBUG_LOG("[%s][%d][%s] %s()\n", file, line, func, __func__);
+    return init_get_bits8_le(s, buffer, byte_size);
+}
+
+const uint8_t *AV_JOIN(dbg_, align_get_bits)(GetBitContext *s, const char *file, int line, const char *func);
+const uint8_t *AV_JOIN(dbg_, align_get_bits)(GetBitContext *s, const char *file, int line, const char *func)
+{
+    GB_DEBUG_LOG("[%s][%d][%s] %s()\n", file, line, func, __func__);
+    return align_get_bits(s);
+}
+
+int AV_JOIN(dbg_, get_vlc2)(GetBitContext *s, VLC_TYPE (*table)[2], int bits, int max_depth, const char *file, int line, const char *func);
+int AV_JOIN(dbg_, get_vlc2)(GetBitContext *s, VLC_TYPE (*table)[2], int bits, int max_depth, const char *file, int line, const char *func)
+{
+    GB_DEBUG_LOG("[%s][%d][%s] %s()\n", file, line, func, __func__);
+    return get_vlc2(s, table, bits, max_depth);
+}
+
+void AV_JOIN(dbg_, get_rl_vlc2)(
+        int *plevel,
+        int *prun,
+        GetBitContext *s,
+        RL_VLC_ELEM *table,
+        int bits,
+        int max_depth,
+        int need_update,
+        const char *file,
+        int line,
+        const char *func);
+void AV_JOIN(dbg_, get_rl_vlc2)(
+        int *plevel,
+        int *prun,
+        GetBitContext *s,
+        RL_VLC_ELEM *table,
+        int bits,
+        int max_depth,
+        int need_update,
+        const char *file,
+        int line,
+        const char *func)
+{
+    GB_DEBUG_LOG("[%s][%d][%s] %s()\n", file, line, func, __func__);
+    return get_rl_vlc2(plevel, prun, s, table, bits, max_depth, need_update);
+}
+
+void AV_JOIN(dbg_, get_cfhd_rl_vlc)(
+        int *plevel,
+        int *prun,
+        GetBitContext *s,
+        CFHD_RL_VLC_ELEM *table,
+        int bits,
+        int max_depth,
+        int need_update,
+        const char *file,
+        int line,
+        const char *func);
+void AV_JOIN(dbg_, get_cfhd_rl_vlc)(
+        int *plevel,
+        int *prun,
+        GetBitContext *s,
+        CFHD_RL_VLC_ELEM *table,
+        int bits,
+        int max_depth,
+        int need_update,
+        const char *file,
+        int line,
+        const char *func)
+{
+    GB_DEBUG_LOG("[%s][%d][%s] %s()\n", file, line, func, __func__);
+    return get_cfhd_rl_vlc(plevel, prun, s, table, bits, max_depth, need_update);
+}
+
+int AV_JOIN(dbg_, decode012)(GetBitContext *gb, const char *file, int line, const char *func);
+int AV_JOIN(dbg_, decode012)(GetBitContext *gb, const char *file, int line, const char *func)
+{
+    GB_DEBUG_LOG("[%s][%d][%s] %s()\n", file, line, func, __func__);
+    return decode012(gb);
+}
+
+int AV_JOIN(dbg_, decode210)(GetBitContext *gb, const char *file, int line, const char *func);
+int AV_JOIN(dbg_, decode210)(GetBitContext *gb, const char *file, int line, const char *func)
+{
+    GB_DEBUG_LOG("[%s][%d][%s] %s()\n", file, line, func, __func__);
+    return decode210(gb);
+}
+
+int AV_JOIN(dbg_, get_bits_left)(GetBitContext *gb, const char *file, int line, const char *func);
+int AV_JOIN(dbg_, get_bits_left)(GetBitContext *gb, const char *file, int line, const char *func)
+{
+    return get_bits_left(gb);
+}
+
+int AV_JOIN(dbg_, skip_1stop_8data_bits)(GetBitContext *gb, const char *file, int line, const char *func);
+int AV_JOIN(dbg_, skip_1stop_8data_bits)(GetBitContext *gb, const char *file, int line, const char *func)
+{
+    GB_DEBUG_LOG("[%s][%d][%s] %s()\n", file, line, func, __func__);
+    return skip_1stop_8data_bits(gb);
+}
+#endif
