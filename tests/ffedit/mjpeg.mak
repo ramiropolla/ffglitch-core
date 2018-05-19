@@ -5,6 +5,7 @@ FFEDIT_TESTS += mjpeg_lena420_128_info
 FFEDIT_TESTS += mjpeg_lena420_128_q_dct
 FFEDIT_TESTS += mjpeg_lena420_128_q_dc
 FFEDIT_TESTS += mjpeg_lena420_128_dqt
+FFEDIT_TESTS += mjpeg_lena420_128_dht
 
 mjpeg_lena420_128_list: $(FFEDIT_SRC)/mjpeg_lena420_128.jpg
 	$(FFEDIT_SCRIPTS)/list.sh "$(FFEDIT_REF)/$@.ref" "$<"
@@ -18,3 +19,5 @@ mjpeg_lena420_128_q_dc: $(FFEDIT_SRC)/mjpeg_lena420_128.jpg
 	$(FFEDIT_SCRIPTS)/script.sh "$(FFEDIT_REF)/$@.ref" "$<" "$(FFEDIT_JSON)/$@.json" "-f q_dc" "dc_inverter.py"
 mjpeg_lena420_128_dqt: $(FFEDIT_SRC)/mjpeg_lena420_128.jpg
 	$(FFEDIT_SCRIPTS)/script.sh "$(FFEDIT_REF)/$@.ref" "$<" "$(FFEDIT_JSON)/$@.json" "-f dqt" "dqt_max0.py"
+mjpeg_lena420_128_dht: $(FFEDIT_SRC)/mjpeg_lena420_128.jpg
+	$(FFEDIT_SCRIPTS)/script.sh "$(FFEDIT_REF)/$@.ref" "$<" "$(FFEDIT_JSON)/$@.json" "-f dht" "cat.sh"
