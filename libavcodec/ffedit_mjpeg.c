@@ -275,7 +275,7 @@ ffe_mjpeg_dct_term(
         int block_last_index[5];
         int n = (ac_index == 0) ? 0 : 4;
         block_last_index[n] = last_index;
-        ff_mjpeg_encode_block(qctx->saved, &s->m, &s->scantable, last_dc,
+        ff_mjpeg_encode_block(s, qctx->saved, &s->m, &s->scantable, last_dc,
                               block_last_index, qblock, n);
         ffe_transplicate_restore(&s->ffe_xp, qctx->saved);
     }
@@ -382,6 +382,211 @@ ffe_mjpeg_dqt_term(
         ffe_transplicate_restore(&s->ffe_xp, dctx->saved);
     if ( dctx->max_index >= 0 )
         json_set_len(dctx->jdata, dctx->max_index+1);
+}
+
+//---------------------------------------------------------------------
+// dht
+
+//---------------------------------------------------------------------
+typedef struct {
+    PutBitContext *saved;
+    json_t *jtables;
+    int table_count;
+} ffe_dht_ctx_t;
+
+/* init */
+
+//---------------------------------------------------------------------
+static void
+ffe_mjpeg_dht_init(MJpegDecodeContext *s, ffe_dht_ctx_t *dctx)
+{
+    dctx->saved = NULL;
+    dctx->jtables = NULL;
+    dctx->table_count = 0;
+
+    if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_DHT)) != 0 )
+    {
+        // {
+        //  "tables": [
+        //   {
+        //    "class": int,
+        //    "index": int,
+        //    "bits" : [
+        //     [ ][16], # values for 1 to 16 bits
+        //    ]
+        //   },
+        //   [...]
+        //  ]
+        // }
+        AVFrame *f = s->picture_ptr;
+        json_t *jframe = json_object_new(f->jctx);
+        dctx->jtables = json_array_new(f->jctx);
+        json_object_add(jframe, "tables", dctx->jtables);
+        f->ffedit_sd[FFEDIT_FEAT_DHT] = jframe;
+    }
+    else if ( (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_DHT)) != 0 )
+    {
+        AVFrame *f = s->picture_ptr;
+        json_t *jframe = f->ffedit_sd[FFEDIT_FEAT_DHT];
+        dctx->jtables = json_object_get(jframe, "tables");
+        dctx->table_count = json_array_length(dctx->jtables);
+    }
+
+    if ( (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_DHT)) != 0 )
+        dctx->saved = ffe_transplicate_save(&s->ffe_xp);
+}
+
+/* export */
+
+//---------------------------------------------------------------------
+static int
+ffe_mjpeg_dht_len(MJpegDecodeContext *s, ffe_dht_ctx_t *dctx)
+{
+    int len = get_bits(&s->gb, 16) - 2;
+
+    if ( (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_DHT)) != 0 )
+    {
+        len = 0;
+        for ( size_t i = 0; i < dctx->table_count; i++ )
+        {
+            json_t *jtable = json_array_get(dctx->jtables, i);
+            json_t *jbits;
+
+            jbits = json_object_get(jtable, "bits");
+            for ( int j = 0; j < 16; j++ )
+            {
+                json_t *jvals = json_array_get(jbits, j);
+                len += json_array_length(jvals);
+            }
+            len += 17;
+        }
+        dctx->table_count = 0;
+    }
+    if ( (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_DHT)) != 0 )
+        put_bits(dctx->saved, 16, len + 2);
+
+    return len;
+}
+
+//---------------------------------------------------------------------
+static void
+ffe_mjpeg_dht_table(
+        MJpegDecodeContext *s,
+        ffe_dht_ctx_t *dctx,
+        int *pclass,
+        int *pindex,
+        uint8_t bits_table[17],
+        uint8_t val_table[256])
+{
+    if ( (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_DHT)) != 0 )
+    {
+        json_t *jtable = json_array_get(dctx->jtables, dctx->table_count++);
+        json_t *jclass = json_object_get(jtable, "class");
+        json_t *jindex = json_object_get(jtable, "index");
+        json_t *jbits = json_object_get(jtable, "bits");
+        int val_idx = 0;
+
+        *pclass = json_int_val(jclass);
+        *pindex = json_int_val(jindex);
+
+        for ( size_t i = 0; i < 16; i++ )
+        {
+            json_t *jvals = json_array_get(jbits, i);
+            int bitn_len = json_array_length(jvals);
+            for ( int j = 0; j < bitn_len; j++ )
+                val_table[val_idx++] = json_array_get_int(jvals, j);
+            bits_table[1+i] = bitn_len;
+        }
+    }
+
+    if ( (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_DHT)) != 0 )
+    {
+        put_bits(dctx->saved, 4, *pclass);
+        put_bits(dctx->saved, 4, *pindex);
+    }
+}
+
+//---------------------------------------------------------------------
+static int
+ffe_mjpeg_dht_bits(
+        MJpegDecodeContext *s,
+        ffe_dht_ctx_t *dctx,
+        uint8_t bits_table[17],
+        size_t i)
+{
+    int v = get_bits(&s->gb, 8);
+    if ( (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_DHT)) != 0 )
+        v = bits_table[i];
+    if ( (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_DHT)) != 0 )
+        put_bits(dctx->saved, 8, v);
+    return v;
+}
+
+//---------------------------------------------------------------------
+static int
+ffe_mjpeg_dht_val(
+        MJpegDecodeContext *s,
+        ffe_dht_ctx_t *dctx,
+        uint8_t val_table[256],
+        size_t i)
+{
+    int v = get_bits(&s->gb, 8);
+    if ( (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_DHT)) != 0 )
+        v = val_table[i];
+    if ( (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_DHT)) != 0 )
+        put_bits(dctx->saved, 8, v);
+    return v;
+}
+
+//---------------------------------------------------------------------
+static void
+ffe_mjpeg_dht_export(
+        MJpegDecodeContext *s,
+        ffe_dht_ctx_t *dctx,
+        int class,
+        int index,
+        uint8_t bits_table[17],
+        uint8_t val_table[256])
+{
+    if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_DHT)) != 0 )
+    {
+        AVFrame *f = s->picture_ptr;
+        json_t *jtable = json_object_new(f->jctx);
+        json_t *jclass = json_int_new(f->jctx, class);
+        json_t *jindex = json_int_new(f->jctx, index);
+        json_t *jbits = json_array_new(f->jctx);
+        int val_idx = 0;
+
+        json_array_alloc(f->jctx, jbits, 16);
+
+        json_array_add(dctx->jtables, jtable);
+        dctx->table_count++;
+        json_object_add(jtable, "class", jclass);
+        json_object_add(jtable, "index", jindex);
+        json_object_add(jtable, "bits", jbits);
+        json_object_done(f->jctx, jtable);
+
+        for ( size_t i = 0; i < 16; i++ )
+        {
+            json_t *jvals = json_array_of_ints_new(f->jctx, bits_table[1+i]);
+            json_set_pflags(jvals, JSON_PFLAGS_NO_LF);
+            for ( int j = 0; j < bits_table[1+i]; j++ )
+                json_array_set_int(f->jctx, jvals, j, val_table[val_idx++]);
+            json_array_set(jbits, i, jvals);
+        }
+    }
+}
+
+/* cleanup */
+
+//---------------------------------------------------------------------
+static void
+ffe_mjpeg_dht_term(
+        MJpegDecodeContext *s,
+        ffe_dht_ctx_t *dctx)
+{
+    if ( (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_DHT)) != 0 )
+        ffe_transplicate_restore(&s->ffe_xp, dctx->saved);
 }
 
 /*-------------------------------------------------------------------*/
