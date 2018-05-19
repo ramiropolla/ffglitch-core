@@ -1,0 +1,18 @@
+{
+  "filename":"mjpeg_lena420_128.jpg",
+  "sha1sum":"38ef0e905284cbbd4b3b5e909b87050d5ea06b3f",
+  "features":[
+    "info"
+  ],
+  "streams":[
+    {
+      "frames":[
+        {
+          "pkt_pos":-1,
+          "pts":0,
+          "dts":0
+        }
+      ]
+    }
+  ]
+}

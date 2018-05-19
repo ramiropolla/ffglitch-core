@@ -52,6 +52,8 @@
 
 #include "mjpegenc_common.h"
 
+#include "ffedit_mjpeg.c"
+
 
 static int build_vlc(VLC *vlc, const uint8_t *bits_table,
                      const uint8_t *val_table, int nb_codes,
@@ -717,7 +719,7 @@ int ff_mjpeg_decode_sof(MJpegDecodeContext *s)
             return 0;
         }
 
-        av_frame_unref(s->picture_ptr);
+        ffe_mjpeg_frame_unref(s->picture_ptr);
         if (ff_get_buffer(s->avctx, s->picture_ptr, AV_GET_BUFFER_FLAG_REF) < 0)
             return -1;
         s->picture_ptr->pict_type = AV_PICTURE_TYPE_I;
@@ -2301,6 +2303,8 @@ int ff_mjpeg_decode_frame(AVCodecContext *avctx, void *data, int *got_frame,
     int ret = 0;
     int is16bit;
 
+    ffe_mjpeg_prepare_frame(s, avpkt);
+
     if ( (avctx->ffedit_apply & (1 << FFEDIT_FEAT_LAST)) != 0 )
     {
         ret = ffe_transplicate_init(avctx, &s->ffe_xp, buf_size);
@@ -2879,6 +2883,7 @@ AVCodec ff_mjpeg_decoder = {
 #endif
                         NULL
                     },
+    .ffedit_features = (1 << FFEDIT_FEAT_INFO)
 };
 #endif
 #if CONFIG_THP_DECODER
