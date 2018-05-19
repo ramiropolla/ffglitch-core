@@ -489,6 +489,7 @@ void ff_mpeg4_encode_mb(MpegEncContext *s, int16_t block[6][64],
     PutBitContext *const tex_pb = s->data_partitioning && s->pict_type != AV_PICTURE_TYPE_B ? &s->tex_pb : &s->pb;
     PutBitContext *const dc_pb  = s->data_partitioning && s->pict_type != AV_PICTURE_TYPE_I ? &s->pb2 : &s->pb;
     const int interleaved_stats = (s->avctx->flags & AV_CODEC_FLAG_PASS1) && !s->data_partitioning ? 1 : 0;
+    int force_mv = (s->mpv_flags & FF_MPV_FLAG_FORCE_MV) != 0;
 
     if (!s->mb_intra) {
         int i, cbp;
@@ -526,7 +527,9 @@ void ff_mpeg4_encode_mb(MpegEncContext *s, int16_t block[6][64],
 
             cbp = get_b_cbp(s, block, motion_x, motion_y, mb_type);
 
-            if ((cbp | motion_x | motion_y | mb_type) == 0) {
+            if ( (cbp | motion_x | motion_y | mb_type) == 0
+              && !force_mv )
+            {
                 /* direct MB with MV={0,0} */
                 av_assert2(s->dquant == 0);
 
@@ -632,8 +635,10 @@ void ff_mpeg4_encode_mb(MpegEncContext *s, int16_t block[6][64],
         } else { /* s->pict_type==AV_PICTURE_TYPE_B */
             cbp = get_p_cbp(s, block, motion_x, motion_y);
 
-            if ((cbp | motion_x | motion_y | s->dquant) == 0 &&
-                s->mv_type == MV_TYPE_16X16) {
+            if ( (cbp | motion_x | motion_y | s->dquant) == 0
+              && s->mv_type == MV_TYPE_16X16
+              && !force_mv )
+            {
                 /* Check if the B-frames can skip it too, as we must skip it
                  * if we skip here why didn't they just compress
                  * the skip-mb bits instead of reusing them ?! */
