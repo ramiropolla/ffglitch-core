@@ -640,7 +640,7 @@ static inline void put_mb_modes(MpegEncContext *s, int n, int bits,
 }
 
 // RAL: Parameter added: f_or_b_code
-static void mpeg1_encode_motion(MpegEncContext *s, int val, int f_or_b_code)
+void ff_mpeg1_encode_motion(MpegEncContext *s, int val, int f_or_b_code)
 {
     if (val == 0) {
         /* zero vector, corresponds to ff_mpeg12_mbMotionVectorTable[0] */
@@ -887,13 +887,13 @@ static av_always_inline void mpeg1_encode_mb_internal(MpegEncContext *s,
                         }
                         s->misc_bits += get_bits_diff(s);
                         // RAL: f_code parameter added
-                        mpeg1_encode_motion(s,
-                                            motion_x - s->last_mv[0][0][0],
-                                            s->f_code);
+                        ff_mpeg1_encode_motion(s,
+                                               motion_x - s->last_mv[0][0][0],
+                                               s->f_code);
                         // RAL: f_code parameter added
-                        mpeg1_encode_motion(s,
-                                            motion_y - s->last_mv[0][0][1],
-                                            s->f_code);
+                        ff_mpeg1_encode_motion(s,
+                                               motion_y - s->last_mv[0][0][1],
+                                               s->f_code);
                         s->mv_bits += get_bits_diff(s);
                     }
                 } else {
@@ -902,13 +902,13 @@ static av_always_inline void mpeg1_encode_mb_internal(MpegEncContext *s,
                         put_bits(&s->pb, 2, 2);     /* motion_type: frame */
                     s->misc_bits += get_bits_diff(s);
                     // RAL: f_code parameter added
-                    mpeg1_encode_motion(s,
-                                        motion_x - s->last_mv[0][0][0],
-                                        s->f_code);
+                    ff_mpeg1_encode_motion(s,
+                                           motion_x - s->last_mv[0][0][0],
+                                           s->f_code);
                     // RAL: f_code parameter added
-                    mpeg1_encode_motion(s,
-                                        motion_y - s->last_mv[0][0][1],
-                                        s->f_code);
+                    ff_mpeg1_encode_motion(s,
+                                           motion_y - s->last_mv[0][0][1],
+                                           s->f_code);
                     s->qscale  -= s->dquant;
                     s->mv_bits += get_bits_diff(s);
                 }
@@ -932,12 +932,12 @@ static av_always_inline void mpeg1_encode_mb_internal(MpegEncContext *s,
                 s->misc_bits += get_bits_diff(s);
                 for (i = 0; i < 2; i++) {
                     put_bits(&s->pb, 1, s->field_select[0][i]);
-                    mpeg1_encode_motion(s,
-                                        s->mv[0][i][0] - s->last_mv[0][i][0],
-                                        s->f_code);
-                    mpeg1_encode_motion(s,
-                                        s->mv[0][i][1] - (s->last_mv[0][i][1] >> 1),
-                                        s->f_code);
+                    ff_mpeg1_encode_motion(s,
+                                           s->mv[0][i][0] - s->last_mv[0][i][0],
+                                           s->f_code);
+                    ff_mpeg1_encode_motion(s,
+                                           s->mv[0][i][1] - (s->last_mv[0][i][1] >> 1),
+                                           s->f_code);
                     s->last_mv[0][i][0] = s->mv[0][i][0];
                     s->last_mv[0][i][1] = 2 * s->mv[0][i][1];
                 }
@@ -975,24 +975,24 @@ static av_always_inline void mpeg1_encode_mb_internal(MpegEncContext *s,
                 }
                 s->misc_bits += get_bits_diff(s);
                 if (s->mv_dir & MV_DIR_FORWARD) {
-                    mpeg1_encode_motion(s,
-                                        s->mv[0][0][0] - s->last_mv[0][0][0],
-                                        s->f_code);
-                    mpeg1_encode_motion(s,
-                                        s->mv[0][0][1] - s->last_mv[0][0][1],
-                                        s->f_code);
+                    ff_mpeg1_encode_motion(s,
+                                           s->mv[0][0][0] - s->last_mv[0][0][0],
+                                           s->f_code);
+                    ff_mpeg1_encode_motion(s,
+                                           s->mv[0][0][1] - s->last_mv[0][0][1],
+                                           s->f_code);
                     s->last_mv[0][0][0] =
                     s->last_mv[0][1][0] = s->mv[0][0][0];
                     s->last_mv[0][0][1] =
                     s->last_mv[0][1][1] = s->mv[0][0][1];
                 }
                 if (s->mv_dir & MV_DIR_BACKWARD) {
-                    mpeg1_encode_motion(s,
-                                        s->mv[1][0][0] - s->last_mv[1][0][0],
-                                        s->b_code);
-                    mpeg1_encode_motion(s,
-                                        s->mv[1][0][1] - s->last_mv[1][0][1],
-                                        s->b_code);
+                    ff_mpeg1_encode_motion(s,
+                                           s->mv[1][0][0] - s->last_mv[1][0][0],
+                                           s->b_code);
+                    ff_mpeg1_encode_motion(s,
+                                           s->mv[1][0][1] - s->last_mv[1][0][1],
+                                           s->b_code);
                     s->last_mv[1][0][0] =
                     s->last_mv[1][1][0] = s->mv[1][0][0];
                     s->last_mv[1][0][1] =
@@ -1020,12 +1020,12 @@ static av_always_inline void mpeg1_encode_mb_internal(MpegEncContext *s,
                 if (s->mv_dir & MV_DIR_FORWARD) {
                     for (i = 0; i < 2; i++) {
                         put_bits(&s->pb, 1, s->field_select[0][i]);
-                        mpeg1_encode_motion(s,
-                                            s->mv[0][i][0] - s->last_mv[0][i][0],
-                                            s->f_code);
-                        mpeg1_encode_motion(s,
-                                            s->mv[0][i][1] - (s->last_mv[0][i][1] >> 1),
-                                            s->f_code);
+                        ff_mpeg1_encode_motion(s,
+                                               s->mv[0][i][0] - s->last_mv[0][i][0],
+                                               s->f_code);
+                        ff_mpeg1_encode_motion(s,
+                                               s->mv[0][i][1] - (s->last_mv[0][i][1] >> 1),
+                                               s->f_code);
                         s->last_mv[0][i][0] = s->mv[0][i][0];
                         s->last_mv[0][i][1] = s->mv[0][i][1] * 2;
                     }
@@ -1033,12 +1033,12 @@ static av_always_inline void mpeg1_encode_mb_internal(MpegEncContext *s,
                 if (s->mv_dir & MV_DIR_BACKWARD) {
                     for (i = 0; i < 2; i++) {
                         put_bits(&s->pb, 1, s->field_select[1][i]);
-                        mpeg1_encode_motion(s,
-                                            s->mv[1][i][0] - s->last_mv[1][i][0],
-                                            s->b_code);
-                        mpeg1_encode_motion(s,
-                                            s->mv[1][i][1] - (s->last_mv[1][i][1] >> 1),
-                                            s->b_code);
+                        ff_mpeg1_encode_motion(s,
+                                               s->mv[1][i][0] - s->last_mv[1][i][0],
+                                               s->b_code);
+                        ff_mpeg1_encode_motion(s,
+                                               s->mv[1][i][1] - (s->last_mv[1][i][1] >> 1),
+                                               s->b_code);
                         s->last_mv[1][i][0] = s->mv[1][i][0];
                         s->last_mv[1][i][1] = s->mv[1][i][1] * 2;
                     }
