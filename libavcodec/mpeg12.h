@@ -67,6 +67,7 @@ int ff_mpeg1_decode_block_intra(GetBitContext *gb,
 void ff_mpeg1_clean_buffers(MpegEncContext *s);
 int ff_mpeg1_find_frame_end(ParseContext *pc, const uint8_t *buf, int buf_size, AVCodecParserContext *s);
 
+void ff_mpeg1_encode_motion(MpegEncContext *s, int val, int f_or_b_code);
 void ff_mpeg1_encode_picture_header(MpegEncContext *s, int picture_number);
 void ff_mpeg1_encode_mb(MpegEncContext *s, int16_t block[8][64],
                         int motion_x, int motion_y);

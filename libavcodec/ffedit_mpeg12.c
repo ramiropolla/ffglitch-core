@@ -2,6 +2,7 @@
 /* This file is included by mpeg12dec.c */
 
 #include "ffedit_json.h"
+#include "ffedit_mv.h"
 
 //---------------------------------------------------------------------
 // info
@@ -93,6 +94,92 @@ ffe_mpeg12_export_info_cleanup(MpegEncContext *s, AVFrame *f)
     json_object_done(f->jctx, jframe);
 }
 
+//---------------------------------------------------------------------
+// mv
+//
+// {
+//   "forward": [
+//     [ mv, mv, ..., mv ],
+//     [ mv, mv, ..., mv ],
+//     ...                ,
+//     [ mv, mv, ..., mv ]
+//   ],
+//   "backward": [
+//     [ mv, mv, ..., mv ],
+//     [ mv, mv, ..., mv ],
+//     ...                ,
+//     [ mv, mv, ..., mv ]
+//   ]
+// }
+//
+// - mv:
+//   - null
+//   - array_of_ints [ mv_x, mv_y ]
+//
+// note: either "forward", "backward", or both may be missing,
+//       depending on the frame type.
+
+/* forward declarations */
+
+static int mpeg_decode_motion(MpegEncContext *s, int fcode, int pred);
+
+/* init */
+
+static void
+ffe_mpeg12_export_mv_init(MpegEncContext *s, AVFrame *f)
+{
+    ffe_mv_export_init(f->jctx, f, s->mb_height, s->mb_width);
+}
+
+static void
+ffe_mpeg12_import_mv_init(MpegEncContext *s, AVFrame *f)
+{
+    ffe_mv_import_init(f->jctx, f);
+}
+
+/* export */
+
+static void ffe_mpeg12_mv_init_mb(
+        MpegEncContext *s,
+        int nb_directions,
+        int nb_blocks)
+{
+    AVFrame *f = s->current_picture_ptr->f;
+    if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_MV)) != 0 )
+        ffe_mv_export_init_mb(f->jctx, f, s->mb_y, s->mb_x, nb_directions, nb_blocks);
+    if ( (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_MV)) != 0 )
+        ffe_mv_import_init_mb(f->jctx, f, s->mb_y, s->mb_x, nb_directions, nb_blocks);
+}
+
+static int ffe_decode_mpegmv(
+        MpegEncContext *s,
+        int fcode,
+        int pred,
+        int x_or_y)     // 0 = x, 1 = y
+{
+    AVFrame *f = s->current_picture_ptr->f;
+    int code;
+
+    if ( (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_MV)) != 0 )
+        s->pb = *ffe_transplicate_save(&s->ffe_xp);
+
+    code = mpeg_decode_motion(s, fcode, pred);
+    if ( code == 0xffff )
+        return code;
+
+    if ( (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_MV)) != 0 )
+        code = ffe_mv_get(f, x_or_y);
+    if ( (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_MV)) != 0 )
+    {
+        ff_mpeg1_encode_motion(s, code - pred, fcode);
+        ffe_transplicate_restore(&s->ffe_xp, &s->pb);
+    }
+    if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_MV)) != 0 )
+        ffe_mv_set(f, x_or_y, code);
+
+    return code;
+}
+
 /*-------------------------------------------------------------------*/
 /* common                                                            */
 /*-------------------------------------------------------------------*/
@@ -113,6 +200,11 @@ ffe_mpeg12_init(MpegEncContext *s)
 
     if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_INFO)) != 0 )
         ffe_mpeg12_export_info_init(s, f);
+
+    if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_MV)) != 0 )
+        ffe_mpeg12_export_mv_init(s, f);
+    else if ( (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_MV)) != 0 )
+        ffe_mpeg12_import_mv_init(s, f);
 }
 
 static void
@@ -120,4 +212,7 @@ ffe_mpeg12_export_cleanup(MpegEncContext *s, AVFrame *f)
 {
     if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_INFO)) != 0 )
         ffe_mpeg12_export_info_cleanup(s, f);
+
+    if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_MV)) != 0 )
+        ffe_mv_export_cleanup(f->jctx, f);
 }
