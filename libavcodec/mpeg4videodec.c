@@ -38,6 +38,9 @@
 #include "thread.h"
 #include "xvididct.h"
 #include "unary.h"
+#include "ffedit.h"
+
+#include "ffedit_mpeg4.c"
 
 /* The defines below define the number of bits that are read at once for
  * reading vlc values. Changing these may improve speed and data cache needs
@@ -1732,6 +1735,8 @@ intra:
     }
 
 end:
+    ffe_mpeg4_export_info(s, s->current_picture.mb_type[xy]);
+
     /* per-MB end of slice check */
     if (s->codec_id == AV_CODEC_ID_MPEG4) {
         int next = mpeg4_is_resync(ctx);
@@ -3574,4 +3579,5 @@ AVCodec ff_mpeg4_decoder = {
 #endif
                                NULL
                            },
+    .ffedit_features = (1 << FFEDIT_FEAT_INFO)
 };

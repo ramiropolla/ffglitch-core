@@ -46,6 +46,8 @@
 #include "wmv2.h"
 #include "ffedit.h"
 
+#include "ffedit_h263.c"
+
 static enum AVPixelFormat h263_get_format(AVCodecContext *avctx)
 {
     /* MPEG-4 Studio Profile only, not supported by hardware */
@@ -433,6 +435,8 @@ int ff_h263_decode_frame(AVCodecContext *avctx, void *data, int *got_frame,
     AVFrame *pict = data;
     PutBitContext retry_pb;
 
+    ffe_h263_prepare_frame(s, avpkt);
+
     /* no supplementary picture */
     if (buf_size == 0) {
         /* special case for last picture */
@@ -649,6 +653,8 @@ retry:
     if ((ret = ff_mpv_frame_start(s, avctx)) < 0)
         return ret;
 
+    ffe_h263_export_init(s);
+
     if (!s->divx_packed && !avctx->hwaccel)
         ff_thread_finish_setup(avctx);
 
@@ -767,6 +773,9 @@ frame_end:
         ret = get_consumed_bytes(s, buf_size);
 
 the_end:
+    if ( *got_frame )
+        ffe_h263_export_cleanup(s, pict);
+
     if ( (avctx->ffedit_apply & (1 << FFEDIT_FEAT_LAST)) != 0 )
         ffe_transplicate_flush(avctx, &s->ffe_xp, avpkt);
 
