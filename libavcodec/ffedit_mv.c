@@ -45,10 +45,8 @@ void ffe_mv_export_init_mb(
                 json_object *jblock = json_object_new_array();
                 json_object_array_put_idx(jmb_x, j, jblock);
             }
-            json_object_set_serializer(jmb_x,
-                                       ffe_int2_line_to_json_string,
-                                       (void *) 3, NULL);
         }
+        json_object_set_userdata(jmb_x, (void *) nb_blocks, NULL);
     }
 }
 

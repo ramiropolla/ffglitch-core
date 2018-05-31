@@ -856,7 +856,7 @@ AVCodec ff_h263_decoder = {
     .max_lowres     = 3,
     .pix_fmts       = ff_h263_hwaccel_pixfmt_list_420,
     .ffedit_features = (1 << FFEDIT_FEAT_INFO)
-                    | (1 << FFEDIT_FEAT_MV)
+                     | (1 << FFEDIT_FEAT_MV)
 };
 
 AVCodec ff_h263p_decoder = {
@@ -888,5 +888,5 @@ AVCodec ff_h263p_decoder = {
                         NULL
                     },
     .ffedit_features = (1 << FFEDIT_FEAT_INFO)
-                    | (1 << FFEDIT_FEAT_MV)
+                     | (1 << FFEDIT_FEAT_MV)
 };

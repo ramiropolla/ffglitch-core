@@ -181,6 +181,31 @@ ffe_json_array_zero_fill(
 /* helper printing functions */
 
 //---------------------------------------------------------------------
+static void
+intx_to_json_string(
+        json_object *jso,
+        struct printbuf *pb,
+        const char *fmt,
+        int arr_len)
+{
+    if ( arr_len > 1 )
+        printbuf_strappend(pb, "[");
+    for ( size_t i = 0; i < arr_len; i++ )
+    {
+        char sbuf[21];
+        json_object *jval = jso;
+        if ( i != 0 )
+            printbuf_strappend(pb, ",");
+        if ( arr_len > 1 )
+            jval = json_object_array_get_idx(jval, i);
+        snprintf(sbuf, sizeof(sbuf), fmt, json_object_get_int(jval));
+        printbuf_memappend(pb, sbuf, strlen(sbuf));
+    }
+    if ( arr_len > 1 )
+        printbuf_strappend(pb, "]");
+}
+
+//---------------------------------------------------------------------
 static av_always_inline int
 intx_line_to_json_string(
         json_object *jso,
@@ -214,40 +239,35 @@ intx_line_to_json_string(
     for ( size_t i = 0; i < length; i++ )
     {
         json_object *jval = json_object_array_get_idx(jso, i);
-        char sbuf[21];
+        int nb_blocks;
 
         if ( i != 0 )
             printbuf_strappend(pb, ", ");
 
         if ( jval == NULL )
         {
+            char sbuf[21];
             snprintf(sbuf, sizeof(sbuf), "%-*s", null_len, "null");
             printbuf_memappend(pb, sbuf, strlen(sbuf));
+            continue;
         }
-        else if ( json_object_get_userdata(jval) )
-        {
-            const char *s;
 
-            s = json_object_to_json_string_ext(jval, JSON_C_TO_STRING_PRETTY);
-            printbuf_memappend(pb, s, strlen(s));
-        }
-        else
+        nb_blocks = (int) json_object_get_userdata(jval);
+        if ( nb_blocks < 1 )
+            nb_blocks = 1;
+        if ( nb_blocks > 1 )
+            printbuf_strappend(pb, "[");
+        for ( size_t j = 0; j < nb_blocks; j++ )
         {
-            if ( arr_len > 1 )
-                printbuf_strappend(pb, "[");
-            for ( size_t j = 0; j < arr_len; j++ )
-            {
-                json_object *jval2 = jval;
-                if ( j != 0 )
-                    printbuf_strappend(pb, ",");
-                if ( arr_len > 1 )
-                    jval2 = json_object_array_get_idx(jval2, j);
-                snprintf(sbuf, sizeof(sbuf), fmt, json_object_get_int(jval2));
-                printbuf_memappend(pb, sbuf, strlen(sbuf));
-            }
-            if ( arr_len > 1 )
-                printbuf_strappend(pb, "]");
+            json_object *jval2 = jval;
+            if ( j != 0 )
+                printbuf_strappend(pb, ", ");
+            if ( nb_blocks > 1 )
+                jval2 = json_object_array_get_idx(jval2, j);
+            intx_to_json_string(jval2, pb, fmt, arr_len);
         }
+        if ( nb_blocks > 1 )
+            printbuf_strappend(pb, "]");
     }
 
     return printbuf_strappend(pb, " ]");

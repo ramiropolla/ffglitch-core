@@ -3475,5 +3475,5 @@ AVCodec ff_mpeg4_decoder = {
                                NULL
                            },
     .ffedit_features = (1 << FFEDIT_FEAT_INFO)
-                           | (1 << FFEDIT_FEAT_MV)
+                     | (1 << FFEDIT_FEAT_MV)
 };
