@@ -1041,7 +1041,7 @@ AVInputFormat ff_image_ ## imgname ## _pipe_demuxer = {\
     .read_header    = ff_img_read_header,\
     .read_packet    = ff_img_read_packet,\
     .priv_class     = & imgname ## _class,\
-    .flags          = AVFMT_GENERIC_INDEX, \
+    .flags          = AVFMT_GENERIC_INDEX | AVFMT_FFEDIT_BITSTREAM, \
     .raw_codec_id   = codecid,\
 };
 
