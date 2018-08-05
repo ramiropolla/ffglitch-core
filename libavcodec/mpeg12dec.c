@@ -1585,7 +1585,7 @@ static void mpeg_decode_picture_coding_extension(Mpeg1Context *s1)
        || (s->avctx->ffedit_apply  & (1 << FFEDIT_FEAT_QSCALE)) != 0) )
     {
         av_log(NULL, AV_LOG_ERROR,
-               "FFglitch doesn't support non-linear qscale yet.\n");
+               "FFedit doesn't support non-linear qscale yet.\n");
         av_assert0(0);
     }
     s->intra_vlc_format           = get_bits1(&s->gb);

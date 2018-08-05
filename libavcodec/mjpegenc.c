@@ -276,7 +276,7 @@ void ff_mjpeg_encode_block(
 
             if ( ctx != NULL && huff_size_ac[code] == 0 )
                 av_log(ctx, AV_LOG_ERROR,
-                       "FFglitch tried to write a huffman code not "
+                       "FFedit tried to write a huffman code not "
                        "available in huffman table. The output file "
                        "will be corrupted.\n"
                        "Try encoding the original file again with "
