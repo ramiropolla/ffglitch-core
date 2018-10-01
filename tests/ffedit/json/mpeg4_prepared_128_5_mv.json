@@ -1,5 +1,8 @@
 {
   "filename":"mpeg4_prepared_128_5.rawvideo",
+  "features":[
+    "mv"
+  ],
   "streams":[
     {
       "frames":[
