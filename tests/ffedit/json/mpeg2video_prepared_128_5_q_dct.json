@@ -1,5 +1,8 @@
 {
   "filename":"mpeg2video_prepared_128_5.rawvideo",
+  "features":[
+    "q_dct"
+  ],
   "streams":[
     {
       "frames":[

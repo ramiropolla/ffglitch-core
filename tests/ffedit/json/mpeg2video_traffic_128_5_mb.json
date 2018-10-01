@@ -1,5 +1,8 @@
 {
   "filename":"mpeg2video_traffic_128_5.rawvideo",
+  "features":[
+    "mb"
+  ],
   "streams":[
     {
       "frames":[

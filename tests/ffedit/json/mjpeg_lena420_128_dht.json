@@ -1,5 +1,8 @@
 {
   "filename":"mjpeg_lena420_128.jpg",
+  "features":[
+    "dht"
+  ],
   "streams":[
     {
       "frames":[

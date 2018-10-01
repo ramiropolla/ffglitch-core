@@ -517,6 +517,7 @@ int main(int argc, char *argv[])
     if ( export_fname != NULL )
     {
         json_object *jfname = NULL;
+        json_object *jfeatures = NULL;
 
         // TODO check if file exists before overwritting
         export_fp = fopen(export_fname, "w");
@@ -537,6 +538,18 @@ int main(int argc, char *argv[])
 
         jfname = json_object_new_string(av_basename(input_filename));
         json_object_object_add(jroot, "filename", jfname);
+
+        jfeatures = json_object_new_array();
+        for ( size_t i = 0; i < FFEDIT_FEAT_LAST; i++ )
+        {
+            if ( selected_features[i] )
+            {
+                const char *feat_str = ffe_feat_to_str(i);
+                json_object *jfeature = json_object_new_string(feat_str);
+                json_object_array_add(jfeatures, jfeature);
+            }
+        }
+        json_object_object_add(jroot, "features", jfeatures);
 
         jstreams0 = json_object_new_array();
         json_object_object_add(jroot, "streams", jstreams0);
