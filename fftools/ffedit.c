@@ -37,6 +37,8 @@ static json_object **jstreams;
 static int        nb_jstreams;
 static json_object **jstframes;
 static int        nb_jstframes;
+static json_object **jstpktmap;
+static int        nb_jstpktmap;
 
 /* TODO use avformat_match_stream_specifier */
 static int selected_features[FFEDIT_FEAT_LAST];
@@ -232,14 +234,18 @@ static int open_files(
         {
             json_object *jstream = json_object_new_object();
             json_object *jframes = json_object_new_array();
+            json_object *jpktmap = json_object_new_object();
 
             GROW_ARRAY(jstreams, nb_jstreams);
             GROW_ARRAY(jstframes, nb_jstframes);
+            GROW_ARRAY(jstpktmap, nb_jstpktmap);
 
             jstreams[i] = jstream;
             jstframes[i] = jframes;
+            jstpktmap[i] = jpktmap;
 
             json_object_object_add(jstream, "frames", jframes);
+            json_object_object_add(jstream, "pktmap", jpktmap);
             json_object_array_put_idx(jstreams0, i, jstream);
         }
     }
@@ -358,12 +364,17 @@ static int ffedit_decode(
             return ret;
         }
 
+        // Export to JSON.
         if ( jstreams0 != NULL && export_fname != NULL )
         {
             json_object *jframes = jstframes[stream_index];
+            json_object *jpktmap = jstpktmap[stream_index];
             json_object *jframe = json_object_new_object();
             json_object *jpts = json_object_new_int64(iframe->pts);
             json_object *jdts = json_object_new_int64(iframe->pkt_dts);
+            size_t frame_idx = json_object_array_length(jframes);
+            json_object *jframe_idx = json_object_new_int(frame_idx);
+            char buf[0x20];
 
             json_object_object_add(jframe, "pts", jpts);
             json_object_object_add(jframe, "dts", jdts);
@@ -378,6 +389,9 @@ static int ffedit_decode(
             }
 
             json_object_array_add(jframes, jframe);
+
+            snprintf(buf, sizeof(buf), "%" PRId64, iframe->pkt_pos);
+            json_object_object_add(jpktmap, buf, jframe_idx);
         }
     }
 
@@ -390,10 +404,6 @@ static int transplicate(FFEditOutputContext *ectx)
 
     AVPacket *ipkt = av_packet_alloc();
     AVFrame *iframe = av_frame_alloc();
-
-    size_t *frames_idx = NULL;
-
-    frames_idx = av_calloc(nb_jstframes, sizeof(size_t));
 
     while ( 42 )
     {
@@ -411,12 +421,26 @@ static int transplicate(FFEditOutputContext *ectx)
         if ( dctx == NULL )
             continue;
 
+        // Import from JSON.
         memset(ipkt->ffedit_sd, 0x00, sizeof(ipkt->ffedit_sd));
         if ( jstreams0 != NULL && apply_fname != NULL )
         {
-            size_t idx = frames_idx[stream_index];
             json_object *jframes = jstframes[stream_index];
-            json_object *jframe = json_object_array_get_idx(jframes, idx);
+            json_object *jpktmap = jstpktmap[stream_index];
+            json_object *jpktpos;
+            json_object *jframe;
+            char buf[0x20];
+            size_t idx;
+
+            snprintf(buf, sizeof(buf), "%" PRId64, ipkt->pos);
+            if ( json_object_object_get_ex(jpktmap, buf, &jpktpos) == 0 )
+            {
+                av_log(NULL, AV_LOG_FATAL, "Packet in pos %" PRId64 " not found in pktmap\n", ipkt->pos);
+                goto the_end;
+            }
+
+            idx = json_object_get_int(jpktpos);
+            jframe = json_object_array_get_idx(jframes, idx);
 
             for ( size_t i = 0; i < FFEDIT_FEAT_LAST; i++ )
             {
@@ -426,8 +450,6 @@ static int transplicate(FFEditOutputContext *ectx)
                     continue;
                 ipkt->ffedit_sd[i] = jso;
             }
-
-            frames_idx[stream_index]++;
         }
 
         ret = ffedit_decode(ectx, dctx, iframe, ipkt, stream_index);
@@ -446,8 +468,6 @@ static int transplicate(FFEditOutputContext *ectx)
 the_end:
     av_frame_free(&iframe);
     av_packet_free(&ipkt);
-    if ( frames_idx != NULL )
-        av_freep(&frames_idx);
 
     return fret;
 }
@@ -589,8 +609,10 @@ int main(int argc, char *argv[])
         {
             GROW_ARRAY(jstreams, nb_jstreams);
             GROW_ARRAY(jstframes, nb_jstframes);
+            GROW_ARRAY(jstpktmap, nb_jstpktmap);
             jstreams[i] = json_object_array_get_idx(jstreams0, i);
             json_object_object_get_ex(jstreams[i], "frames", &jstframes[i]);
+            json_object_object_get_ex(jstreams[i], "pktmap", &jstpktmap[i]);
         }
 
         free(buf);
