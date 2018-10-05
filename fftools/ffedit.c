@@ -325,6 +325,14 @@ static int open_decoders(FFEditOutputContext *ectx)
             continue;
         }
 
+        {
+            json_object *jwidth = json_object_new_int(dctx->width);
+            json_object *jheight = json_object_new_int(dctx->height);
+            json_object *jstream = json_object_array_get_idx(jstreams0, i);
+            json_object_object_add(jstream, "width", jwidth);
+            json_object_object_add(jstream, "height", jheight);
+        }
+
         fret = 0;
     }
 
