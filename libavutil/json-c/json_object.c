@@ -193,8 +193,9 @@ int json_object_put(struct json_object *jso)
 	if (--jso->_ref_count > 0) return 0;
 #endif
 
-	if (jso->_user_delete)
-		jso->_user_delete(jso, jso->_userdata);
+	for ( int i = 0; i < 2; i++ )
+		if (jso->_user_delete[i])
+			jso->_user_delete[i](jso, jso->_userdata[i]);
 	jso->_delete(jso);
 	return 1;
 }
@@ -248,21 +249,35 @@ enum json_type json_object_get_type(const struct json_object *jso)
 }
 
 void* json_object_get_userdata(json_object *jso) {
-	return jso ? jso->_userdata : NULL;
+	return jso ? jso->_userdata[0] : NULL;
 }
 
-void json_object_set_userdata(json_object *jso, void *userdata,
-			      json_object_delete_fn *user_delete)
+void* json_object_get_userdata1(json_object *jso) {
+	return jso ? jso->_userdata[1] : NULL;
+}
+
+static void
+json_object_set_userdata_internal(
+	json_object *jso,
+	void *userdata,
+	json_object_delete_fn *user_delete,
+	int index)
 {
 	// Can't return failure, so abort if we can't perform the operation.
 	assert(jso != NULL);
 
 	// First, clean up any previously existing user info
-	if (jso->_user_delete)
-		jso->_user_delete(jso, jso->_userdata);
+	if (jso->_user_delete[index])
+		jso->_user_delete[index](jso, jso->_userdata[index]);
 
-	jso->_userdata = userdata;
-	jso->_user_delete = user_delete;
+	jso->_userdata[index] = userdata;
+	jso->_user_delete[index] = user_delete;
+}
+
+void json_object_set_userdata(json_object *jso, void *userdata,
+			      json_object_delete_fn *user_delete)
+{
+	json_object_set_userdata_internal(jso, userdata, user_delete, 0);
 }
 
 /* set a custom conversion to string */
@@ -272,7 +287,7 @@ void json_object_set_serializer(json_object *jso,
 	void *userdata,
 	json_object_delete_fn *user_delete)
 {
-	json_object_set_userdata(jso, userdata, user_delete);
+	json_object_set_userdata_internal(jso, userdata, user_delete, 1);
 
 	if (to_string_func == NULL)
 	{
@@ -877,7 +892,7 @@ int json_object_double_to_json_string(struct json_object* jso,
 				      int flags)
 {
 	return json_object_double_to_json_string_format(jso, pb, level, flags,
-							(const char *)jso->_userdata);
+							(const char *)jso->_userdata[0]);
 }
 
 struct json_object* json_object_new_double(double d)
@@ -904,16 +919,16 @@ struct json_object* json_object_new_double_s(double d, const char *ds)
 		errno = ENOMEM;
 		return NULL;
 	}
-	json_object_set_serializer(jso, json_object_userdata_to_json_string,
-	    new_ds, json_object_free_userdata);
+	json_object_set_userdata_internal(jso, new_ds, json_object_free_userdata, 0);
+	jso->_to_json_string = json_object_userdata_to_json_string;
 	return jso;
 }
 
 int json_object_userdata_to_json_string(struct json_object *jso,
 	struct printbuf *pb, int level, int flags)
 {
-	int userdata_len = strlen((const char *)jso->_userdata);
-	printbuf_memappend(pb, (const char *)jso->_userdata, userdata_len);
+	int userdata_len = strlen((const char *)jso->_userdata[0]);
+	printbuf_memappend(pb, (const char *)jso->_userdata[0], userdata_len);
 	return userdata_len;
 }
 
@@ -1320,12 +1335,12 @@ int json_object_equal(struct json_object* jso1, struct json_object* jso2)
 
 static int json_object_copy_serializer_data(struct json_object *src, struct json_object *dst)
 {
-	if (!src->_userdata && !src->_user_delete)
+	if (!src->_userdata[0] && !src->_user_delete[0])
 		return 0;
 
 	if (dst->_to_json_string == json_object_userdata_to_json_string)
 	{
-		dst->_userdata = strdup(src->_userdata);
+		dst->_userdata[0] = strdup(src->_userdata[0]);
 	}
 	// else if ... other supported serializers ...
 	else
@@ -1333,7 +1348,7 @@ static int json_object_copy_serializer_data(struct json_object *src, struct json
 		_json_c_set_last_err("json_object_deep_copy: unable to copy unknown serializer data: %p\n", dst->_to_json_string);
 		return -1;
 	}
-	dst->_user_delete = src->_user_delete;
+	dst->_user_delete[0] = src->_user_delete[0];
 	return 0;
 }
 
