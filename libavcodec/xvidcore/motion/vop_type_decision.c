@@ -210,7 +210,7 @@ MEanalysis(	const IMAGE * const pRef,
 								pParam->edged_width);
 
 				complexity += MAX(dev, 300);
-				if (dev + IntraThresh < pMB->sad16) {
+				if (dev + IntraThresh < pMB->sad16 && (Current->vop_flags & FFEDIT_VOP_NOPIMB) == 0) {
 					pMB->mode = MODE_INTRA;
 					if (++intra > ((pParam->mb_height-2)*(pParam->mb_width-2))/2) return I_VOP;
 				}
