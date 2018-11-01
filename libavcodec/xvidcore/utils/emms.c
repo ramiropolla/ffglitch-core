@@ -42,6 +42,7 @@ emmsFuncPtr emms;
  ****************************************************************************/
 
 /* The no op wrapper for non MMX platforms */
+void emms_c(void);
 void
 emms_c(void)
 {

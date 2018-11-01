@@ -30,7 +30,7 @@
 #include <unistd.h>
 #endif
 
-#include <xvid.h>
+#include "xvidcore/xvid.h"
 
 #include "libavutil/attributes.h"
 #include "libavutil/internal.h"
