@@ -86,6 +86,7 @@ struct xvid_context {
     int me_quality;                /**< Motion estimation quality. 0: fast 6: best. */
     int mpeg_quant;                /**< Quantization type. 0: H.263, 1: MPEG */
     int intra_penalty;             /**< Penalty for intra blocks in block decision */
+    int forcemv;                   /**< Always write mvs for p frames (even if <0,0>) */
 };
 
 /**
@@ -403,6 +404,8 @@ static av_cold int xvid_encode_init(AVCodecContext *avctx)
         x->vop_flags    |= XVID_VOP_GREYSCALE;
     if (x->intra_penalty)
         x->vop_flags    |= FFEDIT_VOP_NOPIMB;
+    if (x->forcemv)
+        x->vop_flags    |= FFEDIT_VOP_FORCE_MV;
 
     /* Decide which ME quality setting to use */
     x->me_flags = 0;
@@ -891,6 +894,7 @@ static const AVOption options[] = {
     { "me_quality",  "Motion estimation quality",       OFFSET(me_quality),  AV_OPT_TYPE_INT,   { .i64 = 4 },       0,       6, VE         },
     { "mpeg_quant",  "Use MPEG quantizers instead of H.263", OFFSET(mpeg_quant), AV_OPT_TYPE_INT, { .i64 = 0 },     0,       1, VE         },
     { "intra_penalty", "Penalty for intra blocks in block decision", OFFSET(intra_penalty), AV_OPT_TYPE_INT, { .i64 = 0 }, 0, INT_MAX/2, VE },
+    { "forcemv",     "Always write mvs for p frames (even if <0,0>)", OFFSET(forcemv), AV_OPT_TYPE_INT, { .i64 = 0 }, 0,     1, VE         },
     { NULL },
 };
 
