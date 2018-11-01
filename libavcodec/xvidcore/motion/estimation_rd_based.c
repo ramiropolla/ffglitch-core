@@ -765,7 +765,7 @@ xvid_me_ModeDecision_Fast(SearchData * const Data,
 	int mcsel = 0;
 	int inter4v = (VopFlags & XVID_VOP_INTER4V) && (pMB->dquant == 0);
 	const uint32_t iQuant = pMB->quant;
-	const int skip_possible = (coding_type == P_VOP) && (pMB->dquant == 0);
+	const int skip_possible = (coding_type == P_VOP) && (pMB->dquant == 0) && (VopFlags & FFEDIT_VOP_FORCE_MV) == 0;
     int sad;
 	int min_rd = -1, intra_rd, i, cbp = 63;
 	VECTOR backup[5], *v;

@@ -670,6 +670,7 @@ extern int xvid_encore(void *handle, int opt, void *param1, void *param2);
 #define XVID_VOP_RD_BVOP              (1<<13) /* enable rate-distortion mode decision in b-frames */
 #define XVID_VOP_RD_PSNRHVSM          (1<<14) /* use PSNR-HVS-M as metric for rate-distortion optimizations */
 #define FFEDIT_VOP_NOPIMB             (1<<15) /* no INTRA macroblocks in predicted frames */
+#define FFEDIT_VOP_FORCE_MV           (1<<16) /* always write mvs for predicted frames (even if <0,0>) */
 
 /* Only valid for vol_flags|=XVID_VOL_INTERLACING */
 #define XVID_VOP_TOPFIELDFIRST        (1<< 9) /* set top-field-first flag  */
