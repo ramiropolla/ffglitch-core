@@ -71,7 +71,7 @@ extern unsigned int xvid_debug;
  *  Some things that are OS dependant
  ****************************************************************************/
 
-#ifdef WIN32
+#ifdef _WIN32
 
 # include <windows.h>
 # define pthread_t				HANDLE
