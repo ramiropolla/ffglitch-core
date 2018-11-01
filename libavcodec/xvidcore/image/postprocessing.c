@@ -53,6 +53,7 @@ void init_postproc(XVID_POSTPROC *tbls)
 	init_noise(tbls);
 }
 
+void stripe_deblock_h(SMPDeblock *h);
 void 
 stripe_deblock_h(SMPDeblock *h)
 {
@@ -90,6 +91,7 @@ stripe_deblock_h(SMPDeblock *h)
 	}
 }
 
+void stripe_deblock_v(SMPDeblock *h);
 void 
 stripe_deblock_v(SMPDeblock *h)
 {

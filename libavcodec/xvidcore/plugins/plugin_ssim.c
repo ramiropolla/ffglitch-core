@@ -95,6 +95,7 @@ typedef struct{
 } ssim_data_t;
 
 /* append the stats for another frame to the linked list*/
+static
 void framestat_append(ssim_data_t* ssim,int type, int quant, float min, float max, float avg){
 	framestat_t* act;
 	act = (framestat_t*) malloc(sizeof(framestat_t));
@@ -115,6 +116,7 @@ void framestat_append(ssim_data_t* ssim,int type, int quant, float min, float ma
 }
 
 /* destroy the whole list*/
+static
 void framestat_free(framestat_t* stat){
 	if(stat != NULL){
 		if(stat->next != NULL) framestat_free(stat->next);
@@ -124,6 +126,7 @@ void framestat_free(framestat_t* stat){
 }
 
 /*writeout the collected stats*/
+static
 void framestat_write(ssim_data_t* ssim, char* path){
 	framestat_t* tmp = ssim->head;
 	FILE* out = fopen(path,"w");
@@ -139,6 +142,7 @@ void framestat_write(ssim_data_t* ssim, char* path){
 }
 
 /*writeout the collected stats in octave readable format*/
+static
 void framestat_write_oct(ssim_data_t* ssim, char* path){
 	framestat_t* tmp;
 	FILE* out = fopen(path,"w");
@@ -228,6 +232,7 @@ void framestat_write_oct(ssim_data_t* ssim, char* path){
 }
 
 /*calculate the luminance of a 8x8 block*/
+static
 int lum_8x8_c(uint8_t* ptr, int stride){
 	int mean=0,i,j;
 	for(i=0;i< 8;i++)
@@ -237,6 +242,7 @@ int lum_8x8_c(uint8_t* ptr, int stride){
 	return mean;
 }
 
+static
 int lum_8x8_gaussian(uint8_t* ptr, int stride){
 	float mean=0,sum;
 	int i,j;
@@ -251,6 +257,7 @@ int lum_8x8_gaussian(uint8_t* ptr, int stride){
 	return (int) (mean + 0.5);
 }
 
+static
 int lum_8x8_gaussian_int(uint8_t* ptr, int stride){
 	uint32_t mean;
 	int i,j;
@@ -267,6 +274,7 @@ int lum_8x8_gaussian_int(uint8_t* ptr, int stride){
 }
 
 /*calculate the difference between two blocks next to each other on a row*/
+static
 int lum_2x8_c(uint8_t* ptr, int stride){
 	int mean=0,i;
 	/*Luminance*/
@@ -279,6 +287,7 @@ int lum_2x8_c(uint8_t* ptr, int stride){
 }
 
 /*calculate contrast and correlation of the two blocks*/
+static
 void consim_gaussian(uint8_t* ptro, uint8_t* ptrc, int stride, int lumo, int lumc, int* pdevo, int* pdevc, int* pcorr){
 	unsigned int valo, valc,i,j,str;
 	float devo=0, devc=0, corr=0,sumo,sumc,sumcorr;
@@ -309,6 +318,7 @@ void consim_gaussian(uint8_t* ptro, uint8_t* ptrc, int stride, int lumo, int lum
 	*pcorr = (int) ((corr - ((lumo*lumc + 32) >> 6)) + 0.5);
 };
 
+static
 void consim_gaussian_int(uint8_t* ptro, uint8_t* ptrc, int stride, int lumo, int lumc, int* pdevo, int* pdevc, int* pcorr)
 {
 	unsigned int valo, valc,i,j,str;
@@ -344,6 +354,7 @@ void consim_gaussian_int(uint8_t* ptro, uint8_t* ptrc, int stride, int lumo, int
 };
 
 /*calculate contrast and correlation of the two blocks*/
+static
 void consim_c(uint8_t* ptro, uint8_t* ptrc, int stride, int lumo, int lumc, int* pdevo, int* pdevc, int* pcorr){
 	unsigned int valo, valc, devo=0, devc=0, corr=0,i,j,str;
 	str = stride - 8;

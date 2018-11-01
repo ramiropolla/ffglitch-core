@@ -408,6 +408,7 @@ static void Init_FIR_Table(int16_t Tab[][4],
 }
 
 
+void xvid_Init_QP(void);
 void xvid_Init_QP(void)
 {
 #if defined (ARCH_IS_IA32) || defined (ARCH_IS_X86_64)
