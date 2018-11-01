@@ -330,7 +330,7 @@ ModeDecision_SAD(SearchData * const Data,
 
 	if (Data->chroma) InterBias += 50; /* dev8(chroma) ??? <-- yes, we need dev8 (no big difference though) */
 
-	if (InterBias < sad) {
+	if (InterBias < sad && (VopFlags & FFEDIT_VOP_NOPIMB) == 0) {
 		int32_t deviation = dev16(Data->Cur, Data->iEdgedWidth);
 		if (deviation < (sad - InterBias)) mode = MODE_INTRA;
 	}

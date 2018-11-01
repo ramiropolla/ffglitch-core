@@ -703,7 +703,7 @@ xvid_me_ModeDecision_RD(SearchData * const Data,
 	}
 	
 	/* there is no way for INTRA to take less than 24 bits - go to findRD_intra() for calculations */
-	if (min_rd > 24*BITS_MULT) { 
+	if (min_rd > 24*BITS_MULT && (VopFlags & FFEDIT_VOP_NOPIMB) == 0) {
 		intra_rd = findRD_intra(Data, pMB, x, y, pParam->mb_width, bound);
 		if (intra_rd < min_rd) {
 			*Data->iMinSAD = min_rd = intra_rd;
@@ -911,7 +911,7 @@ xvid_me_ModeDecision_Fast(SearchData * const Data,
 
 		if (Data->chroma) InterBias += 50; /* dev8(chroma) ??? <-- yes, we need dev8 (no big difference though) */
 
-		if (InterBias < sad) {
+		if (InterBias < sad && (VopFlags & FFEDIT_VOP_NOPIMB) == 0) {
 			int32_t deviation = dev16(Data->Cur, Data->iEdgedWidth);
 			if (deviation < (sad - InterBias)) mode = MODE_INTRA;
 		}
@@ -957,7 +957,7 @@ xvid_me_ModeDecision_Fast(SearchData * const Data,
 		}
 
 		intra_rd = findRD_intra(Data, pMB, x, y, pParam->mb_width, bound);
-		if (intra_rd < min_rd) {
+		if (intra_rd < min_rd && (VopFlags & FFEDIT_VOP_NOPIMB) == 0) {
 			*Data->iMinSAD = min_rd = intra_rd;
 			mode = MODE_INTRA;
 		}
