@@ -1844,14 +1844,21 @@ SliceCodeP(SMPData *data)
 
 			/* Finished processing the MB, now check if to CODE or SKIP */
 
-			skip_possible = (pMB->cbp == 0) && (pMB->mode == MODE_INTER);
+			if ( (current->vop_flags & FFEDIT_VOP_FORCE_MV) != 0 )
+			{
+				skip_possible = 0;
+			}
+			else
+			{
+				skip_possible = (pMB->cbp == 0) && (pMB->mode == MODE_INTER);
 
-			if (current->coding_type == S_VOP)
-				skip_possible &= (pMB->mcsel == 1);
-			else { /* PVOP */
-				const VECTOR * const mv = (pParam->vol_flags & XVID_VOL_QUARTERPEL) ?
-										pMB->qmvs : pMB->mvs;
-				skip_possible &= ((mv->x|mv->y) == 0);
+				if (current->coding_type == S_VOP)
+					skip_possible &= (pMB->mcsel == 1);
+				else { /* PVOP */
+					const VECTOR * const mv = (pParam->vol_flags & XVID_VOL_QUARTERPEL) ?
+											pMB->qmvs : pMB->mvs;
+					skip_possible &= ((mv->x|mv->y) == 0);
+				}
 			}
 
 			if ((pMB->mode == MODE_NOT_CODED) || (skip_possible)) {
