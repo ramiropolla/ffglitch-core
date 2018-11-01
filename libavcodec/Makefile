@@ -1161,6 +1161,87 @@ OBJS-$(CONFIG_LIBXAVS2_ENCODER)           += libxavs2.o
 OBJS-$(CONFIG_LIBXEVD_DECODER)            += libxevd.o
 OBJS-$(CONFIG_LIBXEVE_ENCODER)            += libxeve.o
 OBJS-$(CONFIG_LIBXVID_ENCODER)            += libxvid.o
+# built-in xvidcore files
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/decoder.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/encoder.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/xvid.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/bitstream/bitstream.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/bitstream/cbp.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/bitstream/mbcoding.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/dct/fdct.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/dct/idct.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/dct/simple_idct.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/image/colorspace.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/image/image.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/image/interpolate8x8.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/image/font.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/image/postprocessing.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/image/qpel.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/image/reduced.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/motion/estimation_bvop.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/motion/estimation_common.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/motion/estimation_gmc.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/motion/estimation_pvop.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/motion/estimation_rd_based.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/motion/estimation_rd_based_bvop.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/motion/gmc.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/motion/motion_comp.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/motion/vop_type_decision.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/motion/sad.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/prediction/mbprediction.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/plugins/plugin_single.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/plugins/plugin_2pass1.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/plugins/plugin_2pass2.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/plugins/plugin_lumimasking.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/plugins/plugin_dump.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/plugins/plugin_psnr.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/plugins/plugin_ssim.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/plugins/plugin_psnrhvsm.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/quant/quant_h263.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/quant/quant_matrix.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/quant/quant_mpeg.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/utils/emms.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/utils/mbtransquant.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/utils/mem_align.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/utils/mem_transfer.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/utils/timer.o
+ifdef HAVE_X86ASM
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/bitstream/x86_asm/cbp_mmx.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/bitstream/x86_asm/cbp_sse2.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/dct/x86_asm/fdct_mmx_ffmpeg.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/dct/x86_asm/fdct_mmx_skal.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/dct/x86_asm/fdct_sse2_skal.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/dct/x86_asm/idct_3dne.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/dct/x86_asm/idct_mmx.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/dct/x86_asm/idct_sse2_dmitry.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/image/x86_asm/colorspace_rgb_mmx.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/image/x86_asm/colorspace_yuv_mmx.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/image/x86_asm/colorspace_yuyv_mmx.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/image/x86_asm/interpolate8x8_3dn.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/image/x86_asm/interpolate8x8_3dne.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/image/x86_asm/interpolate8x8_mmx.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/image/x86_asm/interpolate8x8_xmm.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/image/x86_asm/postprocessing_mmx.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/image/x86_asm/postprocessing_sse2.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/image/x86_asm/reduced_mmx.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/image/x86_asm/qpel_mmx.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/image/x86_asm/gmc_mmx.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/image/x86_asm/deintl_sse.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/motion/x86_asm/sad_xmm.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/motion/x86_asm/sad_sse2.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/motion/x86_asm/sad_mmx.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/motion/x86_asm/sad_3dne.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/motion/x86_asm/sad_3dn.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/quant/x86_asm/quantize_h263_mmx.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/quant/x86_asm/quantize_h263_3dne.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/quant/x86_asm/quantize_mpeg_xmm.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/quant/x86_asm/quantize_mpeg_mmx.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/utils/x86_asm/mem_transfer_mmx.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/utils/x86_asm/mem_transfer_3dne.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/utils/x86_asm/interlacing_mmx.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/utils/x86_asm/cpuid.o
+OBJS-$(CONFIG_LIBXVID_ENCODER)            += xvidcore/plugins/x86_asm/plugin_ssim-a.o
+endif
 OBJS-$(CONFIG_LIBZVBI_TELETEXT_DECODER)   += libzvbi-teletextdec.o ass.o
 
 # parsers
@@ -1360,3 +1441,21 @@ $(SUBDIR)pcm.o: $(SUBDIR)pcm_tables.h
 $(SUBDIR)qdm2.o: $(SUBDIR)qdm2_tables.h
 $(SUBDIR)sinewin.o: $(SUBDIR)sinewin_tables.h
 endif
+
+clean::
+	$(RM) $(CLEANSUFFIXES:%=libavcodec/xvidcore/%)
+	$(RM) $(CLEANSUFFIXES:%=libavcodec/xvidcore/bitstream/%)
+	$(RM) $(CLEANSUFFIXES:%=libavcodec/xvidcore/bitstream/x86_asm/%)
+	$(RM) $(CLEANSUFFIXES:%=libavcodec/xvidcore/dct/%)
+	$(RM) $(CLEANSUFFIXES:%=libavcodec/xvidcore/dct/x86_asm/%)
+	$(RM) $(CLEANSUFFIXES:%=libavcodec/xvidcore/image/%)
+	$(RM) $(CLEANSUFFIXES:%=libavcodec/xvidcore/image/x86_asm/%)
+	$(RM) $(CLEANSUFFIXES:%=libavcodec/xvidcore/motion/%)
+	$(RM) $(CLEANSUFFIXES:%=libavcodec/xvidcore/motion/x86_asm/%)
+	$(RM) $(CLEANSUFFIXES:%=libavcodec/xvidcore/plugins/%)
+	$(RM) $(CLEANSUFFIXES:%=libavcodec/xvidcore/plugins/x86_asm/%)
+	$(RM) $(CLEANSUFFIXES:%=libavcodec/xvidcore/prediction/%)
+	$(RM) $(CLEANSUFFIXES:%=libavcodec/xvidcore/quant/%)
+	$(RM) $(CLEANSUFFIXES:%=libavcodec/xvidcore/quant/x86_asm/%)
+	$(RM) $(CLEANSUFFIXES:%=libavcodec/xvidcore/utils/%)
+	$(RM) $(CLEANSUFFIXES:%=libavcodec/xvidcore/utils/x86_asm/%)

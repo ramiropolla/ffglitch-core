@@ -27,7 +27,7 @@
 
 #include <stdio.h>
 #include <string.h>
-#include <xvid.h>
+#include "xvidcore/xvid.h"
 
 #include "libavutil/avassert.h"
 #include "libavutil/file_open.h"
