@@ -16,7 +16,7 @@
 #include "config.h"
 
 #include <math.h>
-#include "math_compat.h"
+#include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stddef.h>
@@ -27,12 +27,10 @@
 #include "debug.h"
 #include "printbuf.h"
 #include "arraylist.h"
-#include "json_inttypes.h"
 #include "json_object.h"
 #include "json_object_private.h"
 #include "json_tokener.h"
 #include "json_util.h"
-#include "strdup_compat.h"
 
 #ifdef HAVE_LOCALE_H
 #include <locale.h>
@@ -43,12 +41,7 @@
 
 #define jt_hexdigit(x) (((x) <= '9') ? (x) - '0' : ((x) & 7) + 9)
 
-#if !HAVE_STRNCASECMP && defined(_MSC_VER)
-  /* MSC has the version as _strnicmp */
-# define strncasecmp _strnicmp
-#elif !HAVE_STRNCASECMP
-# error You do not have strncasecmp on your system.
-#endif /* HAVE_STRNCASECMP */
+int av_strncasecmp(const char *a, const char *b, size_t n);
 
 /* Use C99 NAN by default; if not available, nan("") should work too. */
 #ifndef NAN
@@ -444,7 +437,7 @@ struct json_object* json_tokener_parse_ex(struct json_tokener *tok,
 	size = json_min(tok->st_pos+1, json_null_str_len);
 	size_nan = json_min(tok->st_pos+1, json_nan_str_len);
 	if((!(tok->flags & JSON_TOKENER_STRICT) &&
-	  strncasecmp(json_null_str, tok->pb->buf, size) == 0)
+	  av_strncasecmp(json_null_str, tok->pb->buf, size) == 0)
 	  || (strncmp(json_null_str, tok->pb->buf, size) == 0)
 	  ) {
 	  if (tok->st_pos == json_null_str_len) {
@@ -455,7 +448,7 @@ struct json_object* json_tokener_parse_ex(struct json_tokener *tok,
 	  }
 	}
 	else if ((!(tok->flags & JSON_TOKENER_STRICT) &&
-	          strncasecmp(json_nan_str, tok->pb->buf, size_nan) == 0) ||
+	          av_strncasecmp(json_nan_str, tok->pb->buf, size_nan) == 0) ||
 	         (strncmp(json_nan_str, tok->pb->buf, size_nan) == 0)
 	        )
 	{
@@ -697,7 +690,7 @@ struct json_object* json_tokener_parse_ex(struct json_tokener *tok,
 	size1 = json_min(tok->st_pos+1, json_true_str_len);
 	size2 = json_min(tok->st_pos+1, json_false_str_len);
 	if((!(tok->flags & JSON_TOKENER_STRICT) &&
-	  strncasecmp(json_true_str, tok->pb->buf, size1) == 0)
+	  av_strncasecmp(json_true_str, tok->pb->buf, size1) == 0)
 	  || (strncmp(json_true_str, tok->pb->buf, size1) == 0)
 	  ) {
 	  if(tok->st_pos == json_true_str_len) {
@@ -709,7 +702,7 @@ struct json_object* json_tokener_parse_ex(struct json_tokener *tok,
 	    goto redo_char;
 	  }
 	} else if((!(tok->flags & JSON_TOKENER_STRICT) &&
-	  strncasecmp(json_false_str, tok->pb->buf, size2) == 0)
+	  av_strncasecmp(json_false_str, tok->pb->buf, size2) == 0)
 	  || (strncmp(json_false_str, tok->pb->buf, size2) == 0)) {
 	  if(tok->st_pos == json_false_str_len) {
 	    current = json_object_new_boolean(0);

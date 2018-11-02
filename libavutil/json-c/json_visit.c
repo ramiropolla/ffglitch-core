@@ -5,10 +5,10 @@
  * it under the terms of the MIT license. See COPYING for details.
  */
 
+#include <inttypes.h>
 #include <stdio.h>
 
 #include "config.h"
-#include "json_inttypes.h"
 #include "json_object.h"
 #include "json_visit.h"
 #include "linkhash.h"

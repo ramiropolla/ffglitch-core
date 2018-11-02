@@ -23,11 +23,6 @@
 # include <endian.h>    /* attempt to define endianness */
 #endif
 
-#if defined(_MSC_VER) || defined(__MINGW32__)
-# define WIN32_LEAN_AND_MEAN
-# include <windows.h>   /* Get InterlockedCompareExchange */
-#endif
-
 #include "random_seed.h"
 #include "linkhash.h"
 
@@ -67,6 +62,7 @@ static unsigned long lh_ptr_hash(const void *k)
 	return (unsigned long)((((ptrdiff_t)k * LH_PRIME) >> 4) & ULONG_MAX);
 }
 
+static
 int lh_ptr_equal(const void *k1, const void *k2)
 {
 	return (k1 == k2);
@@ -452,39 +448,19 @@ static unsigned long lh_perllike_str_hash(const void *k)
 
 static unsigned long lh_char_hash(const void *k)
 {
-#if defined _MSC_VER || defined __MINGW32__
-#define RANDOM_SEED_TYPE LONG
-#else
-#define RANDOM_SEED_TYPE int
-#endif
-	static volatile RANDOM_SEED_TYPE random_seed = -1;
+	static volatile int random_seed = -1;
 
 	if (random_seed == -1) {
-		RANDOM_SEED_TYPE seed;
+		int seed;
 		/* we can't use -1 as it is the unitialized sentinel */
 		while ((seed = json_c_get_random_seed()) == -1);
-#if SIZEOF_INT == 8 && defined __GCC_HAVE_SYNC_COMPARE_AND_SWAP_8
-#define USE_SYNC_COMPARE_AND_SWAP 1
-#endif
-#if SIZEOF_INT == 4 && defined __GCC_HAVE_SYNC_COMPARE_AND_SWAP_4
-#define USE_SYNC_COMPARE_AND_SWAP 1
-#endif
-#if SIZEOF_INT == 2 && defined __GCC_HAVE_SYNC_COMPARE_AND_SWAP_2
-#define USE_SYNC_COMPARE_AND_SWAP 1
-#endif
-#if defined USE_SYNC_COMPARE_AND_SWAP
 		(void)__sync_val_compare_and_swap(&random_seed, -1, seed);
-#elif defined _MSC_VER || defined __MINGW32__
-		InterlockedCompareExchange(&random_seed, seed, -1);
-#else
-//#warning "racy random seed initializtion if used by multiple threads"
-		random_seed = seed; /* potentially racy */
-#endif
 	}
 
 	return hashlittle((const char*)k, strlen((const char*)k), random_seed);
 }
 
+static
 int lh_char_equal(const void *k1, const void *k2)
 {
 	return (strcmp((const char*)k1, (const char*)k2) == 0);

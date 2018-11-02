@@ -40,7 +40,7 @@
 #endif
 
 #include <stddef.h>
-#include "json_inttypes.h"
+#include <inttypes.h>
 #include "printbuf.h"
 
 #ifdef __cplusplus

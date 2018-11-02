@@ -157,6 +157,21 @@ OBJS = adler32.o                                                        \
        xtea.o                                                           \
        tea.o                                                            \
 
+# json-c for ffglitch
+OBJS += json-c/arraylist.o
+OBJS += json-c/debug.o
+OBJS += json-c/json_c_version.o
+OBJS += json-c/json_object.o
+OBJS += json-c/json_object_iterator.o
+OBJS += json-c/json_pointer.o
+OBJS += json-c/json_tokener.o
+OBJS += json-c/json_util.o
+OBJS += json-c/json_visit.o
+OBJS += json-c/linkhash.o
+OBJS += json-c/printbuf.o
+OBJS += json-c/random_seed.o
+OBJS += json-c/strerror_override.o
+
 OBJS-$(CONFIG_CUDA)                     += hwcontext_cuda.o
 OBJS-$(CONFIG_D3D11VA)                  += hwcontext_d3d11va.o
 OBJS-$(CONFIG_DXVA2)                    += hwcontext_dxva2.o
@@ -235,6 +250,9 @@ TESTPROGS-$(HAVE_THREADS)            += cpu_init
 TESTPROGS-$(HAVE_LZO1X_999_COMPRESS) += lzo
 
 TOOLS = crypto_bench ffhash ffeval ffescape
+
+clean::
+	$(RM) $(CLEANSUFFIXES:%=libavutil/json-c/%)
 
 tools/crypto_bench$(EXESUF): ELIBS += $(if $(VERSUS),$(subst +, -l,+$(VERSUS)),)
 tools/crypto_bench$(EXESUF): CFLAGS += -DUSE_EXT_LIBS=0$(if $(VERSUS),$(subst +,+USE_,+$(VERSUS)),)

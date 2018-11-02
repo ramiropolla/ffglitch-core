@@ -18,17 +18,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-#ifdef HAVE_STDARG_H
-# include <stdarg.h>
-#else /* !HAVE_STDARG_H */
-# error Not enough var arg support!
-#endif /* HAVE_STDARG_H */
+#include <stdarg.h>
 
 #include "debug.h"
 #include "printbuf.h"
-#include "snprintf_compat.h"
-#include "vasprintf_compat.h"
 
 static int printbuf_extend(struct printbuf *p, int min_size);
 
@@ -115,23 +108,26 @@ int printbuf_memset(struct printbuf *pb, int offset, int charvalue, int len)
 int sprintbuf(struct printbuf *p, const char *msg, ...)
 {
   va_list ap;
-  char *t;
   int size;
-  char buf[128];
+  #define STACK_BUF_SIZE 256
+  char buf[STACK_BUF_SIZE];
 
   /* user stack buffer first */
   va_start(ap, msg);
-  size = vsnprintf(buf, 128, msg, ap);
+  size = vsnprintf(buf, STACK_BUF_SIZE, msg, ap);
   va_end(ap);
+
   /* if string is greater than stack buffer, then use dynamic string
-     with vasprintf.  Note: some implementation of vsnprintf return -1
-     if output is truncated whereas some return the number of bytes that
-     would have been written - this code handles both cases. */
-  if(size == -1 || size > 127) {
+     with vasprintf. */
+  if(size > (STACK_BUF_SIZE-1)) {
+    char *t = malloc(size+1);
+    if ( t == NULL )
+      return -1;
     va_start(ap, msg);
-    if((size = vasprintf(&t, msg, ap)) < 0) { va_end(ap); return -1; }
+    size = vsnprintf(t, size + 1, msg, ap);
     va_end(ap);
-    printbuf_memappend(p, t, size);
+    if ( size < 0 )
+      printbuf_memappend(p, t, size);
     free(t);
     return size;
   } else {

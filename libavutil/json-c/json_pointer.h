@@ -47,24 +47,6 @@ extern "C" {
 int json_pointer_get(struct json_object *obj, const char *path, struct json_object **res);
 
 /**
- * This is a variant of 'json_pointer_get()' that supports printf() style arguments.
- *
- * Example: json_pointer_getf(obj, res, "/foo/%d/%s", 0, bak)
- * This also means that you need to escape '%' with '%%' (just like in printf())
- *
- * Please take into consideration all recommended 'printf()' format security
- * aspects when using this function.
- *
- * @param obj the json_object instance/tree to which to add a sub-object
- * @param res a pointer where to store a reference to the json_object
- *              associated with the given path
- * @param path_fmt a printf() style format for the path
- *
- * @return negative if an error (or not found), or 0 if succeeded
- */
-int json_pointer_getf(struct json_object *obj, struct json_object **res, const char *path_fmt, ...);
-
-/**
  * Sets JSON object 'value' in the 'obj' tree at the location specified
  * by the 'path'. 'path' is JSON pointer notation as defined in RFC 6901
  *   https://tools.ietf.org/html/rfc6901
@@ -94,23 +76,6 @@ int json_pointer_getf(struct json_object *obj, struct json_object **res, const c
  * @return negative if an error (or not found), or 0 if succeeded
  */
 int json_pointer_set(struct json_object **obj, const char *path, struct json_object *value);
-
-/**
- * This is a variant of 'json_pointer_set()' that supports printf() style arguments.
- *
- * Example: json_pointer_setf(obj, value, "/foo/%d/%s", 0, bak)
- * This also means that you need to escape '%' with '%%' (just like in printf())
- *
- * Please take into consideration all recommended 'printf()' format security
- * aspects when using this function.
- *
- * @param obj the json_object instance/tree to which to add a sub-object
- * @param value object to set at path
- * @param path_fmt a printf() style format for the path
- *
- * @return negative if an error (or not found), or 0 if succeeded
- */
-int json_pointer_setf(struct json_object **obj, struct json_object *value, const char *path_fmt, ...);
 
 
 #ifdef __cplusplus

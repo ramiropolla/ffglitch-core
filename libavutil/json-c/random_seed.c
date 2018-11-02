@@ -14,8 +14,6 @@
 #include "config.h"
 #include "random_seed.h"
 
-#define DEBUG_SEED(s)
-
 
 #if defined ENABLE_RDRAND
 
@@ -71,7 +69,6 @@ static int has_rdrand()
 
 static int get_rdrand_seed()
 {
-    DEBUG_SEED("get_rdrand_seed");
     int _eax;
     // rdrand eax
     __asm__ __volatile__("1: .byte 0x0F\n"
@@ -93,7 +90,6 @@ static int get_rdrand_seed()
 
 static int get_rdrand_seed()
 {
-    DEBUG_SEED("get_rdrand_seed");
     int r;
     while (_rdrand32_step(&r) == 0);
     return r;
@@ -106,7 +102,6 @@ static int get_rdrand_seed()
 
 static int get_rdrand_seed()
 {
-	DEBUG_SEED("get_rdrand_seed");
 	int _eax;
 retry:
 	// rdrand eax
@@ -136,7 +131,7 @@ retry:
 
 static const char *dev_random_file = "/dev/urandom";
 
-static int has_dev_urandom()
+static int has_dev_urandom(void)
 {
     struct stat buf;
     if (stat(dev_random_file, &buf)) {
@@ -148,9 +143,10 @@ static int has_dev_urandom()
 
 /* get_dev_random_seed */
 
-static int get_dev_random_seed()
+static int get_dev_random_seed(void)
 {
-    DEBUG_SEED("get_dev_random_seed");
+    ssize_t nread;
+    int r;
 
     int fd = open(dev_random_file, O_RDONLY);
     if (fd < 0) {
@@ -158,8 +154,7 @@ static int get_dev_random_seed()
         exit(1);
     }
 
-    int r;
-    ssize_t nread = read(fd, &r, sizeof(r));
+    nread = read(fd, &r, sizeof(r));
     if (nread != sizeof(r)) {
         fprintf(stderr, "error short read %s: %s", dev_random_file, strerror(errno));
         exit(1);
@@ -189,8 +184,6 @@ static int get_cryptgenrandom_seed()
     HCRYPTPROV hProvider = 0;
     int r;
 
-    DEBUG_SEED("get_cryptgenrandom_seed");
-
     if (!CryptAcquireContextW(&hProvider, 0, 0, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT | CRYPT_SILENT)) {
         fprintf(stderr, "error CryptAcquireContextW");
         exit(1);
@@ -213,25 +206,23 @@ static int get_cryptgenrandom_seed()
 
 #include <time.h>
 
-static int get_time_seed()
+static int get_time_seed(void)
 {
-    DEBUG_SEED("get_time_seed");
-
     return (int)time(NULL) * 433494437;
 }
 
 
 /* json_c_get_random_seed */
 
-int json_c_get_random_seed()
+int json_c_get_random_seed(void)
 {
-#if HAVE_RDRAND
+#ifdef HAVE_RDRAND
     if (has_rdrand()) return get_rdrand_seed();
 #endif
-#if HAVE_DEV_RANDOM
+#ifdef HAVE_DEV_RANDOM
     if (has_dev_urandom()) return get_dev_random_seed();
 #endif
-#if HAVE_CRYPTGENRANDOM
+#ifdef HAVE_CRYPTGENRANDOM
     return get_cryptgenrandom_seed();
 #endif
     return get_time_seed();

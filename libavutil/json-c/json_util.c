@@ -10,10 +10,10 @@
  */
 
 #include "config.h"
-#undef realloc
 
 #include "strerror_override.h"
 
+#include <inttypes.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -22,18 +22,9 @@
 #include <string.h>
 #include <ctype.h>
 
-#ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
-#endif /* HAVE_SYS_TYPES_H */
-
-#ifdef HAVE_SYS_STAT_H
 #include <sys/stat.h>
-#endif /* HAVE_SYS_STAT_H */
-
-#ifdef HAVE_FCNTL_H
 #include <fcntl.h>
-#endif /* HAVE_FCNTL_H */
-
 #ifdef HAVE_UNISTD_H
 # include <unistd.h>
 #endif /* HAVE_UNISTD_H */
@@ -48,15 +39,8 @@
 # include <io.h>
 #endif /* defined(WIN32) */
 
-#if !defined(HAVE_OPEN) && defined(WIN32)
-# define open _open
-#endif
-
-#include "snprintf_compat.h"
-
 #include "debug.h"
 #include "printbuf.h"
-#include "json_inttypes.h"
 #include "json_object.h"
 #include "json_tokener.h"
 #include "json_util.h"
@@ -72,6 +56,7 @@ const char *json_util_get_last_err()
 	return _last_err;
 }
 
+void _json_c_set_last_err(const char *err_fmt, ...);
 void _json_c_set_last_err(const char *err_fmt, ...)
 {
 	va_list ap;
@@ -206,17 +191,6 @@ int json_parse_int64(const char *buf, int64_t *retval)
 		*retval = val;
 	return ((val == 0 && errno != 0) || (end == buf)) ? 1 : 0;
 }
-
-#ifndef HAVE_REALLOC
-void* rpl_realloc(void* p, size_t n)
-{
-	if (n == 0)
-		n = 1;
-	if (p == 0)
-		return malloc(n);
-	return realloc(p, n);
-}
-#endif
 
 #define NELEM(a)        (sizeof(a) / sizeof(a[0]))
 static const char* json_type_name[] = {

@@ -16,6 +16,7 @@
 
 #include <assert.h>
 #include <ctype.h>
+#include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stddef.h>
@@ -26,17 +27,9 @@
 #include "printbuf.h"
 #include "linkhash.h"
 #include "arraylist.h"
-#include "json_inttypes.h"
 #include "json_object.h"
 #include "json_object_private.h"
 #include "json_util.h"
-#include "math_compat.h"
-#include "strdup_compat.h"
-#include "snprintf_compat.h"
-
-#if SIZEOF_LONG_LONG != SIZEOF_INT64_T
-#error "The long long type isn't 64-bits"
-#endif
 
 // Don't define this.  It's not thread-safe.
 /* #define REFCOUNT_DEBUG 1 */
