@@ -43,3 +43,6 @@ mpeg2video_prepared_128_5_q_dct: $(FFEDIT_SRC)/mpeg2video_prepared_128_5.rawvide
 	$(FFEDIT_SCRIPTS)/script.sh "$(FFEDIT_REF)/$@.ref" "$<" "$(FFEDIT_JSON)/$@.json" "-f q_dct" "dct_ac_sorter.py"
 mpeg2video_prepared_128_5_mb: $(FFEDIT_SRC)/mpeg2video_prepared_128_5.rawvideo
 	$(FFEDIT_SCRIPTS)/script.sh "$(FFEDIT_REF)/$@.ref" "$<" "$(FFEDIT_JSON)/$@.json" "-f mb" "mb_sorter.py"
+
+mpeg2video_bframes_2_mv: $(FFEDIT_SRC)/mpeg2video_bframes_2.rawvideo
+	$(FFEDIT_SCRIPTS)/script.sh "$(FFEDIT_REF)/$@.ref" "$<" "$(FFEDIT_JSON)/$@.json" "-f mv" "mv_sink_and_rise.py"

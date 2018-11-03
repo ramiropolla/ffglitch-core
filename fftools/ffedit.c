@@ -146,12 +146,38 @@ static void opt_filenames(void *optctx, const char *filename)
     }
 }
 
+static int sort_by_pkt_pos(const void *j1, const void *j2)
+{
+    json_object *const *jso1;
+    json_object *const *jso2;
+    size_t i1;
+    size_t i2;
+
+    jso1 = (json_object* const*) j1;
+    jso2 = (json_object* const*) j2;
+    if ( !*jso1 && !*jso2 )
+        return 0;
+    if ( !*jso1 )
+        return -1;
+    if ( !*jso2 )
+        return 1;
+
+    i1 = json_object_get_int(json_object_object_get(*jso1, "pkt_pos"));
+    i2 = json_object_get_int(json_object_object_get(*jso2, "pkt_pos"));
+
+    return i1 - i2;
+}
+
 static void close_files(FFEditOutputContext *ectx)
 {
     /* write output json file if needed */
     if ( export_fp != NULL )
     {
         const char *s;
+
+        for ( size_t i = 0; i < fctx->nb_streams; i++ )
+            json_object_array_sort(jstframes[i], sort_by_pkt_pos);
+
         s = json_object_to_json_string_ext(jroot, JSON_C_TO_STRING_PRETTY);
         fprintf(export_fp, "%s\n", s);
 
@@ -362,9 +388,11 @@ static int ffedit_decode(
         {
             json_object *jframes = jstframes[stream_index];
             json_object *jframe = json_object_new_object();
+            json_object *jpkt_pos = json_object_new_int64(iframe->pkt_pos);
             json_object *jpts = json_object_new_int64(iframe->pts);
             json_object *jdts = json_object_new_int64(iframe->pkt_dts);
 
+            json_object_object_add(jframe, "pkt_pos", jpkt_pos);
             json_object_object_add(jframe, "pts", jpts);
             json_object_object_add(jframe, "dts", jdts);
 
