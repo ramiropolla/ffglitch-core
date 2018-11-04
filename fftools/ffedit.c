@@ -6,6 +6,7 @@
 #include "libavutil/opt.h"
 #include "libavutil/avstring.h"
 #include "libavutil/ffversion.h"
+#include "libavutil/sha.h"
 #include "libavformat/ffedit.h"
 #include "libavcodec/ffedit.h"
 
@@ -43,6 +44,36 @@ static int selected_features[FFEDIT_FEAT_LAST];
 static int selected_features_idx[FFEDIT_FEAT_LAST];
 static int features_selected;
 static int opt_feature(void *optctx, const char *opt, const char *arg);
+
+static char nibble2char(uint8_t c)
+{
+    return c + (c > 9 ? ('a'-10) : '0');
+}
+
+static char *read_file(const char *fname, size_t *psize)
+{
+    size_t size;
+    char *buf;
+    FILE *fp;
+
+    fp = fopen(fname, "rb");
+    if ( fp == NULL )
+        return NULL;
+
+    fseek(fp, 0, SEEK_END);
+    size = ftell(fp);
+    fseek(fp, 0, SEEK_SET);
+
+    buf = malloc(size+1);
+    buf[size] = '\0';
+
+    fread(buf, size, 1, fp);
+    fclose(fp);
+
+    *psize = size;
+
+    return buf;
+}
 
 static const OptionDef options[] = {
     CMDUTILS_COMMON_OPTIONS
@@ -546,6 +577,8 @@ int main(int argc, char *argv[])
     {
         json_object *jfname = NULL;
         json_object *jfeatures = NULL;
+        size_t size;
+        char *buf;
 
         // TODO check if file exists before overwritting
         export_fp = fopen(export_fname, "w");
@@ -567,6 +600,33 @@ int main(int argc, char *argv[])
         jfname = json_object_new_string(av_basename(input_filename));
         json_object_object_add(jroot, "filename", jfname);
 
+        buf = read_file(input_filename, &size);
+        if ( buf != NULL )
+        {
+            json_object *jshasum = NULL;
+            struct AVSHA *sha;
+            char shasumstr[41];
+            uint8_t shasum[20];
+
+            sha = av_sha_alloc();
+            av_sha_init(sha, 160);
+            av_sha_update(sha, buf, size);
+            av_sha_final(sha, shasum);
+            av_free(sha);
+
+            free(buf);
+
+            for ( size_t i = 0; i < 20; i++ )
+            {
+                shasumstr[i*2+0] = nibble2char(shasum[i] >> 4);
+                shasumstr[i*2+1] = nibble2char(shasum[i] & 0xF);
+            }
+            shasumstr[40] = '\0';
+
+            jshasum = json_object_new_string(shasumstr);
+            json_object_object_add(jroot, "sha1sum", jshasum);
+        }
+
         jfeatures = json_object_new_array();
         for ( size_t i = 0; i < FFEDIT_FEAT_LAST; i++ )
         {
@@ -584,20 +644,11 @@ int main(int argc, char *argv[])
     }
     else if ( apply_fname != NULL )
     {
-        FILE *fp = fopen(apply_fname, "r");
         struct json_tokener *tok;
         size_t size;
         char *buf;
 
-        fseek(fp, 0, SEEK_END);
-        size = ftell(fp);
-        fseek(fp, 0, SEEK_SET);
-
-        buf = malloc(size + 1);
-        buf[size] = '\0';
-
-        fread(buf, size, 1, fp);
-        fclose(fp);
+        buf = read_file(apply_fname, &size);
 
         tok = json_tokener_new();
         jroot = json_tokener_parse_ex(tok, buf, size + 1);
