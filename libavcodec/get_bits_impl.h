@@ -23,186 +23,10 @@
  * bitstream reader API header.
  */
 
-#ifndef AVCODEC_GET_BITS_H
-#define AVCODEC_GET_BITS_H
+#include "get_bits_funcs.h"
+#include "get_bits_defines.h"
 
-#include <stdint.h>
-
-#include "libavutil/common.h"
-#include "libavutil/intreadwrite.h"
-#include "libavutil/log.h"
-#include "libavutil/avassert.h"
-#include "avcodec.h"
-#include "mathops.h"
-#include "vlc.h"
-
-/*
- * Safe bitstream reading:
- * optionally, the get_bits API can check to ensure that we
- * don't read past input buffer boundaries. This is protected
- * with CONFIG_SAFE_BITSTREAM_READER at the global level, and
- * then below that with UNCHECKED_BITSTREAM_READER at the per-
- * decoder level. This means that decoders that check internally
- * can "#define UNCHECKED_BITSTREAM_READER 1" to disable
- * overread checks.
- * Boundary checking causes a minor performance penalty so for
- * applications that won't want/need this, it can be disabled
- * globally using "#define CONFIG_SAFE_BITSTREAM_READER 0".
- */
-#ifndef UNCHECKED_BITSTREAM_READER
-#define UNCHECKED_BITSTREAM_READER !CONFIG_SAFE_BITSTREAM_READER
-#endif
-
-typedef struct GetBitContext {
-    const uint8_t *buffer, *buffer_end;
-    int index;
-    int size_in_bits;
-    int size_in_bits_plus8;
-} GetBitContext;
-
-static inline unsigned int get_bits(GetBitContext *s, int n);
-static inline unsigned int get_bits_long(GetBitContext *s, int n);
-static inline void skip_bits(GetBitContext *s, int n);
-static inline unsigned int show_bits(GetBitContext *s, int n);
-
-/* Bitstream reader API docs:
- * name
- *   arbitrary name which is used as prefix for the internal variables
- *
- * gb
- *   getbitcontext
- *
- * OPEN_READER(name, gb)
- *   load gb into local variables
- *
- * CLOSE_READER(name, gb)
- *   store local vars in gb
- *
- * UPDATE_CACHE(name, gb)
- *   Refill the internal cache from the bitstream.
- *   After this call at least MIN_CACHE_BITS will be available.
- *
- * GET_CACHE(name, gb)
- *   Will output the contents of the internal cache,
- *   next bit is MSB of 32 or 64 bits (FIXME 64 bits).
- *
- * SHOW_UBITS(name, gb, num)
- *   Will return the next num bits.
- *
- * SHOW_SBITS(name, gb, num)
- *   Will return the next num bits and do sign extension.
- *
- * SKIP_BITS(name, gb, num)
- *   Will skip over the next num bits.
- *   Note, this is equivalent to SKIP_CACHE; SKIP_COUNTER.
- *
- * SKIP_CACHE(name, gb, num)
- *   Will remove the next num bits from the cache (note SKIP_COUNTER
- *   MUST be called before UPDATE_CACHE / CLOSE_READER).
- *
- * SKIP_COUNTER(name, gb, num)
- *   Will increment the internal bit counter (see SKIP_CACHE & SKIP_BITS).
- *
- * LAST_SKIP_BITS(name, gb, num)
- *   Like SKIP_BITS, to be used if next call is UPDATE_CACHE or CLOSE_READER.
- *
- * BITS_LEFT(name, gb)
- *   Return the number of bits left
- *
- * For examples see get_bits, show_bits, skip_bits, get_vlc.
- */
-
-#if defined LONG_BITSTREAM_READER
-#   define MIN_CACHE_BITS 32
-#else
-#   define MIN_CACHE_BITS 25
-#endif
-
-#define OPEN_READER_NOSIZE(name, gb)            \
-    unsigned int name ## _index = (gb)->index;  \
-    unsigned int av_unused name ## _cache
-
-#if UNCHECKED_BITSTREAM_READER
-#define OPEN_READER(name, gb) OPEN_READER_NOSIZE(name, gb)
-
-#define BITS_AVAILABLE(name, gb) 1
-#else
-#define OPEN_READER(name, gb)                   \
-    OPEN_READER_NOSIZE(name, gb);               \
-    unsigned int name ## _size_plus8 = (gb)->size_in_bits_plus8
-
-#define BITS_AVAILABLE(name, gb) name ## _index < name ## _size_plus8
-#endif
-
-#define CLOSE_READER(name, gb) (gb)->index = name ## _index
-
-# ifdef LONG_BITSTREAM_READER
-
-# define UPDATE_CACHE_LE(name, gb) name ## _cache = \
-      AV_RL64((gb)->buffer + (name ## _index >> 3)) >> (name ## _index & 7)
-
-# define UPDATE_CACHE_BE(name, gb) name ## _cache = \
-      AV_RB64((gb)->buffer + (name ## _index >> 3)) >> (32 - (name ## _index & 7))
-
-#else
-
-# define UPDATE_CACHE_LE(name, gb) name ## _cache = \
-      AV_RL32((gb)->buffer + (name ## _index >> 3)) >> (name ## _index & 7)
-
-# define UPDATE_CACHE_BE(name, gb) name ## _cache = \
-      AV_RB32((gb)->buffer + (name ## _index >> 3)) << (name ## _index & 7)
-
-#endif
-
-
-#ifdef BITSTREAM_READER_LE
-
-# define UPDATE_CACHE(name, gb) UPDATE_CACHE_LE(name, gb)
-
-# define SKIP_CACHE(name, gb, num) name ## _cache >>= (num)
-
-#else
-
-# define UPDATE_CACHE(name, gb) UPDATE_CACHE_BE(name, gb)
-
-# define SKIP_CACHE(name, gb, num) name ## _cache <<= (num)
-
-#endif
-
-#if UNCHECKED_BITSTREAM_READER
-#   define SKIP_COUNTER(name, gb, num) name ## _index += (num)
-#else
-#   define SKIP_COUNTER(name, gb, num) \
-    name ## _index = FFMIN(name ## _size_plus8, name ## _index + (num))
-#endif
-
-#define BITS_LEFT(name, gb) ((int)((gb)->size_in_bits - name ## _index))
-
-#define SKIP_BITS(name, gb, num)                \
-    do {                                        \
-        SKIP_CACHE(name, gb, num);              \
-        SKIP_COUNTER(name, gb, num);            \
-    } while (0)
-
-#define LAST_SKIP_BITS(name, gb, num) SKIP_COUNTER(name, gb, num)
-
-#define SHOW_UBITS_LE(name, gb, num) zero_extend(name ## _cache, num)
-#define SHOW_SBITS_LE(name, gb, num) sign_extend(name ## _cache, num)
-
-#define SHOW_UBITS_BE(name, gb, num) NEG_USR32(name ## _cache, num)
-#define SHOW_SBITS_BE(name, gb, num) NEG_SSR32(name ## _cache, num)
-
-#ifdef BITSTREAM_READER_LE
-#   define SHOW_UBITS(name, gb, num) SHOW_UBITS_LE(name, gb, num)
-#   define SHOW_SBITS(name, gb, num) SHOW_SBITS_LE(name, gb, num)
-#else
-#   define SHOW_UBITS(name, gb, num) SHOW_UBITS_BE(name, gb, num)
-#   define SHOW_SBITS(name, gb, num) SHOW_SBITS_BE(name, gb, num)
-#endif
-
-#define GET_CACHE(name, gb) ((uint32_t) name ## _cache)
-
-static inline int get_bits_count(const GetBitContext *s)
+int get_bits_count(const GetBitContext *s)
 {
     return s->index;
 }
@@ -214,7 +38,7 @@ static inline int get_bits_count(const GetBitContext *s)
  *          from the start to overflow int32_t. Staying within the bitstream + padding
  *          is sufficient, too.
  */
-static inline void skip_bits_long(GetBitContext *s, int n)
+void skip_bits_long(GetBitContext *s, int n)
 {
     get_bits_long(s, n);
 }
@@ -224,7 +48,7 @@ static inline void skip_bits_long(GetBitContext *s, int n)
  * if MSB not set it is negative
  * @param n length in bits
  */
-static inline int get_xbits(GetBitContext *s, int n)
+int get_xbits(GetBitContext *s, int n)
 {
     register int sign;
     register int32_t cache;
@@ -238,7 +62,7 @@ static inline int get_xbits(GetBitContext *s, int n)
     return (NEG_USR32(sign ^ cache, n) ^ sign) - sign;
 }
 
-static inline int get_xbits_le(GetBitContext *s, int n)
+int get_xbits_le(GetBitContext *s, int n)
 {
     register int sign;
     register int32_t cache;
@@ -252,7 +76,7 @@ static inline int get_xbits_le(GetBitContext *s, int n)
     return (zero_extend(sign ^ cache, n) ^ sign) - sign;
 }
 
-static inline int get_sbits(GetBitContext *s, int n)
+int get_sbits(GetBitContext *s, int n)
 {
     register int tmp;
     OPEN_READER(re, s);
@@ -267,7 +91,7 @@ static inline int get_sbits(GetBitContext *s, int n)
 /**
  * Read 1-25 bits.
  */
-static inline unsigned int get_bits(GetBitContext *s, int n)
+unsigned int get_bits(GetBitContext *s, int n)
 {
     register unsigned int tmp;
     OPEN_READER(re, s);
@@ -283,12 +107,12 @@ static inline unsigned int get_bits(GetBitContext *s, int n)
 /**
  * Read 0-25 bits.
  */
-static av_always_inline int get_bitsz(GetBitContext *s, int n)
+int get_bitsz(GetBitContext *s, int n)
 {
     return n ? get_bits(s, n) : 0;
 }
 
-static inline unsigned int get_bits_le(GetBitContext *s, int n)
+unsigned int get_bits_le(GetBitContext *s, int n)
 {
     register int tmp;
     OPEN_READER(re, s);
@@ -303,7 +127,7 @@ static inline unsigned int get_bits_le(GetBitContext *s, int n)
 /**
  * Show 1-25 bits.
  */
-static inline unsigned int show_bits(GetBitContext *s, int n)
+unsigned int show_bits(GetBitContext *s, int n)
 {
     register unsigned int tmp;
     OPEN_READER_NOSIZE(re, s);
@@ -313,22 +137,22 @@ static inline unsigned int show_bits(GetBitContext *s, int n)
     return tmp;
 }
 
-static inline void skip_bits(GetBitContext *s, int n)
+void skip_bits(GetBitContext *s, int n)
 {
     get_bits(s, n);
 }
 
-static inline unsigned int get_bits1(GetBitContext *s)
+unsigned int get_bits1(GetBitContext *s)
 {
     return get_bits(s, 1);
 }
 
-static inline unsigned int show_bits1(GetBitContext *s)
+unsigned int show_bits1(GetBitContext *s)
 {
     return show_bits(s, 1);
 }
 
-static inline void skip_bits1(GetBitContext *s)
+void skip_bits1(GetBitContext *s)
 {
     skip_bits(s, 1);
 }
@@ -336,7 +160,7 @@ static inline void skip_bits1(GetBitContext *s)
 /**
  * Read 0-32 bits.
  */
-static inline unsigned int get_bits_long(GetBitContext *s, int n)
+unsigned int get_bits_long(GetBitContext *s, int n)
 {
     av_assert2(n>=0 && n<=32);
     if (!n) {
@@ -357,7 +181,7 @@ static inline unsigned int get_bits_long(GetBitContext *s, int n)
 /**
  * Read 0-64 bits.
  */
-static inline uint64_t get_bits64(GetBitContext *s, int n)
+uint64_t get_bits64(GetBitContext *s, int n)
 {
     if (n <= 32) {
         return get_bits_long(s, n);
@@ -375,7 +199,7 @@ static inline uint64_t get_bits64(GetBitContext *s, int n)
 /**
  * Read 0-32 bits as a signed integer.
  */
-static inline int get_sbits_long(GetBitContext *s, int n)
+int get_sbits_long(GetBitContext *s, int n)
 {
     // sign_extend(x, 0) is undefined
     if (!n)
@@ -387,7 +211,7 @@ static inline int get_sbits_long(GetBitContext *s, int n)
 /**
  * Show 0-32 bits.
  */
-static inline unsigned int show_bits_long(GetBitContext *s, int n)
+unsigned int show_bits_long(GetBitContext *s, int n)
 {
     if (n <= MIN_CACHE_BITS) {
         return show_bits(s, n);
@@ -397,7 +221,7 @@ static inline unsigned int show_bits_long(GetBitContext *s, int n)
     }
 }
 
-static inline int check_marker(void *logctx, GetBitContext *s, const char *msg)
+int check_marker(void *logctx, GetBitContext *s, const char *msg)
 {
     int bit = get_bits1(s);
     if (!bit)
@@ -407,6 +231,7 @@ static inline int check_marker(void *logctx, GetBitContext *s, const char *msg)
     return bit;
 }
 
+#define init_get_bits_xe AV_JOIN(GB_PREFIX, init_get_bits_xe)
 static inline int init_get_bits_xe(GetBitContext *s, const uint8_t *buffer,
                                    int bit_size, int is_le)
 {
@@ -438,7 +263,7 @@ static inline int init_get_bits_xe(GetBitContext *s, const uint8_t *buffer,
  * @param bit_size the size of the buffer in bits
  * @return 0 on success, AVERROR_INVALIDDATA if the buffer_size would overflow.
  */
-static inline int init_get_bits(GetBitContext *s, const uint8_t *buffer,
+int init_get_bits(GetBitContext *s, const uint8_t *buffer,
                                 int bit_size)
 {
 #ifdef BITSTREAM_READER_LE
@@ -456,115 +281,26 @@ static inline int init_get_bits(GetBitContext *s, const uint8_t *buffer,
  * @param byte_size the size of the buffer in bytes
  * @return 0 on success, AVERROR_INVALIDDATA if the buffer_size would overflow.
  */
-static inline int init_get_bits8(GetBitContext *s, const uint8_t *buffer,
-                                 int byte_size)
+int init_get_bits8(GetBitContext *s, const uint8_t *buffer, int byte_size)
 {
     if (byte_size > INT_MAX / 8 || byte_size < 0)
         byte_size = -1;
     return init_get_bits(s, buffer, byte_size * 8);
 }
 
-static inline int init_get_bits8_le(GetBitContext *s, const uint8_t *buffer,
-                                    int byte_size)
+int init_get_bits8_le(GetBitContext *s, const uint8_t *buffer, int byte_size)
 {
     if (byte_size > INT_MAX / 8 || byte_size < 0)
         byte_size = -1;
     return init_get_bits_xe(s, buffer, byte_size * 8, 1);
 }
 
-static inline const uint8_t *align_get_bits(GetBitContext *s)
+const uint8_t *align_get_bits(GetBitContext *s)
 {
     int n = -get_bits_count(s) & 7;
     if (n)
         skip_bits(s, n);
     return s->buffer + (s->index >> 3);
-}
-
-/**
- * If the vlc code is invalid and max_depth=1, then no bits will be removed.
- * If the vlc code is invalid and max_depth>1, then the number of bits removed
- * is undefined.
- */
-#define GET_VLC(code, name, gb, table, bits, max_depth)         \
-    do {                                                        \
-        int n, nb_bits;                                         \
-        unsigned int index;                                     \
-                                                                \
-        index = SHOW_UBITS(name, gb, bits);                     \
-        code  = table[index][0];                                \
-        n     = table[index][1];                                \
-                                                                \
-        if (max_depth > 1 && n < 0) {                           \
-            LAST_SKIP_BITS(name, gb, bits);                     \
-            UPDATE_CACHE(name, gb);                             \
-                                                                \
-            nb_bits = -n;                                       \
-                                                                \
-            index = SHOW_UBITS(name, gb, nb_bits) + code;       \
-            code  = table[index][0];                            \
-            n     = table[index][1];                            \
-            if (max_depth > 2 && n < 0) {                       \
-                LAST_SKIP_BITS(name, gb, nb_bits);              \
-                UPDATE_CACHE(name, gb);                         \
-                                                                \
-                nb_bits = -n;                                   \
-                                                                \
-                index = SHOW_UBITS(name, gb, nb_bits) + code;   \
-                code  = table[index][0];                        \
-                n     = table[index][1];                        \
-            }                                                   \
-        }                                                       \
-        SKIP_BITS(name, gb, n);                                 \
-    } while (0)
-
-#define GET_RL_VLC(level, run, name, gb, table, bits,  \
-                   max_depth, need_update)                      \
-    do {                                                        \
-        int n, nb_bits;                                         \
-        unsigned int index;                                     \
-                                                                \
-        index = SHOW_UBITS(name, gb, bits);                     \
-        level = table[index].level;                             \
-        n     = table[index].len;                               \
-                                                                \
-        if (max_depth > 1 && n < 0) {                           \
-            SKIP_BITS(name, gb, bits);                          \
-            if (need_update) {                                  \
-                UPDATE_CACHE(name, gb);                         \
-            }                                                   \
-                                                                \
-            nb_bits = -n;                                       \
-                                                                \
-            index = SHOW_UBITS(name, gb, nb_bits) + level;      \
-            level = table[index].level;                         \
-            n     = table[index].len;                           \
-            if (max_depth > 2 && n < 0) {                       \
-                LAST_SKIP_BITS(name, gb, nb_bits);              \
-                if (need_update) {                              \
-                    UPDATE_CACHE(name, gb);                     \
-                }                                               \
-                nb_bits = -n;                                   \
-                                                                \
-                index = SHOW_UBITS(name, gb, nb_bits) + level;  \
-                level = table[index].level;                     \
-                n     = table[index].len;                       \
-            }                                                   \
-        }                                                       \
-        run = table[index].run;                                 \
-        SKIP_BITS(name, gb, n);                                 \
-    } while (0)
-
-/* Return the LUT element for the given bitstream configuration. */
-static inline int set_idx(GetBitContext *s, int code, int *n, int *nb_bits,
-                          VLC_TYPE (*table)[2])
-{
-    unsigned idx;
-
-    *nb_bits = -*n;
-    idx = show_bits(s, *nb_bits) + code;
-    *n = table[idx][1];
-
-    return table[idx][0];
 }
 
 /**
@@ -576,8 +312,7 @@ static inline int set_idx(GetBitContext *s, int code, int *n, int *nb_bits,
  *                  = (max_vlc_length + bits - 1) / bits
  * @returns the code parsed or -1 if no vlc matches
  */
-static av_always_inline int get_vlc2(GetBitContext *s, VLC_TYPE (*table)[2],
-                                     int bits, int max_depth)
+int get_vlc2(GetBitContext *s, VLC_TYPE (*table)[2], int bits, int max_depth)
 {
     int code;
 
@@ -591,7 +326,7 @@ static av_always_inline int get_vlc2(GetBitContext *s, VLC_TYPE (*table)[2],
     return code;
 }
 
-static av_always_inline void get_rl_vlc2(
+void get_rl_vlc2(
         int *plevel,
         int *prun,
         GetBitContext *s,
@@ -613,7 +348,7 @@ static av_always_inline void get_rl_vlc2(
     *prun = run;
 }
 
-static av_always_inline void get_cfhd_rl_vlc(
+void get_cfhd_rl_vlc(
         int *plevel,
         int *prun,
         GetBitContext *s,
@@ -635,7 +370,7 @@ static av_always_inline void get_cfhd_rl_vlc(
     *prun = run;
 }
 
-static inline int decode012(GetBitContext *gb)
+int decode012(GetBitContext *gb)
 {
     int n;
     n = get_bits1(gb);
@@ -645,7 +380,7 @@ static inline int decode012(GetBitContext *gb)
         return get_bits1(gb) + 1;
 }
 
-static inline int decode210(GetBitContext *gb)
+int decode210(GetBitContext *gb)
 {
     if (get_bits1(gb))
         return 0;
@@ -653,12 +388,12 @@ static inline int decode210(GetBitContext *gb)
         return 2 - get_bits1(gb);
 }
 
-static inline int get_bits_left(GetBitContext *gb)
+int get_bits_left(GetBitContext *gb)
 {
     return gb->size_in_bits - get_bits_count(gb);
 }
 
-static inline int skip_1stop_8data_bits(GetBitContext *gb)
+int skip_1stop_8data_bits(GetBitContext *gb)
 {
     if (get_bits_left(gb) <= 0)
         return AVERROR_INVALIDDATA;
@@ -672,4 +407,4 @@ static inline int skip_1stop_8data_bits(GetBitContext *gb)
     return 0;
 }
 
-#endif /* AVCODEC_GET_BITS_H */
+#include "get_bits_undef.h"

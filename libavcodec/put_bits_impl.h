@@ -23,21 +23,7 @@
  * bitstream writer API
  */
 
-#ifndef AVCODEC_PUT_BITS_H
-#define AVCODEC_PUT_BITS_H
-
-#include <stdint.h>
-#include <stddef.h>
-
-#include "libavutil/intreadwrite.h"
-#include "libavutil/avassert.h"
-
-typedef struct PutBitContext {
-    uint32_t bit_buf;
-    int bit_left;
-    uint8_t *buf, *buf_ptr, *buf_end;
-    int size_in_bits;
-} PutBitContext;
+#include "put_bits_funcs.h"
 
 /**
  * Initialize the PutBitContext s.
@@ -45,8 +31,7 @@ typedef struct PutBitContext {
  * @param buffer the buffer where to put bits
  * @param buffer_size the size in bytes of buffer
  */
-static inline void init_put_bits(PutBitContext *s, uint8_t *buffer,
-                                 int buffer_size)
+void init_put_bits(PutBitContext *s, uint8_t *buffer, int buffer_size)
 {
     if (buffer_size < 0) {
         buffer_size = 0;
@@ -64,7 +49,7 @@ static inline void init_put_bits(PutBitContext *s, uint8_t *buffer,
 /**
  * @return the total number of bits written to the bitstream.
  */
-static inline int put_bits_count(PutBitContext *s)
+int put_bits_count(PutBitContext *s)
 {
     return (s->buf_ptr - s->buf) * 8 + 32 - s->bit_left;
 }
@@ -76,8 +61,7 @@ static inline int put_bits_count(PutBitContext *s)
  * @param buffer_size the size in bytes of buffer,
  *                    must be large enough to hold everything written so far
  */
-static inline void rebase_put_bits(PutBitContext *s, uint8_t *buffer,
-                                   int buffer_size)
+void rebase_put_bits(PutBitContext *s, uint8_t *buffer, int buffer_size)
 {
     av_assert0(8*buffer_size >= put_bits_count(s));
 
@@ -90,7 +74,7 @@ static inline void rebase_put_bits(PutBitContext *s, uint8_t *buffer,
 /**
  * @return the number of bits available in the bitstream.
  */
-static inline int put_bits_left(PutBitContext* s)
+int put_bits_left(PutBitContext* s)
 {
     return (s->buf_end - s->buf_ptr) * 8 - 32 + s->bit_left;
 }
@@ -98,7 +82,7 @@ static inline int put_bits_left(PutBitContext* s)
 /**
  * Pad the end of the output stream with zeros.
  */
-static inline void flush_put_bits(PutBitContext *s)
+void flush_put_bits(PutBitContext *s)
 {
 #ifndef BITSTREAM_WRITER_LE
     if (s->bit_left < 32)
@@ -119,7 +103,7 @@ static inline void flush_put_bits(PutBitContext *s)
     s->bit_buf  = 0;
 }
 
-static inline void flush_put_bits_le(PutBitContext *s)
+void flush_put_bits_le(PutBitContext *s)
 {
     while (s->bit_left < 32) {
         av_assert0(s->buf_ptr < s->buf_end);
@@ -131,37 +115,11 @@ static inline void flush_put_bits_le(PutBitContext *s)
     s->bit_buf  = 0;
 }
 
-#ifdef BITSTREAM_WRITER_LE
-#define avpriv_align_put_bits align_put_bits_unsupported_here
-#define avpriv_put_string ff_put_string_unsupported_here
-#define avpriv_copy_bits avpriv_copy_bits_unsupported_here
-#else
-/**
- * Pad the bitstream with zeros up to the next byte boundary.
- */
-void avpriv_align_put_bits(PutBitContext *s);
-
-/**
- * Put the string string in the bitstream.
- *
- * @param terminate_string 0-terminates the written string if value is 1
- */
-void avpriv_put_string(PutBitContext *pb, const char *string,
-                       int terminate_string);
-
-/**
- * Copy the content of src to the bitstream.
- *
- * @param length the number of bits of src to copy
- */
-void avpriv_copy_bits(PutBitContext *pb, const uint8_t *src, int length);
-#endif
-
 /**
  * Write up to 31 bits into a bitstream.
  * Use put_bits32 to write 32 bits.
  */
-static inline void put_bits(PutBitContext *s, int n, unsigned int value)
+void put_bits(PutBitContext *s, int n, unsigned int value)
 {
     unsigned int bit_buf;
     int bit_left;
@@ -209,7 +167,7 @@ static inline void put_bits(PutBitContext *s, int n, unsigned int value)
     s->bit_left = bit_left;
 }
 
-static inline void put_bits_le(PutBitContext *s, int n, unsigned int value)
+void put_bits_le(PutBitContext *s, int n, unsigned int value)
 {
     unsigned int bit_buf;
     int bit_left;
@@ -237,7 +195,7 @@ static inline void put_bits_le(PutBitContext *s, int n, unsigned int value)
     s->bit_left = bit_left;
 }
 
-static inline void put_sbits(PutBitContext *pb, int n, int32_t value)
+void put_sbits(PutBitContext *pb, int n, int32_t value)
 {
     av_assert2(n >= 0 && n <= 31);
 
@@ -247,7 +205,7 @@ static inline void put_sbits(PutBitContext *pb, int n, int32_t value)
 /**
  * Write exactly 32 bits into a bitstream.
  */
-static void av_unused put_bits32(PutBitContext *s, uint32_t value)
+void put_bits32(PutBitContext *s, uint32_t value)
 {
     unsigned int bit_buf;
     int bit_left;
@@ -285,7 +243,7 @@ static void av_unused put_bits32(PutBitContext *s, uint32_t value)
 /**
  * Write up to 64 bits into a bitstream.
  */
-static inline void put_bits64(PutBitContext *s, int n, uint64_t value)
+void put_bits64(PutBitContext *s, int n, uint64_t value)
 {
     av_assert2((n == 64) || (n < 64 && value < (UINT64_C(1) << n)));
 
@@ -321,7 +279,7 @@ static inline void put_bits64(PutBitContext *s, int n, uint64_t value)
  * Return the pointer to the byte where the bitstream writer will put
  * the next bit.
  */
-static inline uint8_t *put_bits_ptr(PutBitContext *s)
+uint8_t *put_bits_ptr(PutBitContext *s)
 {
     return s->buf_ptr;
 }
@@ -330,7 +288,7 @@ static inline uint8_t *put_bits_ptr(PutBitContext *s)
  * Skip the given number of bytes.
  * PutBitContext must be flushed & aligned to a byte boundary before calling this.
  */
-static inline void skip_put_bytes(PutBitContext *s, int n)
+void skip_put_bytes(PutBitContext *s, int n)
 {
     av_assert2((put_bits_count(s) & 7) == 0);
     av_assert2(s->bit_left == 32);
@@ -343,7 +301,7 @@ static inline void skip_put_bytes(PutBitContext *s, int n)
  * Must only be used if the actual values in the bitstream do not matter.
  * If n is 0 the behavior is undefined.
  */
-static inline void skip_put_bits(PutBitContext *s, int n)
+void skip_put_bits(PutBitContext *s, int n)
 {
     s->bit_left -= n;
     s->buf_ptr  -= 4 * (s->bit_left >> 5);
@@ -355,11 +313,9 @@ static inline void skip_put_bits(PutBitContext *s, int n)
  *
  * @param size the new size in bytes of the buffer where to put bits
  */
-static inline void set_put_bits_buffer_size(PutBitContext *s, int size)
+void set_put_bits_buffer_size(PutBitContext *s, int size)
 {
     av_assert0(size <= INT_MAX/8 - 32);
     s->buf_end = s->buf + size;
     s->size_in_bits = 8*size;
 }
-
-#endif /* AVCODEC_PUT_BITS_H */
