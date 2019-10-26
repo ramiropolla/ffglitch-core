@@ -100,15 +100,10 @@ static inline int asv2_get_vlc2(GetBitContext *gb, const VLCElem *table, int bit
     unsigned int index;
     int code, n;
 
-    OPEN_READER(re, gb);
-    UPDATE_CACHE_LE(re, gb);
-
-    index = SHOW_UBITS_LE(re, gb, bits);
+    index = show_bits_le(gb, bits);
     code  = table[index].sym;
     n     = table[index].len;
-    LAST_SKIP_BITS(re, gb, n);
-
-    CLOSE_READER(re, gb);
+    skip_bits(gb, n);
 
     return code;
 }

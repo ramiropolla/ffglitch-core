@@ -96,12 +96,6 @@ enum CFHDParam {
 #define SUBBAND_COUNT 10
 #define SUBBAND_COUNT_3D 17
 
-typedef struct CFHD_RL_VLC_ELEM {
-    int16_t level;
-    int8_t len;
-    uint16_t run;
-} CFHD_RL_VLC_ELEM;
-
 #define DWT_LEVELS 3
 #define DWT_LEVELS_3D 6
 

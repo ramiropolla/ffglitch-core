@@ -806,17 +806,14 @@ static int cfhd_decode(AVCodecContext *avctx, AVFrame *pic,
             if (ret < 0)
                 goto end;
             {
-                OPEN_READER(re, &s->gb);
-
                 const int lossless = s->band_encoding == 5;
 
                 if (s->codebook == 0 && s->transform_type == 2 && s->subband_num_actual == 7)
                     s->codebook = 1;
+
                 if (!s->codebook) {
                     while (1) {
-                        UPDATE_CACHE(re, &s->gb);
-                        GET_RL_VLC(level, run, re, &s->gb, s->table_9_rl_vlc,
-                                   VLC_BITS, 3, 1);
+                        get_cfhd_rl_vlc(&level, &run, &s->gb, s->table_9_rl_vlc, VLC_BITS, 3, 1);
 
                         /* escape */
                         if (!run)
@@ -845,9 +842,7 @@ static int cfhd_decode(AVCodecContext *avctx, AVFrame *pic,
                     }
                 } else {
                     while (1) {
-                        UPDATE_CACHE(re, &s->gb);
-                        GET_RL_VLC(level, run, re, &s->gb, s->table_18_rl_vlc,
-                                   VLC_BITS, 3, 1);
+                        get_cfhd_rl_vlc(&level, &run, &s->gb, s->table_18_rl_vlc, VLC_BITS, 3, 1);
 
                         /* escape */
                         if (!run)
@@ -875,7 +870,6 @@ static int cfhd_decode(AVCodecContext *avctx, AVFrame *pic,
                         }
                     }
                 }
-                CLOSE_READER(re, &s->gb);
             }
 
             if (count > expected) {

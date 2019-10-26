@@ -301,6 +301,16 @@ static av_always_inline int get_bitsz(GetBitContext *s, int n)
     return n ? get_bits(s, n) : 0;
 }
 
+static inline unsigned int show_bits_le(GetBitContext *s, int n)
+{
+    register unsigned int tmp;
+    OPEN_READER_NOSIZE(re, s);
+    av_assert2(n>0 && n<=25);
+    UPDATE_CACHE_LE(re, s);
+    tmp = SHOW_UBITS_LE(re, s, n);
+    return tmp;
+}
+
 static inline unsigned int get_bits_le(GetBitContext *s, int n)
 {
     register int tmp;
@@ -620,6 +630,50 @@ static inline int get_vlc_multi(GetBitContext *s, uint8_t *dst,
 {
     dst[0] = get_vlc2(s, table, bits, max_depth);
     return 1;
+}
+
+static av_always_inline void get_rl_vlc2(
+        int *plevel,
+        int *prun,
+        GetBitContext *s,
+        const RL_VLC_ELEM *table,
+        int bits,
+        int max_depth,
+        int need_update)
+{
+    int level, run;
+
+    OPEN_READER(re, s);
+    UPDATE_CACHE(re, s);
+
+    GET_RL_VLC(level, run, re, s, table, bits, max_depth, need_update);
+
+    CLOSE_READER(re, s);
+
+    *plevel = level;
+    *prun = run;
+}
+
+static av_always_inline void get_cfhd_rl_vlc(
+        int *plevel,
+        int *prun,
+        GetBitContext *s,
+        const CFHD_RL_VLC_ELEM *table,
+        int bits,
+        int max_depth,
+        int need_update)
+{
+    int level, run;
+
+    OPEN_READER(re, s);
+    UPDATE_CACHE(re, s);
+
+    GET_RL_VLC(level, run, re, s, table, bits, max_depth, need_update);
+
+    CLOSE_READER(re, s);
+
+    *plevel = level;
+    *prun = run;
 }
 
 static inline int decode012(GetBitContext *gb)
