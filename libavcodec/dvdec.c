@@ -207,8 +207,8 @@ static void dv_decode_ac(GetBitContext *gb, BlockInfo *mb, int16_t *block)
     int partial_bit_count        = mb->partial_bit_count;
     int level, run, vlc_len, index;
 
-    OPEN_READER_NOSIZE(re, gb);
-    UPDATE_CACHE(re, gb);
+    uint32_t re_cache = show_bits(gb, 16) << 16;
+    int re_index = gb->index;
 
     /* if we must parse a partial VLC, we do it here */
     if (partial_bit_count > 0) {
@@ -221,7 +221,7 @@ static void dv_decode_ac(GetBitContext *gb, BlockInfo *mb, int16_t *block)
     /* get the AC coefficients until last_index is reached */
     for (;;) {
         ff_dlog(NULL, "%2d: bits=%04"PRIx32" index=%u\n",
-                pos, SHOW_UBITS(re, gb, 16), re_index);
+                pos, re_cache >> 16, re_index);
         /* our own optimized GET_RL_VLC */
         index   = NEG_USR32(re_cache, TEX_VLC_BITS);
         vlc_len = ff_dv_rl_vlc[index].len;
@@ -252,9 +252,10 @@ static void dv_decode_ac(GetBitContext *gb, BlockInfo *mb, int16_t *block)
                 dv_iweight_bits;
         block[scan_table[pos]] = level;
 
-        UPDATE_CACHE(re, gb);
+        gb->index = re_index;
+        re_cache = show_bits(gb, 16) << 16;
     }
-    CLOSE_READER(re, gb);
+    gb->index = re_index;
     mb->pos = pos;
 }
 

@@ -1705,7 +1705,6 @@ static int decode_spectrum_and_dequant(AACContext *ac, INTFLOAT coef[1024],
 #endif /* !USE_FIXED */
                 const uint16_t *cb_vector_idx = ff_aac_codebook_vector_idx[cbt_m1];
                 VLC_TYPE (*vlc_tab)[2] = vlc_spectral[cbt_m1].table;
-                OPEN_READER(re, gb);
 
                 switch (cbt_m1 >> 1) {
                 case 0:
@@ -1717,8 +1716,7 @@ static int decode_spectrum_and_dequant(AACContext *ac, INTFLOAT coef[1024],
                             int code;
                             unsigned cb_idx;
 
-                            UPDATE_CACHE(re, gb);
-                            GET_VLC(code, re, gb, vlc_tab, 8, 2);
+                            code = get_vlc2(gb, vlc_tab, 8, 2);
                             cb_idx = cb_vector_idx[code];
 #if USE_FIXED
                             cf = DEC_SQUAD(cf, cb_idx);
@@ -1740,12 +1738,11 @@ static int decode_spectrum_and_dequant(AACContext *ac, INTFLOAT coef[1024],
                             unsigned cb_idx;
                             uint32_t bits;
 
-                            UPDATE_CACHE(re, gb);
-                            GET_VLC(code, re, gb, vlc_tab, 8, 2);
+                            code = get_vlc2(gb, vlc_tab, 8, 2);
                             cb_idx = cb_vector_idx[code];
                             nnz = cb_idx >> 8 & 15;
-                            bits = nnz ? GET_CACHE(re, gb) : 0;
-                            LAST_SKIP_BITS(re, gb, nnz);
+                            bits = nnz ? (show_bits(gb, MIN_CACHE_BITS) << (32-MIN_CACHE_BITS)) : 0;
+                            skip_bits(gb, nnz);
 #if USE_FIXED
                             cf = DEC_UQUAD(cf, cb_idx, bits);
 #else
@@ -1764,8 +1761,7 @@ static int decode_spectrum_and_dequant(AACContext *ac, INTFLOAT coef[1024],
                             int code;
                             unsigned cb_idx;
 
-                            UPDATE_CACHE(re, gb);
-                            GET_VLC(code, re, gb, vlc_tab, 8, 2);
+                            code = get_vlc2(gb, vlc_tab, 8, 2);
                             cb_idx = cb_vector_idx[code];
 #if USE_FIXED
                             cf = DEC_SPAIR(cf, cb_idx);
@@ -1788,12 +1784,10 @@ static int decode_spectrum_and_dequant(AACContext *ac, INTFLOAT coef[1024],
                             unsigned cb_idx;
                             unsigned sign;
 
-                            UPDATE_CACHE(re, gb);
-                            GET_VLC(code, re, gb, vlc_tab, 8, 2);
+                            code = get_vlc2(gb, vlc_tab, 8, 2);
                             cb_idx = cb_vector_idx[code];
                             nnz = cb_idx >> 8 & 15;
-                            sign = nnz ? SHOW_UBITS(re, gb, nnz) << (cb_idx >> 12) : 0;
-                            LAST_SKIP_BITS(re, gb, nnz);
+                            sign = nnz ? get_bits(gb, nnz) << (cb_idx >> 12) : 0;
 #if USE_FIXED
                             cf = DEC_UPAIR(cf, cb_idx, sign);
 #else
@@ -1821,8 +1815,7 @@ static int decode_spectrum_and_dequant(AACContext *ac, INTFLOAT coef[1024],
                             uint32_t bits;
                             int j;
 
-                            UPDATE_CACHE(re, gb);
-                            GET_VLC(code, re, gb, vlc_tab, 8, 2);
+                            code = get_vlc2(gb, vlc_tab, 8, 2);
 
                             if (!code) {
                                 *icf++ = 0;
@@ -1833,8 +1826,7 @@ static int decode_spectrum_and_dequant(AACContext *ac, INTFLOAT coef[1024],
                             cb_idx = cb_vector_idx[code];
                             nnz = cb_idx >> 12;
                             nzt = cb_idx >> 8;
-                            bits = SHOW_UBITS(re, gb, nnz) << (32-nnz);
-                            LAST_SKIP_BITS(re, gb, nnz);
+                            bits = get_bits(gb, nnz) << (32-nnz);
 
                             for (j = 0; j < 2; j++) {
                                 if (nzt & 1<<j) {
@@ -1842,8 +1834,7 @@ static int decode_spectrum_and_dequant(AACContext *ac, INTFLOAT coef[1024],
                                     int n;
                                     /* The total length of escape_sequence must be < 22 bits according
                                        to the specification (i.e. max is 111111110xxxxxxxxxxxx). */
-                                    UPDATE_CACHE(re, gb);
-                                    b = GET_CACHE(re, gb);
+                                    b = show_bits(gb, MIN_CACHE_BITS) << (32-MIN_CACHE_BITS);
                                     b = 31 - av_log2(~b);
 
                                     if (b > 8) {
@@ -1851,10 +1842,9 @@ static int decode_spectrum_and_dequant(AACContext *ac, INTFLOAT coef[1024],
                                         return AVERROR_INVALIDDATA;
                                     }
 
-                                    SKIP_BITS(re, gb, b + 1);
+                                    skip_bits(gb, b + 1);
                                     b += 4;
-                                    n = (1 << b) + SHOW_UBITS(re, gb, b);
-                                    LAST_SKIP_BITS(re, gb, b);
+                                    n = (1 << b) + get_bits(gb, b);
 #if USE_FIXED
                                     v = n;
                                     if (bits & 1U<<31)
@@ -1884,8 +1874,6 @@ static int decode_spectrum_and_dequant(AACContext *ac, INTFLOAT coef[1024],
 #endif /* !USE_FIXED */
                     }
                 }
-
-                CLOSE_READER(re, gb);
             }
         }
         coef += g_len << 7;

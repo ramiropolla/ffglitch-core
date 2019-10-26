@@ -145,25 +145,23 @@ static inline int mpeg1_decode_block_inter(MpegEncContext *s,
     const int qscale             = s->qscale;
 
     {
-        OPEN_READER(re, &s->gb);
         i = -1;
         // special case for first coefficient, no need to add second VLC table
-        UPDATE_CACHE(re, &s->gb);
-        if (((int32_t) GET_CACHE(re, &s->gb)) < 0) {
+        if ( show_bits1(&s->gb) ) {
+            skip_bits1(&s->gb);
             level = (3 * qscale * quant_matrix[0]) >> 5;
             level = (level - 1) | 1;
-            if (GET_CACHE(re, &s->gb) & 0x40000000)
+            if ( get_bits1(&s->gb) )
                 level = -level;
             block[0] = level;
             i++;
-            SKIP_BITS(re, &s->gb, 2);
-            if (((int32_t) GET_CACHE(re, &s->gb)) <= (int32_t) 0xBFFFFFFF)
+            if ( show_bits(&s->gb, 2) == 2 )
                 goto end;
         }
         /* now quantify & encode AC coefficients */
         for (;;) {
-            GET_RL_VLC(level, run, re, &s->gb, rl->rl_vlc[0],
-                       TEX_VLC_BITS, 2, 0);
+            get_rl_vlc2(&level, &run, &s->gb, rl->rl_vlc[0],
+                        TEX_VLC_BITS, 2, 0);
 
             if (level != 0) {
                 i += run;
@@ -172,22 +170,16 @@ static inline int mpeg1_decode_block_inter(MpegEncContext *s,
                 j = scantable[i];
                 level = ((level * 2 + 1) * qscale * quant_matrix[j]) >> 5;
                 level = (level - 1) | 1;
-                level = (level ^ SHOW_SBITS(re, &s->gb, 1)) -
-                        SHOW_SBITS(re, &s->gb, 1);
-                SKIP_BITS(re, &s->gb, 1);
+                if ( get_bits1(&s->gb) )
+                    level = -level;
             } else {
                 /* escape */
-                run = SHOW_UBITS(re, &s->gb, 6) + 1;
-                LAST_SKIP_BITS(re, &s->gb, 6);
-                UPDATE_CACHE(re, &s->gb);
-                level = SHOW_SBITS(re, &s->gb, 8);
-                SKIP_BITS(re, &s->gb, 8);
+                run = get_bits(&s->gb, 6) + 1;
+                level = get_sbits(&s->gb, 8);
                 if (level == -128) {
-                    level = SHOW_UBITS(re, &s->gb, 8) - 256;
-                    SKIP_BITS(re, &s->gb, 8);
+                    level = get_bits(&s->gb, 8) - 256;
                 } else if (level == 0) {
-                    level = SHOW_UBITS(re, &s->gb, 8);
-                    SKIP_BITS(re, &s->gb, 8);
+                    level = get_bits(&s->gb, 8);
                 }
                 i += run;
                 if (i > MAX_INDEX)
@@ -205,13 +197,11 @@ static inline int mpeg1_decode_block_inter(MpegEncContext *s,
             }
 
             block[j] = level;
-            if (((int32_t) GET_CACHE(re, &s->gb)) <= (int32_t) 0xBFFFFFFF)
+            if ( show_bits(&s->gb, 2) == 2 )
                 break;
-            UPDATE_CACHE(re, &s->gb);
         }
 end:
-        LAST_SKIP_BITS(re, &s->gb, 2);
-        CLOSE_READER(re, &s->gb);
+        skip_bits(&s->gb, 2);
     }
 
     check_scantable_index(s, i);
@@ -233,7 +223,6 @@ static inline int mpeg2_decode_block_non_intra(MpegEncContext *s,
     mismatch = 1;
 
     {
-        OPEN_READER(re, &s->gb);
         i = -1;
         if (n < 4)
             quant_matrix = s->inter_matrix;
@@ -241,23 +230,22 @@ static inline int mpeg2_decode_block_non_intra(MpegEncContext *s,
             quant_matrix = s->chroma_inter_matrix;
 
         // Special case for first coefficient, no need to add second VLC table.
-        UPDATE_CACHE(re, &s->gb);
-        if (((int32_t) GET_CACHE(re, &s->gb)) < 0) {
+        if ( show_bits1(&s->gb) ) {
+            skip_bits1(&s->gb);
             level = (3 * qscale * quant_matrix[0]) >> 5;
-            if (GET_CACHE(re, &s->gb) & 0x40000000)
+            if ( get_bits1(&s->gb) )
                 level = -level;
             block[0]  = level;
             mismatch ^= level;
             i++;
-            SKIP_BITS(re, &s->gb, 2);
-            if (((int32_t) GET_CACHE(re, &s->gb)) <= (int32_t) 0xBFFFFFFF)
+            if ( show_bits(&s->gb, 2) == 2 )
                 goto end;
         }
 
         /* now quantify & encode AC coefficients */
         for (;;) {
-            GET_RL_VLC(level, run, re, &s->gb, rl->rl_vlc[0],
-                       TEX_VLC_BITS, 2, 0);
+            get_rl_vlc2(&level, &run, &s->gb, rl->rl_vlc[0],
+                        TEX_VLC_BITS, 2, 0);
 
             if (level != 0) {
                 i += run;
@@ -265,16 +253,12 @@ static inline int mpeg2_decode_block_non_intra(MpegEncContext *s,
                     break;
                 j = scantable[i];
                 level = ((level * 2 + 1) * qscale * quant_matrix[j]) >> 5;
-                level = (level ^ SHOW_SBITS(re, &s->gb, 1)) -
-                        SHOW_SBITS(re, &s->gb, 1);
-                SKIP_BITS(re, &s->gb, 1);
+                if ( get_bits1(&s->gb) )
+                    level = -level;
             } else {
                 /* escape */
-                run = SHOW_UBITS(re, &s->gb, 6) + 1;
-                LAST_SKIP_BITS(re, &s->gb, 6);
-                UPDATE_CACHE(re, &s->gb);
-                level = SHOW_SBITS(re, &s->gb, 12);
-                SKIP_BITS(re, &s->gb, 12);
+                run = get_bits(&s->gb, 6) + 1;
+                level = get_sbits(&s->gb, 12);
 
                 i += run;
                 if (i > MAX_INDEX)
@@ -290,13 +274,11 @@ static inline int mpeg2_decode_block_non_intra(MpegEncContext *s,
 
             mismatch ^= level;
             block[j]  = level;
-            if (((int32_t) GET_CACHE(re, &s->gb)) <= (int32_t) 0xBFFFFFFF)
+            if ( show_bits(&s->gb, 2) == 2 )
                 break;
-            UPDATE_CACHE(re, &s->gb);
         }
 end:
-        LAST_SKIP_BITS(re, &s->gb, 2);
-        CLOSE_READER(re, &s->gb);
+        skip_bits(&s->gb, 2);
     }
     block[63] ^= (mismatch & 1);
 
@@ -341,12 +323,10 @@ static inline int mpeg2_decode_block_intra(MpegEncContext *s,
         rl = &ff_rl_mpeg1;
 
     {
-        OPEN_READER(re, &s->gb);
         /* now quantify & encode AC coefficients */
         for (;;) {
-            UPDATE_CACHE(re, &s->gb);
-            GET_RL_VLC(level, run, re, &s->gb, rl->rl_vlc[0],
-                       TEX_VLC_BITS, 2, 0);
+            get_rl_vlc2(&level, &run, &s->gb, rl->rl_vlc[0],
+                        TEX_VLC_BITS, 2, 0);
 
             if (level == 127) {
                 break;
@@ -356,16 +336,12 @@ static inline int mpeg2_decode_block_intra(MpegEncContext *s,
                     break;
                 j = scantable[i];
                 level = (level * qscale * quant_matrix[j]) >> 4;
-                level = (level ^ SHOW_SBITS(re, &s->gb, 1)) -
-                        SHOW_SBITS(re, &s->gb, 1);
-                LAST_SKIP_BITS(re, &s->gb, 1);
+                if ( get_bits1(&s->gb) )
+                    level = -level;
             } else {
                 /* escape */
-                run = SHOW_UBITS(re, &s->gb, 6) + 1;
-                LAST_SKIP_BITS(re, &s->gb, 6);
-                UPDATE_CACHE(re, &s->gb);
-                level = SHOW_SBITS(re, &s->gb, 12);
-                SKIP_BITS(re, &s->gb, 12);
+                run = get_bits(&s->gb, 6) + 1;
+                level = get_sbits(&s->gb, 12);
                 i += run;
                 if (i > MAX_INDEX)
                     break;
@@ -381,7 +357,6 @@ static inline int mpeg2_decode_block_intra(MpegEncContext *s,
             mismatch ^= level;
             block[j]  = level;
         }
-        CLOSE_READER(re, &s->gb);
     }
     block[63] ^= mismatch & 1;
 

@@ -33,12 +33,6 @@
 #define VLC_BITS       9
 #define SUBBAND_COUNT 10
 
-typedef struct CFHD_RL_VLC_ELEM {
-    int16_t level;
-    int8_t len;
-    uint16_t run;
-} CFHD_RL_VLC_ELEM;
-
 #define DWT_LEVELS 3
 
 typedef struct SubBand {

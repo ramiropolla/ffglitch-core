@@ -713,12 +713,9 @@ static int cfhd_decode(AVCodecContext *avctx, void *data, int *got_frame,
 
             init_get_bits(&s->gb, gb.buffer, bytestream2_get_bytes_left(&gb) * 8);
             {
-                OPEN_READER(re, &s->gb);
                 if (!s->codebook) {
                     while (1) {
-                        UPDATE_CACHE(re, &s->gb);
-                        GET_RL_VLC(level, run, re, &s->gb, s->table_9_rl_vlc,
-                                   VLC_BITS, 3, 1);
+                        get_cfhd_rl_vlc(&level, &run, &s->gb, s->table_9_rl_vlc, VLC_BITS, 3, 1);
 
                         /* escape */
                         if (level == 64)
@@ -735,9 +732,7 @@ static int cfhd_decode(AVCodecContext *avctx, void *data, int *got_frame,
                     }
                 } else {
                     while (1) {
-                        UPDATE_CACHE(re, &s->gb);
-                        GET_RL_VLC(level, run, re, &s->gb, s->table_18_rl_vlc,
-                                   VLC_BITS, 3, 1);
+                        get_cfhd_rl_vlc(&level, &run, &s->gb, s->table_18_rl_vlc, VLC_BITS, 3, 1);
 
                         /* escape */
                         if (level == 255 && run == 2)
@@ -753,7 +748,6 @@ static int cfhd_decode(AVCodecContext *avctx, void *data, int *got_frame,
                             *coeff_data++ = coeff;
                     }
                 }
-                CLOSE_READER(re, &s->gb);
             }
 
             if (count > expected) {

@@ -141,11 +141,9 @@ static inline int decode_block_intra(MadContext *s, int16_t * block)
        Escaped level and run values a decoded differently */
     i = 0;
     {
-        OPEN_READER(re, &s->gb);
         /* now quantify & encode AC coefficients */
         for (;;) {
-            UPDATE_CACHE(re, &s->gb);
-            GET_RL_VLC(level, run, re, &s->gb, rl->rl_vlc[0], TEX_VLC_BITS, 2, 0);
+            get_rl_vlc2(&level, &run, &s->gb, rl->rl_vlc[0], TEX_VLC_BITS, 2, 0);
 
             if (level == 127) {
                 break;
@@ -159,15 +157,13 @@ static inline int decode_block_intra(MadContext *s, int16_t * block)
                 j = scantable[i];
                 level = (level*quant_matrix[j]) >> 4;
                 level = (level-1)|1;
-                level = (level ^ SHOW_SBITS(re, &s->gb, 1)) - SHOW_SBITS(re, &s->gb, 1);
-                LAST_SKIP_BITS(re, &s->gb, 1);
+                if ( get_bits1(&s->gb) )
+                    level = -level;
             } else {
                 /* escape */
-                UPDATE_CACHE(re, &s->gb);
-                level = SHOW_SBITS(re, &s->gb, 10); SKIP_BITS(re, &s->gb, 10);
+                level = get_sbits(&s->gb, 10);
 
-                UPDATE_CACHE(re, &s->gb);
-                run = SHOW_UBITS(re, &s->gb, 6)+1; LAST_SKIP_BITS(re, &s->gb, 6);
+                run = get_bits(&s->gb, 6)+1;
 
                 i += run;
                 if (i > 63) {
@@ -189,7 +185,6 @@ static inline int decode_block_intra(MadContext *s, int16_t * block)
 
             block[j] = level;
         }
-        CLOSE_READER(re, &s->gb);
     }
     return 0;
 }
