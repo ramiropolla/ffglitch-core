@@ -611,6 +611,50 @@ static av_always_inline int get_vlc2(GetBitContext *s, VLC_TYPE (*table)[2],
     return code;
 }
 
+static av_always_inline void get_rl_vlc2(
+        int *plevel,
+        int *prun,
+        GetBitContext *s,
+        RL_VLC_ELEM *table,
+        int bits,
+        int max_depth,
+        int need_update)
+{
+    int level, run;
+
+    OPEN_READER(re, s);
+    UPDATE_CACHE(re, s);
+
+    GET_RL_VLC(level, run, re, s, table, bits, max_depth, need_update);
+
+    CLOSE_READER(re, s);
+
+    *plevel = level;
+    *prun = run;
+}
+
+static av_always_inline void get_cfhd_rl_vlc(
+        int *plevel,
+        int *prun,
+        GetBitContext *s,
+        CFHD_RL_VLC_ELEM *table,
+        int bits,
+        int max_depth,
+        int need_update)
+{
+    int level, run;
+
+    OPEN_READER(re, s);
+    UPDATE_CACHE(re, s);
+
+    GET_RL_VLC(level, run, re, s, table, bits, max_depth, need_update);
+
+    CLOSE_READER(re, s);
+
+    *plevel = level;
+    *prun = run;
+}
+
 static inline int decode012(GetBitContext *gb)
 {
     int n;

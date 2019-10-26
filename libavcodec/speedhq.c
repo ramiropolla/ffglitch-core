@@ -188,25 +188,19 @@ static inline int decode_alpha_block(const SHQContext *s, GetBitContext *gb, uin
     memset(block, 0, sizeof(block));
 
     {
-        OPEN_READER(re, gb);
-
         for ( ;; ) {
             int run, level;
 
-            UPDATE_CACHE_LE(re, gb);
-            GET_VLC(run, re, gb, ff_dc_alpha_run_vlc_le.table, ALPHA_VLC_BITS, 2);
+            run = get_vlc2(gb, ff_dc_alpha_run_vlc_le.table, ALPHA_VLC_BITS, 2);
 
             if (run < 0) break;
             i += run;
             if (i >= 128)
                 return AVERROR_INVALIDDATA;
 
-            UPDATE_CACHE_LE(re, gb);
-            GET_VLC(level, re, gb, ff_dc_alpha_level_vlc_le.table, ALPHA_VLC_BITS, 2);
+            level = get_vlc2(gb, ff_dc_alpha_level_vlc_le.table, ALPHA_VLC_BITS, 2);
             block[i++] = level;
         }
-
-        CLOSE_READER(re, gb);
     }
 
     for (y = 0; y < 8; y++) {
@@ -236,12 +230,9 @@ static inline int decode_dct_block(const SHQContext *s, GetBitContext *gb, int l
     /* Read AC coefficients. */
     {
         int i = 0;
-        OPEN_READER(re, gb);
         for ( ;; ) {
             int level, run;
-            UPDATE_CACHE_LE(re, gb);
-            GET_RL_VLC(level, run, re, gb, ff_rl_speedhq.rl_vlc[0],
-                       TEX_VLC_BITS, 2, 0);
+            get_rl_vlc2(&level, &run, gb, ff_rl_speedhq.rl_vlc[0], TEX_VLC_BITS, 2, 0);
             if (level == 127) {
                 break;
             } else if (level) {
@@ -249,18 +240,15 @@ static inline int decode_dct_block(const SHQContext *s, GetBitContext *gb, int l
                 if (i > MAX_INDEX)
                     return AVERROR_INVALIDDATA;
                 /* If next bit is 1, level = -level */
-                level = (level ^ SHOW_SBITS(re, gb, 1)) -
-                        SHOW_SBITS(re, gb, 1);
-                LAST_SKIP_BITS(re, gb, 1);
+                if ( get_bits1(gb) )
+                    level = -level;
             } else {
                 /* Escape. */
 #if MIN_CACHE_BITS < 6 + 6 + 12
 #error MIN_CACHE_BITS is too small for the escape code, add UPDATE_CACHE
 #endif
-                run = SHOW_UBITS(re, gb, 6) + 1;
-                SKIP_BITS(re, gb, 6);
-                level = SHOW_UBITS(re, gb, 12) - 2048;
-                LAST_SKIP_BITS(re, gb, 12);
+                run = get_bits(gb, 6) + 1;
+                level = get_bits(gb, 12) - 2048;
 
                 i += run;
                 if (i > MAX_INDEX)
@@ -269,7 +257,6 @@ static inline int decode_dct_block(const SHQContext *s, GetBitContext *gb, int l
 
             block[scantable[i]] = (level * quant_matrix[i]) >> 4;
         }
-        CLOSE_READER(re, gb);
     }
 
     s->idsp.idct_put(dest, linesize, block);

@@ -35,6 +35,12 @@ typedef struct RL_VLC_ELEM {
     uint8_t run;
 } RL_VLC_ELEM;
 
+typedef struct CFHD_RL_VLC_ELEM {
+    int16_t level;
+    int8_t len;
+    uint16_t run;
+} CFHD_RL_VLC_ELEM;
+
 #define init_vlc(vlc, nb_bits, nb_codes,                \
                  bits, bits_wrap, bits_size,            \
                  codes, codes_wrap, codes_size,         \

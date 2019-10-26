@@ -259,17 +259,15 @@ int ff_mpeg1_decode_block_intra(GetBitContext *gb,
     block[0] = dc * quant_matrix[0];
 
     {
-        OPEN_READER(re, gb);
-        UPDATE_CACHE(re, gb);
-        if (((int32_t)GET_CACHE(re, gb)) <= (int32_t)0xBFFFFFFF)
+        if ( show_bits(gb, 2) == 2 )
             goto end;
 
         /* now quantify & encode AC coefficients */
         while (1) {
             int level, run, j;
 
-            GET_RL_VLC(level, run, re, gb, rl->rl_vlc[0],
-                       TEX_VLC_BITS, 2, 0);
+            get_rl_vlc2(&level, &run, gb, rl->rl_vlc[0],
+                        TEX_VLC_BITS, 2, 0);
 
             if (level != 0) {
                 i += run;
@@ -279,23 +277,17 @@ int ff_mpeg1_decode_block_intra(GetBitContext *gb,
                 j = scantable[i];
                 level = (level * qscale * quant_matrix[j]) >> 4;
                 level = (level - 1) | 1;
-                level = (level ^ SHOW_SBITS(re, gb, 1)) -
-                        SHOW_SBITS(re, gb, 1);
-                SKIP_BITS(re, gb, 1);
+                if ( get_bits1(gb) )
+                    level = -level;
             } else {
                 /* escape */
-                run = SHOW_UBITS(re, gb, 6) + 1;
-                LAST_SKIP_BITS(re, gb, 6);
-                UPDATE_CACHE(re, gb);
-                level = SHOW_SBITS(re, gb, 8);
-                SKIP_BITS(re, gb, 8);
+                run = get_bits(gb, 6) + 1;
+                level = get_sbits(gb, 8);
 
                 if (level == -128) {
-                    level = SHOW_UBITS(re, gb, 8) - 256;
-                    SKIP_BITS(re, gb, 8);
+                    level = get_bits(gb, 8) - 256;
                 } else if (level == 0) {
-                    level = SHOW_UBITS(re, gb, 8);
-                    SKIP_BITS(re, gb, 8);
+                    level = get_bits(gb, 8);
                 }
 
                 i += run;
@@ -315,14 +307,11 @@ int ff_mpeg1_decode_block_intra(GetBitContext *gb,
             }
 
             block[j] = level;
-            if (((int32_t)GET_CACHE(re, gb)) <= (int32_t)0xBFFFFFFF)
+            if ( show_bits(gb, 2) == 2 )
                break;
-
-            UPDATE_CACHE(re, gb);
         }
 end:
-        LAST_SKIP_BITS(re, gb, 2);
-        CLOSE_READER(re, gb);
+        skip_bits(gb, 2);
     }
 
     if (i > MAX_INDEX)

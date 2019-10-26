@@ -503,59 +503,42 @@ static int h263_decode_block(MpegEncContext * s, int16_t * block,
     }
 retry:
     {
-    OPEN_READER(re, &s->gb);
     i--; // offset by -1 to allow direct indexing of scan_table
     for(;;) {
-        UPDATE_CACHE(re, &s->gb);
-        GET_RL_VLC(level, run, re, &s->gb, rl->rl_vlc[0], TEX_VLC_BITS, 2, 0);
+        get_rl_vlc2(&level, &run, &s->gb, rl->rl_vlc[0], TEX_VLC_BITS, 2, 0);
         if (run == 66) {
             if (level){
-                CLOSE_READER(re, &s->gb);
                 av_log(s->avctx, AV_LOG_ERROR, "illegal ac vlc code at %dx%d\n", s->mb_x, s->mb_y);
                 return -1;
             }
             /* escape */
             if (CONFIG_FLV_DECODER && s->h263_flv > 1) {
-                int is11 = SHOW_UBITS(re, &s->gb, 1);
-                SKIP_CACHE(re, &s->gb, 1);
-                run = SHOW_UBITS(re, &s->gb, 7) + 1;
+                int is11 = get_bits1(&s->gb);
+                run = get_bits(&s->gb, 7) + 1;
                 if (is11) {
-                    SKIP_COUNTER(re, &s->gb, 1 + 7);
-                    UPDATE_CACHE(re, &s->gb);
-                    level = SHOW_SBITS(re, &s->gb, 11);
-                    SKIP_COUNTER(re, &s->gb, 11);
+                    level = get_sbits(&s->gb, 11);
                 } else {
-                    SKIP_CACHE(re, &s->gb, 7);
-                    level = SHOW_SBITS(re, &s->gb, 7);
-                    SKIP_COUNTER(re, &s->gb, 1 + 7 + 7);
+                    level = get_sbits(&s->gb, 7);
                 }
             } else {
-                run = SHOW_UBITS(re, &s->gb, 7) + 1;
-                SKIP_CACHE(re, &s->gb, 7);
-                level = (int8_t)SHOW_UBITS(re, &s->gb, 8);
-                SKIP_COUNTER(re, &s->gb, 7 + 8);
+                run = get_bits(&s->gb, 7) + 1;
+                level = (int8_t)get_bits(&s->gb, 8);
                 if(level == -128){
-                    UPDATE_CACHE(re, &s->gb);
                     if (s->codec_id == AV_CODEC_ID_RV10) {
                         /* XXX: should patch encoder too */
-                        level = SHOW_SBITS(re, &s->gb, 12);
-                        SKIP_COUNTER(re, &s->gb, 12);
+                        level = get_sbits(&s->gb, 12);
                     }else{
-                        level = SHOW_UBITS(re, &s->gb, 5);
-                        SKIP_CACHE(re, &s->gb, 5);
-                        level |= SHOW_SBITS(re, &s->gb, 6) * (1<<5);
-                        SKIP_COUNTER(re, &s->gb, 5 + 6);
+                        level = get_bits(&s->gb, 5);
+                        level |= get_sbits(&s->gb, 6) * (1<<5);
                     }
                 }
             }
         } else {
-            if (SHOW_UBITS(re, &s->gb, 1))
+            if (get_bits1(&s->gb))
                 level = -level;
-            SKIP_COUNTER(re, &s->gb, 1);
         }
         i += run;
         if (i >= 64){
-            CLOSE_READER(re, &s->gb);
             // redo update without last flag, revert -1 offset
             i = i - run + ((run-1)&63) + 1;
             if (i < 64) {

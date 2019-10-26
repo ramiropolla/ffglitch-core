@@ -1122,89 +1122,72 @@ static inline int mpeg4_decode_block(Mpeg4DecContext *ctx, int16_t *block,
         }
     }
     {
-        OPEN_READER(re, &s->gb);
         for (;;) {
-            UPDATE_CACHE(re, &s->gb);
-            GET_RL_VLC(level, run, re, &s->gb, rl_vlc, TEX_VLC_BITS, 2, 0);
+            get_rl_vlc2(&level, &run, &s->gb, rl_vlc, TEX_VLC_BITS, 2, 0);
             if (level == 0) {
                 /* escape */
                 if (rvlc) {
-                    if (SHOW_UBITS(re, &s->gb, 1) == 0) {
+                    if (get_bits1(&s->gb) == 0) {
                         av_log(s->avctx, AV_LOG_ERROR,
                                "1. marker bit missing in rvlc esc\n");
                         return AVERROR_INVALIDDATA;
                     }
-                    SKIP_CACHE(re, &s->gb, 1);
 
-                    last = SHOW_UBITS(re, &s->gb, 1);
-                    SKIP_CACHE(re, &s->gb, 1);
-                    run = SHOW_UBITS(re, &s->gb, 6);
-                    SKIP_COUNTER(re, &s->gb, 1 + 1 + 6);
-                    UPDATE_CACHE(re, &s->gb);
+                    last = get_bits1(&s->gb);
+                    run = get_bits(&s->gb, 6);
 
-                    if (SHOW_UBITS(re, &s->gb, 1) == 0) {
+                    if (get_bits1(&s->gb) == 0) {
                         av_log(s->avctx, AV_LOG_ERROR,
                                "2. marker bit missing in rvlc esc\n");
                         return AVERROR_INVALIDDATA;
                     }
-                    SKIP_CACHE(re, &s->gb, 1);
 
-                    level = SHOW_UBITS(re, &s->gb, 11);
-                    SKIP_CACHE(re, &s->gb, 11);
+                    level = get_bits(&s->gb, 11);
 
-                    if (SHOW_UBITS(re, &s->gb, 5) != 0x10) {
+                    if (get_bits(&s->gb, 5) != 0x10) {
                         av_log(s->avctx, AV_LOG_ERROR, "reverse esc missing\n");
                         return AVERROR_INVALIDDATA;
                     }
-                    SKIP_CACHE(re, &s->gb, 5);
 
                     level = level * qmul + qadd;
-                    level = (level ^ SHOW_SBITS(re, &s->gb, 1)) - SHOW_SBITS(re, &s->gb, 1);
-                    SKIP_COUNTER(re, &s->gb, 1 + 11 + 5 + 1);
+                    if ( get_bits1(&s->gb) )
+                        level = -level;
 
                     i += run + 1;
                     if (last)
                         i += 192;
                 } else {
-                    int cache;
-                    cache = GET_CACHE(re, &s->gb);
-
+                    int bit = get_bits1(&s->gb);
                     if (IS_3IV1)
-                        cache ^= 0xC0000000;
+                        bit = !bit;
 
-                    if (cache & 0x80000000) {
-                        if (cache & 0x40000000) {
+                    if (bit) {
+                        bit = get_bits1(&s->gb);
+                        if (IS_3IV1)
+                            bit = !bit;
+                        if (bit) {
                             /* third escape */
-                            SKIP_CACHE(re, &s->gb, 2);
-                            last = SHOW_UBITS(re, &s->gb, 1);
-                            SKIP_CACHE(re, &s->gb, 1);
-                            run = SHOW_UBITS(re, &s->gb, 6);
-                            SKIP_COUNTER(re, &s->gb, 2 + 1 + 6);
-                            UPDATE_CACHE(re, &s->gb);
+                            last = get_bits1(&s->gb);
+                            run = get_bits(&s->gb, 6);
 
                             if (IS_3IV1) {
-                                level = SHOW_SBITS(re, &s->gb, 12);
-                                LAST_SKIP_BITS(re, &s->gb, 12);
+                                level = get_sbits(&s->gb, 12);
                             } else {
-                                if (SHOW_UBITS(re, &s->gb, 1) == 0) {
+                                if (get_bits1(&s->gb) == 0) {
                                     av_log(s->avctx, AV_LOG_ERROR,
                                            "1. marker bit missing in 3. esc\n");
                                     if (!(s->avctx->err_recognition & AV_EF_IGNORE_ERR))
                                         return AVERROR_INVALIDDATA;
                                 }
-                                SKIP_CACHE(re, &s->gb, 1);
 
-                                level = SHOW_SBITS(re, &s->gb, 12);
-                                SKIP_CACHE(re, &s->gb, 12);
+                                level = get_sbits(&s->gb, 12);
 
-                                if (SHOW_UBITS(re, &s->gb, 1) == 0) {
+                                if (get_bits1(&s->gb) == 0) {
                                     av_log(s->avctx, AV_LOG_ERROR,
                                            "2. marker bit missing in 3. esc\n");
                                     if (!(s->avctx->err_recognition & AV_EF_IGNORE_ERR))
                                         return AVERROR_INVALIDDATA;
                                 }
-
-                                SKIP_COUNTER(re, &s->gb, 1 + 12 + 1);
                             }
 
 #if 0
@@ -1251,26 +1234,24 @@ static inline int mpeg4_decode_block(Mpeg4DecContext *ctx, int16_t *block,
                                 i += 192;
                         } else {
                             /* second escape */
-                            SKIP_BITS(re, &s->gb, 2);
-                            GET_RL_VLC(level, run, re, &s->gb, rl_vlc, TEX_VLC_BITS, 2, 1);
+                            get_rl_vlc2(&level, &run, &s->gb, rl_vlc, TEX_VLC_BITS, 2, 1);
                             i    += run + rl->max_run[run >> 7][level / qmul] + 1;  // FIXME opt indexing
-                            level = (level ^ SHOW_SBITS(re, &s->gb, 1)) - SHOW_SBITS(re, &s->gb, 1);
-                            LAST_SKIP_BITS(re, &s->gb, 1);
+                            if ( get_bits1(&s->gb) )
+                                level = -level;
                         }
                     } else {
                         /* first escape */
-                        SKIP_BITS(re, &s->gb, 1);
-                        GET_RL_VLC(level, run, re, &s->gb, rl_vlc, TEX_VLC_BITS, 2, 1);
+                        get_rl_vlc2(&level, &run, &s->gb, rl_vlc, TEX_VLC_BITS, 2, 1);
                         i    += run;
                         level = level + rl->max_level[run >> 7][(run - 1) & 63] * qmul;  // FIXME opt indexing
-                        level = (level ^ SHOW_SBITS(re, &s->gb, 1)) - SHOW_SBITS(re, &s->gb, 1);
-                        LAST_SKIP_BITS(re, &s->gb, 1);
+                        if ( get_bits1(&s->gb) )
+                            level = -level;
                     }
                 }
             } else {
                 i    += run;
-                level = (level ^ SHOW_SBITS(re, &s->gb, 1)) - SHOW_SBITS(re, &s->gb, 1);
-                LAST_SKIP_BITS(re, &s->gb, 1);
+                if ( get_bits1(&s->gb) )
+                    level = -level;
             }
             ff_tlog(s->avctx, "dct[%d][%d] = %- 4d end?:%d\n", scan_table[i&63]&7, scan_table[i&63] >> 3, level, i>62);
             if (i > 62) {
@@ -1287,7 +1268,6 @@ static inline int mpeg4_decode_block(Mpeg4DecContext *ctx, int16_t *block,
 
             block[scan_table[i]] = level;
         }
-        CLOSE_READER(re, &s->gb);
     }
 
 not_coded:

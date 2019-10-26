@@ -804,24 +804,13 @@ static int decode_block(MJpegDecodeContext *s, int16_t *block, int component,
     block[0] = val;
     /* AC coefs */
     i = 0;
-    {OPEN_READER(re, &s->gb);
     do {
-        UPDATE_CACHE(re, &s->gb);
-        GET_VLC(code, re, &s->gb, s->vlcs[1][ac_index].table, 9, 2);
+        code = get_vlc2(&s->gb, s->vlcs[1][ac_index].table, 9, 2);
 
         i += ((unsigned)code) >> 4;
             code &= 0xf;
         if (code) {
-            if (code > MIN_CACHE_BITS - 16)
-                UPDATE_CACHE(re, &s->gb);
-
-            {
-                int cache = GET_CACHE(re, &s->gb);
-                int sign  = (~cache) >> 31;
-                level     = (NEG_USR32(sign ^ cache,code) ^ sign) - sign;
-            }
-
-            LAST_SKIP_BITS(re, &s->gb, code);
+            level = get_xbits(&s->gb, code);
 
             if (i > 63) {
                 av_log(s->avctx, AV_LOG_ERROR, "error count: %d\n", i);
@@ -831,7 +820,6 @@ static int decode_block(MJpegDecodeContext *s, int16_t *block, int component,
             block[j] = level * quant_matrix[i];
         }
     } while (i < 63);
-    CLOSE_READER(re, &s->gb);}
 
     return 0;
 }
@@ -868,25 +856,14 @@ static int decode_block_progressive(MJpegDecodeContext *s, int16_t *block,
     }
 
     {
-        OPEN_READER(re, &s->gb);
         for (i = ss; ; i++) {
-            UPDATE_CACHE(re, &s->gb);
-            GET_VLC(code, re, &s->gb, s->vlcs[2][ac_index].table, 9, 2);
+            code = get_vlc2(&s->gb, s->vlcs[2][ac_index].table, 9, 2);
 
             run = ((unsigned) code) >> 4;
             code &= 0xF;
             if (code) {
                 i += run;
-                if (code > MIN_CACHE_BITS - 16)
-                    UPDATE_CACHE(re, &s->gb);
-
-                {
-                    int cache = GET_CACHE(re, &s->gb);
-                    int sign  = (~cache) >> 31;
-                    level     = (NEG_USR32(sign ^ cache,code) ^ sign) - sign;
-                }
-
-                LAST_SKIP_BITS(re, &s->gb, code);
+                level = get_xbits(&s->gb, code);
 
                 if (i >= se) {
                     if (i == se) {
@@ -909,16 +886,13 @@ static int decode_block_progressive(MJpegDecodeContext *s, int16_t *block,
                 } else {
                     val = (1 << run);
                     if (run) {
-                        UPDATE_CACHE(re, &s->gb);
-                        val += NEG_USR32(GET_CACHE(re, &s->gb), run);
-                        LAST_SKIP_BITS(re, &s->gb, run);
+                        val += get_bits(&s->gb, run);
                     }
                     *EOBRUN = val - 1;
                     break;
                 }
             }
         }
-        CLOSE_READER(re, &s->gb);
     }
 
     if (i > *last_nnz)
@@ -928,11 +902,9 @@ static int decode_block_progressive(MJpegDecodeContext *s, int16_t *block,
 }
 
 #define REFINE_BIT(j) {                                             \
-    UPDATE_CACHE(re, &s->gb);                                       \
     sign = block[j] >> 15;                                          \
-    block[j] += SHOW_UBITS(re, &s->gb, 1) *                         \
+    block[j] += get_bits1(&s->gb) *                                 \
                 ((quant_matrix[i] ^ sign) - sign) << Al;            \
-    LAST_SKIP_BITS(re, &s->gb, 1);                                  \
 }
 
 #define ZERO_RUN                                                    \
@@ -961,19 +933,15 @@ static int decode_block_refinement(MJpegDecodeContext *s, int16_t *block,
     int code, i = ss, j, sign, val, run;
     int last    = FFMIN(se, *last_nnz);
 
-    OPEN_READER(re, &s->gb);
     if (*EOBRUN) {
         (*EOBRUN)--;
     } else {
         for (; ; i++) {
-            UPDATE_CACHE(re, &s->gb);
-            GET_VLC(code, re, &s->gb, s->vlcs[2][ac_index].table, 9, 2);
+            code = get_vlc2(&s->gb, s->vlcs[2][ac_index].table, 9, 2);
 
             if (code & 0xF) {
                 run = ((unsigned) code) >> 4;
-                UPDATE_CACHE(re, &s->gb);
-                val = SHOW_UBITS(re, &s->gb, 1);
-                LAST_SKIP_BITS(re, &s->gb, 1);
+                val = get_bits1(&s->gb);
                 ZERO_RUN;
                 j = s->scantable.permutated[i];
                 val--;
@@ -981,7 +949,6 @@ static int decode_block_refinement(MJpegDecodeContext *s, int16_t *block,
                 if (i == se) {
                     if (i > *last_nnz)
                         *last_nnz = i;
-                    CLOSE_READER(re, &s->gb);
                     return 0;
                 }
             } else {
@@ -992,9 +959,7 @@ static int decode_block_refinement(MJpegDecodeContext *s, int16_t *block,
                     val = run;
                     run = (1 << run);
                     if (val) {
-                        UPDATE_CACHE(re, &s->gb);
-                        run += SHOW_UBITS(re, &s->gb, val);
-                        LAST_SKIP_BITS(re, &s->gb, val);
+                        run += get_bits(&s->gb, val);
                     }
                     *EOBRUN = run - 1;
                     break;
@@ -1011,7 +976,6 @@ static int decode_block_refinement(MJpegDecodeContext *s, int16_t *block,
         if (block[j])
             REFINE_BIT(j)
     }
-    CLOSE_READER(re, &s->gb);
 
     return 0;
 }
