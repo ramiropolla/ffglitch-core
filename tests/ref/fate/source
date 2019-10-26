@@ -2,6 +2,13 @@ Files without standard license headers:
 compat/avisynth/windowsPorts/basicDataTypeConversions.h
 compat/avisynth/windowsPorts/windows2linux.h
 libavcodec/file_open.c
+libavcodec/get_bits.c
+libavcodec/get_bits.h
+libavcodec/get_bits_common.h
+libavcodec/get_bits_funcs.h
+libavcodec/get_bits_undef.h
+libavcodec/golomb.h
+libavcodec/golomb_common.h
 libavcodec/ilbcdata.h
 libavcodec/ilbcdec.c
 libavcodec/interplayacm.c
@@ -29,5 +36,8 @@ compat/avisynth/windowsPorts/windows2linux.h
 compat/djgpp/math.h
 compat/float/float.h
 compat/float/limits.h
+libavcodec/get_bits_funcs.h
+libavcodec/get_bits_impl.h
+libavcodec/get_bits_undef.h
 Use of av_clip() where av_clip_uintp2() could be used:
 Use of av_clip() where av_clip_intp2() could be used:
