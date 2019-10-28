@@ -1,0 +1,53 @@
+{
+  "filename":"mpeg2video_prepared_128_5.rawvideo",
+  "sha1sum":"f7da4b593bc268689f8f5c534587a34abd9c7956",
+  "features":[
+    "qscale"
+  ],
+  "streams":[
+    {
+      "frames":[
+        {
+          "pkt_pos":0,
+          "pts":null,
+          "dts":40040,
+          "qscale":{
+            "slice":[ 4, 4, 4, 4, 4, 4, 4, 4 ]
+          }
+        },
+        {
+          "pkt_pos":6839,
+          "pts":null,
+          "dts":80080,
+          "qscale":{
+            "slice":[ 2, 2, 2, 2, 2, 2, 2, 2 ]
+          }
+        },
+        {
+          "pkt_pos":14147,
+          "pts":null,
+          "dts":120120,
+          "qscale":{
+            "slice":[ 2, 2, 2, 2, 2, 2, 2, 2 ]
+          }
+        },
+        {
+          "pkt_pos":17874,
+          "pts":null,
+          "dts":160160,
+          "qscale":{
+            "slice":[ 2, 2, 2, 2, 2, 2, 2, 2 ]
+          }
+        },
+        {
+          "pkt_pos":22018,
+          "pts":null,
+          "dts":null,
+          "qscale":{
+            "slice":[ 2, 2, 2, 2, 2, 2, 2, 2 ]
+          }
+        }
+      ]
+    }
+  ]
+}

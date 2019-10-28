@@ -473,7 +473,7 @@ static int mpeg_decode_mb(MpegEncContext *s, int16_t block[12][64])
             s->interlaced_dct = get_bits1(&s->gb);
 
         if (IS_QUANT(mb_type))
-            s->qscale = mpeg_get_qscale(s);
+            s->qscale = ffe_get_qscale(s, 1);
 
         if (s->concealment_motion_vectors) {
             /* just parse them */
@@ -539,7 +539,7 @@ static int mpeg_decode_mb(MpegEncContext *s, int16_t block[12][64])
             }
 
             if (IS_QUANT(mb_type))
-                s->qscale = mpeg_get_qscale(s);
+                s->qscale = ffe_get_qscale(s, 1);
 
             s->last_mv[0][0][0] = 0;
             s->last_mv[0][0][1] = 0;
@@ -560,7 +560,7 @@ static int mpeg_decode_mb(MpegEncContext *s, int16_t block[12][64])
             }
 
             if (IS_QUANT(mb_type))
-                s->qscale = mpeg_get_qscale(s);
+                s->qscale = ffe_get_qscale(s, 1);
 
             /* motion vectors */
             s->mv_dir = (mb_type >> 13) & 3;
@@ -1287,6 +1287,15 @@ static void mpeg_decode_picture_coding_extension(Mpeg1Context *s1)
     s->frame_pred_frame_dct       = get_bits1(&s->gb);
     s->concealment_motion_vectors = get_bits1(&s->gb);
     s->q_scale_type               = get_bits1(&s->gb);
+    if ( s->q_scale_type
+      && ((s->avctx->ffedit_import & (1 << FFEDIT_FEAT_QSCALE)) != 0
+       || (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_QSCALE)) != 0
+       || (s->avctx->ffedit_apply  & (1 << FFEDIT_FEAT_QSCALE)) != 0) )
+    {
+        av_log(NULL, AV_LOG_ERROR,
+               "FFedit doesn't support non-linear qscale yet.\n");
+        av_assert0(0);
+    }
     s->intra_vlc_format           = get_bits1(&s->gb);
     s->alternate_scan             = get_bits1(&s->gb);
     s->repeat_first_field         = get_bits1(&s->gb);
@@ -1450,7 +1459,7 @@ static int mpeg_decode_slice(MpegEncContext *s, int mb_y,
     ff_mpeg1_clean_buffers(s);
     s->interlaced_dct = 0;
 
-    s->qscale = mpeg_get_qscale(s);
+    s->qscale = ffe_get_qscale(s, 0);
 
     if (s->qscale == 0) {
         av_log(s->avctx, AV_LOG_ERROR, "qscale == 0\n");
@@ -2685,6 +2694,7 @@ AVCodec ff_mpeg1video_decoder = {
                            },
     .ffedit_features = (1 << FFEDIT_FEAT_INFO)
                      | (1 << FFEDIT_FEAT_MV)
+                     | (1 << FFEDIT_FEAT_QSCALE)
 };
 
 AVCodec ff_mpeg2video_decoder = {
@@ -2733,6 +2743,7 @@ AVCodec ff_mpeg2video_decoder = {
                     },
     .ffedit_features = (1 << FFEDIT_FEAT_INFO)
                      | (1 << FFEDIT_FEAT_MV)
+                     | (1 << FFEDIT_FEAT_QSCALE)
 };
 
 //legacy decoder
@@ -2754,4 +2765,5 @@ AVCodec ff_mpegvideo_decoder = {
     .max_lowres     = 3,
     .ffedit_features = (1 << FFEDIT_FEAT_INFO)
                      | (1 << FFEDIT_FEAT_MV)
+                     | (1 << FFEDIT_FEAT_QSCALE)
 };
