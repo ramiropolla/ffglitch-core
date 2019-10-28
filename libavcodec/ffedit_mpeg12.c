@@ -1,6 +1,8 @@
 
 /* This file is included by mpeg12dec.c */
 
+#include <stdatomic.h>
+
 #include "ffedit_json.h"
 #include "ffedit_mv.h"
 
@@ -296,6 +298,184 @@ static int ffe_decode_mpegmv(
 }
 
 /*-------------------------------------------------------------------*/
+/* qscale                                                            */
+/*-------------------------------------------------------------------*/
+
+/* needed stuff */
+
+typedef struct
+{
+    json_t *slice;
+    json_t *mb;
+    atomic_size_t mb_count;
+} qscale_ctx;
+
+/* init */
+
+static void
+ffe_mpeg12_export_qscale_init(MpegEncContext *s, AVFrame *f)
+{
+    // {
+    //  "slice": [ ] # line
+    //           { }
+    //  "mb":    [ ] # line
+    //           [ ] # column
+    //           null or qscale
+    // }
+
+    json_t *jframe = json_object_new(s->jctx);
+    qscale_ctx *ctx = json_allocator_get0(s->jctx, sizeof(qscale_ctx));
+    json_userdata_set(jframe, ctx);
+
+    ctx->slice = json_array_new(s->jctx, s->mb_height);
+    for ( size_t mb_y = 0; mb_y < s->mb_height; mb_y++ )
+    {
+        json_t *jcolumns = json_object_new(s->jctx);
+        json_set_pflags(jcolumns, JSON_PFLAGS_NO_LF);
+        json_array_set(ctx->slice, mb_y, jcolumns);
+    }
+    json_object_add(jframe, "slice", ctx->slice);
+
+    ctx->mb = ffe_jblock_new(s->jctx,
+                             s->mb_width, s->mb_height,
+                             JSON_PFLAGS_NO_LF);
+    atomic_init(&ctx->mb_count, 0);
+    json_object_add(jframe, "mb", ctx->mb);
+
+    f->ffedit_sd[FFEDIT_FEAT_QSCALE] = jframe;
+}
+
+static void
+ffe_mpeg12_import_qscale_init(MpegEncContext *s, AVFrame *f)
+{
+    json_t *jframe = f->ffedit_sd[FFEDIT_FEAT_QSCALE];
+    qscale_ctx *ctx = json_allocator_get0(s->jctx, sizeof(qscale_ctx));
+    json_userdata_set(jframe, ctx);
+    ctx->slice = json_object_get(jframe, "slice");
+    ctx->mb = json_object_get(jframe, "mb");
+}
+
+/* cleanup */
+
+static void
+ffe_mpeg12_export_qscale_cleanup(MpegEncContext *s, AVFrame *f)
+{
+    json_t *jframe = f->ffedit_sd[FFEDIT_FEAT_QSCALE];
+    qscale_ctx *ctx = json_userdata_get(jframe);
+    for ( size_t mb_y = 0; mb_y < s->mb_height; mb_y++ )
+    {
+        json_t *jmb_y = json_array_get(ctx->slice, mb_y);
+        json_object_done(s->jctx, jmb_y);
+    }
+    if ( atomic_load(&ctx->mb_count) == 0 )
+        json_object_del(jframe, "mb");
+    json_object_done(s->jctx, jframe);
+}
+
+/* export */
+
+static int64_t
+ffe_qscale_get_mb(MpegEncContext *s)
+{
+    AVFrame *f = s->current_picture_ptr->f;
+    json_t *jframe = f->ffedit_sd[FFEDIT_FEAT_QSCALE];
+    qscale_ctx *ctx = json_userdata_get(jframe);
+    json_t *jdata = ctx->mb;
+    json_t *jmb_y = json_array_get(jdata, s->mb_y);
+    return jmb_y->array_of_ints[s->mb_x];
+}
+
+static int64_t
+ffe_qscale_get_slice(MpegEncContext *s, int mb_y)
+{
+    AVFrame *f = s->current_picture_ptr->f;
+    json_t *jframe = f->ffedit_sd[FFEDIT_FEAT_QSCALE];
+    qscale_ctx *ctx = json_userdata_get(jframe);
+    json_t *jdata = ctx->slice;
+    json_t *jmb_y = json_array_get(jdata, mb_y);
+    json_t *jint;
+    char buf[10];
+    snprintf(buf, sizeof(buf), "%d", s->mb_x);
+    jint = json_object_get(jmb_y, buf);
+    if ( jint == NULL )
+    {
+        av_log(ffe_class, AV_LOG_ERROR,
+               "qscale value for slice at line %d row %d not found!\n",
+               mb_y, s->mb_x);
+        av_assert0(0);
+    }
+    return json_int_val(jint);
+}
+
+static void
+ffe_qscale_set_mb(MpegEncContext *s, int val)
+{
+    AVFrame *f = s->current_picture_ptr->f;
+    json_t *jframe = f->ffedit_sd[FFEDIT_FEAT_QSCALE];
+    qscale_ctx *ctx = json_userdata_get(jframe);
+    json_t *jdata = ctx->mb;
+    json_t *jmb_y = json_array_get(jdata, s->mb_y);
+    json_t *jval = json_int_new(s->jctx, val);
+    json_array_set(jmb_y, s->mb_x, jval);
+    atomic_fetch_add(&ctx->mb_count, 1);
+}
+
+static void
+ffe_qscale_set_slice(MpegEncContext *s, int mb_y, int val)
+{
+    // TODO not multi-thread friendly!
+    AVFrame *f = s->current_picture_ptr->f;
+    json_t *jframe = f->ffedit_sd[FFEDIT_FEAT_QSCALE];
+    qscale_ctx *ctx = json_userdata_get(jframe);
+    json_t *jdata = ctx->slice;
+    json_t *jmb_y = json_array_get(jdata, mb_y);
+    json_t *jval = json_int_new(s->jctx, val);
+    char buf[10];
+    snprintf(buf, sizeof(buf), "%d", s->mb_x);
+    json_object_add(jmb_y, buf, jval);
+}
+
+static int ffe_get_qscale(MpegEncContext *s, int mb_y, int is_mb)
+{
+    PutBitContext *saved;
+    int orig_qscale;
+    int qscale;
+
+    if ( (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_QSCALE)) != 0 )
+        saved = ffe_transplicate_save(&s->ffe_xp);
+
+    // mpeg_get_qscale
+    orig_qscale = get_bits(&s->gb, 5);
+
+    if ( (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_QSCALE)) != 0 )
+    {
+        if ( is_mb )
+            orig_qscale = ffe_qscale_get_mb(s);
+        else
+            orig_qscale = ffe_qscale_get_slice(s, mb_y);
+    }
+    if ( (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_QSCALE)) != 0 )
+    {
+        put_bits(saved, 5, orig_qscale);
+        ffe_transplicate_restore(&s->ffe_xp, saved);
+    }
+    if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_QSCALE)) != 0 )
+    {
+        if ( is_mb )
+            ffe_qscale_set_mb(s, orig_qscale);
+        else
+            ffe_qscale_set_slice(s, mb_y, orig_qscale);
+    }
+
+    if ( s->q_scale_type )
+        qscale = ff_mpeg2_non_linear_qscale[orig_qscale];
+    else
+        qscale = orig_qscale << 1;
+
+    return qscale;
+}
+
+/*-------------------------------------------------------------------*/
 /* common                                                            */
 /*-------------------------------------------------------------------*/
 
@@ -330,6 +510,11 @@ ffe_mpeg12_init(MpegEncContext *s)
         ffe_mpeg12_export_mv_delta_init(s, f);
     else if ( (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_MV_DELTA)) != 0 )
         ffe_mpeg12_import_mv_delta_init(s, f);
+
+    if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_QSCALE)) != 0 )
+        ffe_mpeg12_export_qscale_init(s, f);
+    else if ( (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_QSCALE)) != 0 )
+        ffe_mpeg12_import_qscale_init(s, f);
 }
 
 static void
@@ -343,4 +528,7 @@ ffe_mpeg12_export_cleanup(MpegEncContext *s, AVFrame *f)
 
     if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_MV_DELTA)) != 0 )
         ffe_mv_delta_export_cleanup(s->jctx, f);
+
+    if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_QSCALE)) != 0 )
+        ffe_mpeg12_export_qscale_cleanup(s, f);
 }
