@@ -61,6 +61,7 @@ typedef struct GetBitContext {
 } GetBitContext;
 
 static inline unsigned int get_bits(GetBitContext *s, int n);
+static inline unsigned int get_bits_long(GetBitContext *s, int n);
 static inline void skip_bits(GetBitContext *s, int n);
 static inline unsigned int show_bits(GetBitContext *s, int n);
 
@@ -215,11 +216,7 @@ static inline int get_bits_count(const GetBitContext *s)
  */
 static inline void skip_bits_long(GetBitContext *s, int n)
 {
-#if UNCHECKED_BITSTREAM_READER
-    s->index += n;
-#else
-    s->index += av_clip(n, -s->index, s->size_in_bits_plus8 - s->index);
-#endif
+    get_bits_long(s, n);
 }
 
 /**
@@ -318,29 +315,12 @@ static inline unsigned int show_bits(GetBitContext *s, int n)
 
 static inline void skip_bits(GetBitContext *s, int n)
 {
-    OPEN_READER(re, s);
-    LAST_SKIP_BITS(re, s, n);
-    CLOSE_READER(re, s);
+    get_bits(s, n);
 }
 
 static inline unsigned int get_bits1(GetBitContext *s)
 {
-    unsigned int index = s->index;
-    uint8_t result     = s->buffer[index >> 3];
-#ifdef BITSTREAM_READER_LE
-    result >>= index & 7;
-    result  &= 1;
-#else
-    result <<= index & 7;
-    result >>= 8 - 1;
-#endif
-#if !UNCHECKED_BITSTREAM_READER
-    if (s->index < s->size_in_bits_plus8)
-#endif
-        index++;
-    s->index = index;
-
-    return result;
+    return get_bits(s, 1);
 }
 
 static inline unsigned int show_bits1(GetBitContext *s)
