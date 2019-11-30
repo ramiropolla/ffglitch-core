@@ -1250,7 +1250,9 @@ static int decode_packet(AVCodecContext *avctx, void *data, int *got_frame_ptr,
 
         s->buf_bit_size = (avpkt->size - s->next_packet_start) << 3;
         init_get_bits(gb, avpkt->data, s->buf_bit_size);
-        skip_bits(gb, s->packet_offset);
+        /* TODO someone should take a look at this */
+        if ( s->buf_bit_size != 0 )
+            skip_bits(gb, s->packet_offset);
 
         if (s->len_prefix && remaining_bits(s, gb) > s->log2_frame_size &&
             (frame_size = show_bits(gb, s->log2_frame_size)) &&
