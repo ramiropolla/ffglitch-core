@@ -343,6 +343,10 @@ av_cold int ff_mpv_encode_init(AVCodecContext *avctx)
 
     mpv_encode_defaults(s);
 
+    /* ffedit backwards compatibility for -mpv_flags +nopimb */
+    if ( (s->mpv_flags & FF_MPV_FLAG_NOPIMB) != 0 )
+        s->intra_penalty = INT_MAX/2;
+
     switch (avctx->pix_fmt) {
     case AV_PIX_FMT_YUVJ444P:
     case AV_PIX_FMT_YUV444P:

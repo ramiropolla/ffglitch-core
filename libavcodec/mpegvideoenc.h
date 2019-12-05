@@ -43,6 +43,7 @@
 #define FF_MPV_FLAG_NAQ          0x0010
 #define FF_MPV_FLAG_MV0          0x0020
 #define FF_MPV_FLAG_FORCE_MV     0x0040
+#define FF_MPV_FLAG_NOPIMB       0x0080
 
 #define FF_MPV_OPT_CMP_FUNC \
 { "sad",    "Sum of absolute differences, fast", 0, AV_OPT_TYPE_CONST, {.i64 = FF_CMP_SAD }, INT_MIN, INT_MAX, FF_MPV_OPT_FLAGS, .unit = "cmp_func" }, \
@@ -73,6 +74,7 @@ FF_MPV_OPT_CMP_FUNC, \
 { "naq",            "normalize adaptive quantization",                   0, AV_OPT_TYPE_CONST, { .i64 = FF_MPV_FLAG_NAQ },    0, 0, FF_MPV_OPT_FLAGS, .unit = "mpv_flags" },\
 { "mv0",            "always try a mb with mv=<0,0>",                     0, AV_OPT_TYPE_CONST, { .i64 = FF_MPV_FLAG_MV0 },    0, 0, FF_MPV_OPT_FLAGS, .unit = "mpv_flags" },\
 { "forcemv",        "always write mvs for p frames (even if <0,0>)",     0, AV_OPT_TYPE_CONST, { .i64 = FF_MPV_FLAG_FORCE_MV }, 0, 0, FF_MPV_OPT_FLAGS, .unit = "mpv_flags" },\
+{ "nopimb",         "do not use intra mbs for predictive frames",        0, AV_OPT_TYPE_CONST, { .i64 = FF_MPV_FLAG_NOPIMB }, 0, 0, FF_MPV_OPT_FLAGS, .unit = "mpv_flags" },\
 { "luma_elim_threshold",   "single coefficient elimination threshold for luminance (negative values also consider dc coefficient)",\
                                                                       FF_MPV_OFFSET(luma_elim_threshold), AV_OPT_TYPE_INT, { .i64 = 0 }, INT_MIN, INT_MAX, FF_MPV_OPT_FLAGS },\
 { "chroma_elim_threshold", "single coefficient elimination threshold for chrominance (negative values also consider dc coefficient)",\
