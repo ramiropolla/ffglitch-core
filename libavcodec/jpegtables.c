@@ -124,9 +124,9 @@ const uint8_t avpriv_mjpeg_val_ac_chrominance[] =
 };
 
 /* isn't this function nicer than the one in the libjpeg ? */
-void ff_mjpeg_build_huffman_codes(uint8_t *huff_size, uint16_t *huff_code,
-                                  const uint8_t *bits_table,
-                                  const uint8_t *val_table)
+int ff_mjpeg_build_huffman_codes(uint8_t *huff_size, uint16_t *huff_code,
+                                 const uint8_t *bits_table,
+                                 const uint8_t *val_table)
 {
     int i, j, k,nb, code, sym;
 
@@ -153,4 +153,6 @@ void ff_mjpeg_build_huffman_codes(uint8_t *huff_size, uint16_t *huff_code,
         }
         code <<= 1;
     }
+
+    return k - 1;
 }
