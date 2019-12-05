@@ -171,6 +171,8 @@ typedef struct MJpegDecodeContext {
     int huff_max_dc_chrominance;
     int huff_max_ac_luminance;
     int huff_max_ac_chrominance;
+    int chroma_h_shift;
+    int chroma_v_shift;
 } MJpegDecodeContext;
 
 int ff_mjpeg_decode_init(AVCodecContext *avctx);
