@@ -55,10 +55,12 @@
 #include "ffedit_mjpeg.c"
 
 
-static int build_vlc(VLC *vlc, const uint8_t *bits_table,
+static int build_vlc(MJpegDecodeContext *s, int class, int index,
+                     const uint8_t *bits_table,
                      const uint8_t *val_table, int nb_codes,
                      int use_static, int is_ac)
 {
+    VLC *vlc = &s->vlcs[class][index];
     uint8_t huff_size[256] = { 0 };
     uint16_t huff_code[256];
     uint16_t huff_sym[256];
@@ -66,7 +68,7 @@ static int build_vlc(VLC *vlc, const uint8_t *bits_table,
 
     av_assert0(nb_codes <= 256);
 
-    ff_mjpeg_build_huffman_codes(huff_size, huff_code, bits_table, val_table);
+    ffe_mjpeg_build_huffman_codes(s, class, index, huff_size, huff_code, bits_table, val_table);
 
     for (i = 0; i < 256; i++)
         huff_sym[i] = i + 16 * is_ac;
@@ -104,7 +106,7 @@ static int init_default_huffman_tables(MJpegDecodeContext *s)
     int i, ret;
 
     for (i = 0; i < FF_ARRAY_ELEMS(ht); i++) {
-        ret = build_vlc(&s->vlcs[ht[i].class][ht[i].index],
+        ret = build_vlc(s, ht[i].class, ht[i].index,
                         ht[i].bits, ht[i].values, ht[i].codes,
                         0, ht[i].class == 1);
         if (ret < 0)
@@ -288,13 +290,13 @@ int ff_mjpeg_decode_dht(MJpegDecodeContext *s)
         ff_free_vlc(&s->vlcs[class][index]);
         av_log(s->avctx, AV_LOG_DEBUG, "class=%d index=%d nb_codes=%d\n",
                class, index, code_max + 1);
-        if ((ret = build_vlc(&s->vlcs[class][index], bits_table, val_table,
+        if ((ret = build_vlc(s, class, index, bits_table, val_table,
                              code_max + 1, 0, class > 0)) < 0)
             return ret;
 
         if (class > 0) {
             ff_free_vlc(&s->vlcs[2][index]);
-            if ((ret = build_vlc(&s->vlcs[2][index], bits_table, val_table,
+            if ((ret = build_vlc(s, 2, index, bits_table, val_table,
                                  code_max + 1, 0, 0)) < 0)
                 return ret;
         }

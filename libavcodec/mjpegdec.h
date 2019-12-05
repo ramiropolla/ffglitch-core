@@ -40,6 +40,8 @@
 #include "idctdsp.h"
 #include "ffedit_xp.h"
 
+#include "mjpegenc_common.h"
+
 #undef near /* This file uses struct member 'near' which in windows.h is defined as empty. */
 
 #define MAX_COMPONENTS 4
@@ -162,6 +164,13 @@ typedef struct MJpegDecodeContext {
 
     /* ffedit sidedata (for importing) */
     void *ffedit_sd[32]; // should be at least [FFEDIT_FEAT_LAST]
+
+    /* ffedit dct/dc */
+    MJpegContext m;
+    int huff_max_dc_luminance;
+    int huff_max_dc_chrominance;
+    int huff_max_ac_luminance;
+    int huff_max_ac_chrominance;
 } MJpegDecodeContext;
 
 int ff_mjpeg_decode_init(AVCodecContext *avctx);

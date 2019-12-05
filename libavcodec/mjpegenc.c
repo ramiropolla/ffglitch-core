@@ -222,41 +222,47 @@ static void record_block(MpegEncContext *s, int16_t *block, int n)
         ff_mjpeg_encode_code(m, table_id, 0);
 }
 
-static void encode_block(MpegEncContext *s, int16_t *block, int n)
+void ff_mjpeg_encode_block(
+        PutBitContext *pb,
+        MJpegContext *m,
+        ScanTable *scantable,
+        int *last_dc,
+        int *block_last_index,
+        int16_t *block,
+        int n)
 {
     int mant, nbits, code, i, j;
     int component, dc, run, last_index, val;
-    MJpegContext *m = s->mjpeg_ctx;
     uint8_t *huff_size_ac;
     uint16_t *huff_code_ac;
 
     /* DC coef */
     component = (n <= 3 ? 0 : (n&1) + 1);
     dc = block[0]; /* overflow is impossible */
-    val = dc - s->last_dc[component];
+    val = dc - last_dc[component];
     if (n < 4) {
-        ff_mjpeg_encode_dc(&s->pb, val, m->huff_size_dc_luminance, m->huff_code_dc_luminance);
+        ff_mjpeg_encode_dc(pb, val, m->huff_size_dc_luminance, m->huff_code_dc_luminance);
         huff_size_ac = m->huff_size_ac_luminance;
         huff_code_ac = m->huff_code_ac_luminance;
     } else {
-        ff_mjpeg_encode_dc(&s->pb, val, m->huff_size_dc_chrominance, m->huff_code_dc_chrominance);
+        ff_mjpeg_encode_dc(pb, val, m->huff_size_dc_chrominance, m->huff_code_dc_chrominance);
         huff_size_ac = m->huff_size_ac_chrominance;
         huff_code_ac = m->huff_code_ac_chrominance;
     }
-    s->last_dc[component] = dc;
+    last_dc[component] = dc;
 
     /* AC coefs */
 
     run = 0;
-    last_index = s->block_last_index[n];
+    last_index = block_last_index[n];
     for(i=1;i<=last_index;i++) {
-        j = s->intra_scantable.permutated[i];
+        j = scantable->permutated[i];
         val = block[j];
         if (val == 0) {
             run++;
         } else {
             while (run >= 16) {
-                put_bits(&s->pb, huff_size_ac[0xf0], huff_code_ac[0xf0]);
+                put_bits(pb, huff_size_ac[0xf0], huff_code_ac[0xf0]);
                 run -= 16;
             }
             mant = val;
@@ -268,16 +274,22 @@ static void encode_block(MpegEncContext *s, int16_t *block, int n)
             nbits= av_log2_16bit(val) + 1;
             code = (run << 4) | nbits;
 
-            put_bits(&s->pb, huff_size_ac[code], huff_code_ac[code]);
+            put_bits(pb, huff_size_ac[code], huff_code_ac[code]);
 
-            put_sbits(&s->pb, nbits, mant);
+            put_sbits(pb, nbits, mant);
             run = 0;
         }
     }
 
     /* output EOB only if not already 64 values */
     if (last_index < 63 || run != 0)
-        put_bits(&s->pb, huff_size_ac[0], huff_code_ac[0]);
+        put_bits(pb, huff_size_ac[0], huff_code_ac[0]);
+}
+
+static void encode_block(MpegEncContext *s, int16_t *block, int n)
+{
+    ff_mjpeg_encode_block(&s->pb, s->mjpeg_ctx, &s->intra_scantable,
+                          s->last_dc, s->block_last_index, block, n);
 }
 
 void ff_mjpeg_encode_mb(MpegEncContext *s, int16_t block[12][64])
