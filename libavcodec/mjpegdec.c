@@ -835,9 +835,14 @@ static inline int mjpeg_decode_dc(MJpegDecodeContext *s, int dc_index)
 
 /* decode block and dequantize */
 static int decode_block(MJpegDecodeContext *s, int16_t *block, int component,
+                        int mb_y, int mb_x, int blockn,
                         int dc_index, int ac_index, uint16_t *quant_matrix)
 {
     int code, i, j, level, val;
+    ffe_q_dct_ctx_t qctx;
+    int16_t qblock[64];
+
+    ffe_mjpeg_dct_init(s, &qctx, qblock, component);
 
     /* DC coef */
     val = mjpeg_decode_dc(s, dc_index);
@@ -845,6 +850,7 @@ static int decode_block(MJpegDecodeContext *s, int16_t *block, int component,
         av_log(s->avctx, AV_LOG_ERROR, "error dc\n");
         return AVERROR_INVALIDDATA;
     }
+    qblock[0] = val;
     val += s->last_q_dc[component];
     s->last_q_dc[component] = val;
     val *= (unsigned) quant_matrix[0];
@@ -866,8 +872,11 @@ static int decode_block(MJpegDecodeContext *s, int16_t *block, int component,
             }
             j        = s->permutated_scantable[i];
             block[j] = level * quant_matrix[i];
+            qblock[j] = level;
         }
     } while (i < 63);
+
+    ffe_mjpeg_dct_term(s, &qctx, qblock, block, component, mb_y, mb_x, blockn, ac_index, quant_matrix);
 
     return 0;
 }
@@ -1451,6 +1460,8 @@ static int mjpeg_decode_scan(MJpegDecodeContext *s, int nb_components, int Ah,
     chroma_width  = AV_CEIL_RSHIFT(s->width,  chroma_h_shift);
     chroma_height = AV_CEIL_RSHIFT(s->height, chroma_v_shift);
 
+    ffe_mjpeg_scan_init(s, nb_components, chroma_h_shift, chroma_v_shift);
+
     for (i = 0; i < nb_components; i++) {
         int c   = s->comp_index[i];
         data[c] = s->picture_ptr->data[c];
@@ -1501,6 +1512,7 @@ static int mjpeg_decode_scan(MJpegDecodeContext *s, int nb_components, int Ah,
                         } else {
                             s->bdsp.clear_block(s->block);
                             if (decode_block(s, s->block, i,
+                                             mb_y, mb_x, j,
                                              s->dc_index[i], s->ac_index[i],
                                              s->quant_matrixes[s->quant_sindex[i]]) < 0) {
                                 av_log(s->avctx, AV_LOG_ERROR,
@@ -3031,6 +3043,8 @@ const FFCodec ff_mjpeg_decoder = {
                         NULL
                     },
     .p.ffedit_features = (1 << FFEDIT_FEAT_INFO)
+                       | (1 << FFEDIT_FEAT_Q_DCT)
+                       | (1 << FFEDIT_FEAT_Q_DCT_DELTA)
 };
 #endif
 #if CONFIG_THP_DECODER

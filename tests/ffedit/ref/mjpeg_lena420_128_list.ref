@@ -1,3 +1,5 @@
 
 FFEdit support for codec 'MJPEG (Motion JPEG)':
 	[info        ]: info
+	[q_dct       ]: quantized DCT coefficients
+	[q_dct_delta ]: quantized DCT coefficients (with DC delta)

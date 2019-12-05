@@ -188,6 +188,8 @@ typedef struct MJpegDecodeContext {
 
     /* ffedit dct/dc */
     MJpegContext m;
+    int chroma_h_shift;
+    int chroma_v_shift;
 } MJpegDecodeContext;
 
 int ff_mjpeg_build_vlc(VLC *vlc, const uint8_t *bits_table,
