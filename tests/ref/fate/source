@@ -27,10 +27,6 @@ libavcodec/ilbcdata.h
 libavcodec/ilbcdec.c
 libavcodec/interplayacm.c
 libavcodec/log2_tab.c
-libavcodec/put_bits.c
-libavcodec/put_bits.h
-libavcodec/put_bits_common.h
-libavcodec/put_bits_funcs.h
 libavcodec/reverse.c
 libavcodec/xvidcore/bitstream/bitstream.c
 libavcodec/xvidcore/bitstream/bitstream.h
@@ -168,8 +164,6 @@ libavcodec/get_bits_funcs.h
 libavcodec/get_bits_funcs_dbg.h
 libavcodec/get_bits_impl.h
 libavcodec/get_bits_undef.h
-libavcodec/put_bits_funcs.h
-libavcodec/put_bits_impl.h
 libavcodec/xvidcore/bitstream/bitstream.h
 libavcodec/xvidcore/bitstream/cbp.h
 libavcodec/xvidcore/bitstream/mbcoding.h
