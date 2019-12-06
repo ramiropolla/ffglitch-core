@@ -369,6 +369,7 @@ FF_ENABLE_DEPRECATION_WARNINGS
     s->bit_rate = avctx->bit_rate;
     s->width    = avctx->width;
     s->height   = avctx->height;
+#if 0
     if (avctx->gop_size > 600 &&
         avctx->strict_std_compliance > FF_COMPLIANCE_EXPERIMENTAL) {
         av_log(avctx, AV_LOG_WARNING,
@@ -376,6 +377,7 @@ FF_ENABLE_DEPRECATION_WARNINGS
                avctx->gop_size, 600);
         avctx->gop_size = 600;
     }
+#endif
     s->gop_size     = avctx->gop_size;
     s->avctx        = avctx;
     if (avctx->max_b_frames > MAX_B_FRAMES) {
