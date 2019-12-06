@@ -673,7 +673,7 @@ static int mpeg_decode_mb(MpegEncContext *s, int16_t block[12][64])
                     for (i = 0; i < 2; i++) {
                         if (USES_LIST(mb_type, i)) {
                             s->field_select[i][0] = get_bits1(&s->gb);
-                            ffe_mv_select(f, i, j);
+                            ffe_mv_select(f, i, 0);
                             for (k = 0; k < 2; k++) {
                                 val = ffe_decode_mpegmv(s, s->mpeg_f_code[i][k],
                                                         s->last_mv[i][0][k], k);
