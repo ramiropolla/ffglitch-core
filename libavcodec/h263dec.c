@@ -433,6 +433,7 @@ int ff_h263_decode_frame(AVCodecContext *avctx, void *data, int *got_frame,
     int ret;
     int slice_ret = 0;
     AVFrame *pict = data;
+    PutBitContext *transplicate_pb;
     PutBitContext retry_pb;
 
     ffe_h263_prepare_frame(s, avpkt);
@@ -505,8 +506,9 @@ retry:
     }
 
     retry_pb.buf = NULL;
-    if ( s->ffe_xp.o_pb != NULL )
-        retry_pb = *ffe_transplicate_pb(&s->ffe_xp);
+    transplicate_pb = ffe_transplicate_pb(&s->ffe_xp);
+    if ( transplicate_pb != NULL )
+        retry_pb = *transplicate_pb;
 
     if (!s->context_initialized)
         // we need the idct permutation for reading a custom matrix
