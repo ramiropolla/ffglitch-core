@@ -9,6 +9,26 @@
 #include <string.h>
 
 //---------------------------------------------------------------------
+#if !HAVE_THREADS
+#  ifdef pthread_mutex_lock
+#    undef pthread_mutex_lock
+#  endif
+#  define pthread_mutex_lock(a) do{}while(0)
+#  ifdef pthread_mutex_unlock
+#    undef pthread_mutex_unlock
+#  endif
+#  define pthread_mutex_unlock(a) do{}while(0)
+#  ifdef pthread_mutex_init
+#    undef pthread_mutex_init
+#  endif
+#  define pthread_mutex_init(a, b) do{}while(0)
+#  ifdef pthread_mutex_destroy
+#    undef pthread_mutex_destroy
+#  endif
+#  define pthread_mutex_destroy(a) do{}while(0)
+#endif
+
+//---------------------------------------------------------------------
 void json_set_len(json_t *jso, size_t len)
 {
     int type = JSON_TYPE(jso->flags);
@@ -44,14 +64,18 @@ void json_ctx_start(json_ctx_t *jctx)
     jctx->str.bytes_left = 0;
 
     jctx->error = NULL;
+
+    pthread_mutex_init(&jctx->mutex, NULL);
 }
 
 static void *json_allocator_get_internal(
+        json_ctx_t *jctx,
         json_allocator_t *jal,
         size_t chunk_size,
         size_t len)
 {
     void *ptr;
+    pthread_mutex_lock(&jctx->mutex);
     if ( jal->bytes_left < len )
     {
         size_t cur_i = jal->len++;
@@ -63,12 +87,13 @@ static void *json_allocator_get_internal(
     ptr = jal->ptr;
     jal->bytes_left -= len;
     jal->ptr += len;
+    pthread_mutex_unlock(&jctx->mutex);
     return ptr;
 }
 
 void *json_allocator_get(json_ctx_t *jctx, size_t len)
 {
-    return json_allocator_get_internal(&jctx->data, DATA_CHUNK, len);
+    return json_allocator_get_internal(jctx, &jctx->data, DATA_CHUNK, len);
 }
 
 void *json_allocator_get0(json_ctx_t *jctx, size_t len)
@@ -87,7 +112,7 @@ void *json_allocator_dup(json_ctx_t *jctx, const void *src, size_t len)
 
 void *json_allocator_strget(json_ctx_t *jctx, size_t len)
 {
-    return json_allocator_get_internal(&jctx->str, STR_CHUNK, len);
+    return json_allocator_get_internal(jctx, &jctx->str, STR_CHUNK, len);
 }
 
 void *json_allocator_strdup(json_ctx_t *jctx, const void *src, size_t len)
@@ -108,6 +133,7 @@ void json_ctx_free(json_ctx_t *jctx)
 {
     json_allocator_free(&jctx->data);
     json_allocator_free(&jctx->str);
+    pthread_mutex_destroy(&jctx->mutex);
 }
 
 json_t *alloc_json_t(json_ctx_t *jctx)
