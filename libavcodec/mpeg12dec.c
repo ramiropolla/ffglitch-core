@@ -2457,12 +2457,11 @@ static int decode_chunks(AVCodecContext *avctx, AVFrame *picture,
 
                         thread_context->start_mb_y = mb_y;
                         thread_context->end_mb_y   = s2->mb_height;
-                        if (s->slice_count) {
+                        if (s->slice_count)
                             s2->thread_context[s->slice_count - 1]->end_mb_y = mb_y;
-                            ret = ff_update_duplicate_context(thread_context, s2);
-                            if (ret < 0)
-                                return ret;
-                        }
+                        ret = ff_update_duplicate_context(thread_context, s2);
+                        if (ret < 0)
+                            return ret;
                         init_get_bits(&thread_context->gb, buf_ptr, input_size * 8);
                         s->slice_count++;
                     }

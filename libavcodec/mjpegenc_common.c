@@ -353,7 +353,7 @@ end:
         MpegEncContext *s = avctx->priv_data;
         av_assert0(avctx->codec->priv_data_size == sizeof(MpegEncContext));
 
-        s->esc_pos = put_bits_count(pb) >> 3;
+        s->thread_context[0]->esc_pos = put_bits_count(pb) >> 3;
         for(i=1; i<s->slice_context_count; i++)
             s->thread_context[i]->esc_pos = 0;
     }

@@ -47,6 +47,7 @@
 #include "qpeldsp.h"
 #include "thread.h"
 #include "wmv2.h"
+#include "h261.h"
 #include <limits.h>
 
 static void dct_unquantize_mpeg1_intra_c(MpegEncContext *s,
@@ -961,29 +962,28 @@ av_cold int ff_mpv_common_init(MpegEncContext *s)
 
     s->context_initialized = 1;
     memset(s->thread_context, 0, sizeof(s->thread_context));
-    s->thread_context[0]   = s;
 
 //     if (s->width && s->height) {
-    if (nb_slices > 1) {
-        for (i = 0; i < nb_slices; i++) {
-            if (i) {
-                s->thread_context[i] = av_memdup(s, sizeof(MpegEncContext));
-                if (!s->thread_context[i])
-                    goto fail;
-            }
-            if (init_duplicate_context(s->thread_context[i]) < 0)
-                goto fail;
-            s->thread_context[i]->start_mb_y =
-                (s->mb_height * (i) + nb_slices / 2) / nb_slices;
-            s->thread_context[i]->end_mb_y   =
-                (s->mb_height * (i + 1) + nb_slices / 2) / nb_slices;
-        }
-    } else {
-        if (init_duplicate_context(s) < 0)
+    for (i = 0; i < nb_slices; i++) {
+        if ( s->out_format == FMT_H261 )
+            s->thread_context[i] = av_memdup(s, sizeof(H261Context));
+        else if ( s->codec_id == AV_CODEC_ID_WMV2 )
+            s->thread_context[i] = av_memdup(s, sizeof(Wmv2Context));
+        else
+            s->thread_context[i] = av_memdup(s, sizeof(MpegEncContext));
+        if (!s->thread_context[i])
             goto fail;
-        s->start_mb_y = 0;
-        s->end_mb_y   = s->mb_height;
+        if (init_duplicate_context(s->thread_context[i]) < 0)
+            goto fail;
+        s->thread_context[i]->start_mb_y =
+            (s->mb_height * (i) + nb_slices / 2) / nb_slices;
+        s->thread_context[i]->end_mb_y   =
+            (s->mb_height * (i + 1) + nb_slices / 2) / nb_slices;
     }
+    if (init_duplicate_context(s) < 0)
+        goto fail;
+    s->start_mb_y = 0;
+    s->end_mb_y   = s->mb_height;
     s->slice_context_count = nb_slices;
 //     }
 
@@ -1054,15 +1054,13 @@ int ff_mpv_common_frame_size_change(MpegEncContext *s)
     if (!s->context_initialized)
         return AVERROR(EINVAL);
 
-    if (s->slice_context_count > 1) {
-        for (i = 0; i < s->slice_context_count; i++) {
-            free_duplicate_context(s->thread_context[i]);
-        }
-        for (i = 1; i < s->slice_context_count; i++) {
-            av_freep(&s->thread_context[i]);
-        }
-    } else
-        free_duplicate_context(s);
+    for (i = 0; i < s->slice_context_count; i++) {
+        free_duplicate_context(s->thread_context[i]);
+    }
+    for (i = 0; i < s->slice_context_count; i++) {
+        av_freep(&s->thread_context[i]);
+    }
+    free_duplicate_context(s);
 
     free_context_frame(s);
 
@@ -1089,33 +1087,32 @@ int ff_mpv_common_frame_size_change(MpegEncContext *s)
         goto fail;
 
     memset(s->thread_context, 0, sizeof(s->thread_context));
-    s->thread_context[0]   = s;
 
     if (s->width && s->height) {
         int nb_slices = s->slice_context_count;
-        if (nb_slices > 1) {
-            for (i = 0; i < nb_slices; i++) {
-                if (i) {
-                    s->thread_context[i] = av_memdup(s, sizeof(MpegEncContext));
-                    if (!s->thread_context[i]) {
-                        err = AVERROR(ENOMEM);
-                        goto fail;
-                    }
-                }
-                if ((err = init_duplicate_context(s->thread_context[i])) < 0)
-                    goto fail;
-                s->thread_context[i]->start_mb_y =
-                    (s->mb_height * (i) + nb_slices / 2) / nb_slices;
-                s->thread_context[i]->end_mb_y   =
-                    (s->mb_height * (i + 1) + nb_slices / 2) / nb_slices;
-            }
-        } else {
-            err = init_duplicate_context(s);
-            if (err < 0)
+        for (i = 0; i < nb_slices; i++) {
+            if ( s->out_format == FMT_H261 )
+                s->thread_context[i] = av_memdup(s, sizeof(H261Context));
+            else if ( s->codec_id == AV_CODEC_ID_WMV2 )
+                s->thread_context[i] = av_memdup(s, sizeof(Wmv2Context));
+            else
+                s->thread_context[i] = av_memdup(s, sizeof(MpegEncContext));
+            if (!s->thread_context[i]) {
+                err = AVERROR(ENOMEM);
                 goto fail;
-            s->start_mb_y = 0;
-            s->end_mb_y   = s->mb_height;
+            }
+            if ((err = init_duplicate_context(s->thread_context[i])) < 0)
+                goto fail;
+            s->thread_context[i]->start_mb_y =
+                (s->mb_height * (i) + nb_slices / 2) / nb_slices;
+            s->thread_context[i]->end_mb_y   =
+                (s->mb_height * (i + 1) + nb_slices / 2) / nb_slices;
         }
+        err = init_duplicate_context(s);
+        if (err < 0)
+            goto fail;
+        s->start_mb_y = 0;
+        s->end_mb_y   = s->mb_height;
         s->slice_context_count = nb_slices;
     }
 
@@ -1133,15 +1130,14 @@ void ff_mpv_common_end(MpegEncContext *s)
     if (!s)
         return ;
 
-    if (s->slice_context_count > 1) {
-        for (i = 0; i < s->slice_context_count; i++) {
-            free_duplicate_context(s->thread_context[i]);
-        }
-        for (i = 1; i < s->slice_context_count; i++) {
-            av_freep(&s->thread_context[i]);
-        }
-        s->slice_context_count = 1;
-    } else free_duplicate_context(s);
+    for (i = 0; i < s->slice_context_count; i++) {
+        free_duplicate_context(s->thread_context[i]);
+    }
+    for (i = 0; i < s->slice_context_count; i++) {
+        av_freep(&s->thread_context[i]);
+    }
+    s->slice_context_count = 1;
+    free_duplicate_context(s);
 
     av_freep(&s->parse_context.buffer);
     s->parse_context.buffer_size = 0;
