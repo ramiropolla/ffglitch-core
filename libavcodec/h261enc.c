@@ -32,25 +32,12 @@
 #include "codec_internal.h"
 #include "mpegutils.h"
 #include "mpegvideo.h"
-#include "h261.h"
 #include "h261enc.h"
 #include "mpegvideodata.h"
 #include "mpegvideoenc.h"
 
 static uint8_t uni_h261_rl_len [64*64*2*2];
 #define UNI_ENC_INDEX(last,run,level) ((last)*128*64 + (run)*128 + (level))
-
-typedef struct H261EncContext {
-    MpegEncContext s;
-
-    H261Context common;
-
-    int gob_number;
-    enum {
-        H261_QCIF = 0,
-        H261_CIF  = 1,
-    } format;
-} H261EncContext;
 
 void ff_h261_encode_picture_header(MpegEncContext *s)
 {

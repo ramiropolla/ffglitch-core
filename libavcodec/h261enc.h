@@ -29,6 +29,19 @@
 #define AVCODEC_H261ENC_H
 
 #include "mpegvideo.h"
+#include "h261.h"
+
+typedef struct H261EncContext {
+    MpegEncContext s;
+
+    H261Context common;
+
+    int gob_number;
+    enum {
+        H261_QCIF = 0,
+        H261_CIF  = 1,
+    } format;
+} H261EncContext;
 
 void ff_h261_reorder_mb_index(MpegEncContext *s);
 void ff_h261_encode_mb(MpegEncContext *s, int16_t block[6][64],

@@ -85,7 +85,7 @@ static void mjpeg_encode_picture_header(MpegEncContext *s)
                                    s->intra_matrix, s->chroma_intra_matrix,
                                    s->slice_context_count > 1);
 
-    s->esc_pos = put_bytes_count(&s->pb, 0);
+    s->thread_context[0]->esc_pos = put_bytes_count(&s->pb, 0);
     for (int i = 1; i < s->slice_context_count; i++)
         s->thread_context[i]->esc_pos = 0;
 }

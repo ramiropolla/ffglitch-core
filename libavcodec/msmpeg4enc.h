@@ -30,7 +30,7 @@ typedef struct MSMPEG4EncContext {
     MpegEncContext s;
 
     /** [mb_intra][isChroma][level][run][last] */
-    unsigned ac_stats[2][2][MAX_LEVEL + 1][MAX_RUN + 1][2];
+    unsigned (*ac_stats)[2][MAX_LEVEL+1][MAX_RUN+1][2];
 } MSMPEG4EncContext;
 
 void ff_msmpeg4_encode_init(MpegEncContext *s);

@@ -200,7 +200,7 @@ static void find_best_tables(MSMPEG4EncContext *ms)
 
     if(s->pict_type==AV_PICTURE_TYPE_P) chroma_best= best;
 
-    memset(ms->ac_stats, 0, sizeof(ms->ac_stats));
+    memset(ms->ac_stats, 0, 2 * 2 * (MAX_LEVEL + 1) * (MAX_RUN + 1) * 2 * sizeof(unsigned));
 
     s->rl_table_index       =        best;
     s->rl_chroma_table_index= chroma_best;

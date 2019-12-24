@@ -259,6 +259,33 @@ static void update_duplicate_context_after_me(MpegEncContext *dst,
     COPY(frame_pred_frame_dct); // FIXME don't set in encode_header
     COPY(progressive_frame);    // FIXME don't set in encode_header
     COPY(partitioned_frame);    // FIXME don't set in encode_header
+    if ( src->out_format == FMT_H261 )
+    {
+        /* FFedit: gob_number is set in ff_h261_encode_picture_header()
+         *         for src, but it is encoded from dst in
+         *         h261_encode_gob_header(), so it must be duplicated.
+         */
+        H261EncContext *h261_src = (H261EncContext *)src;
+        H261EncContext *h261_dst = (H261EncContext *)dst;
+        h261_dst->gob_number = h261_src->gob_number;
+    }
+    else if ( src->out_format == FMT_SPEEDHQ )
+    {
+        /* FFedit: same thing for slice_start in ff_speedhq_end_slice()
+         *         and ff_speedhq_end_slice(). */
+        SpeedHQEncContext *speedhq_src = (SpeedHQEncContext *)src;
+        SpeedHQEncContext *speedhq_dst = (SpeedHQEncContext *)dst;
+        speedhq_dst->slice_start = speedhq_src->slice_start;
+    }
+    memcpy(&dst->intra_scantable, &src->intra_scantable, sizeof(dst->intra_scantable));
+    memcpy(dst->intra_matrix, src->intra_matrix, sizeof(dst->intra_matrix));
+    memcpy(dst->chroma_intra_matrix, src->chroma_intra_matrix, sizeof(dst->chroma_intra_matrix));
+    COPY(h263_aic);
+    COPY(y_dc_scale_table);
+    COPY(c_dc_scale_table);
+    COPY(rl_table_index);
+    COPY(rl_chroma_table_index);
+    COPY(dc_table_index);
 #undef COPY
 }
 
@@ -812,6 +839,13 @@ av_cold int ff_mpv_encode_init(AVCodecContext *avctx)
     ff_mpegvideoencdsp_init(&s->mpvencdsp, avctx);
     ff_pixblockdsp_init(&s->pdsp, avctx);
 
+    if (s->msmpeg4_version) {
+        size_t ac_stats_size = 2 * 2 * (MAX_LEVEL + 1) * (MAX_RUN + 1) * 2 * sizeof(unsigned);
+        MSMPEG4EncContext *ms = (MSMPEG4EncContext *)s;
+        if (!(ms->ac_stats = av_mallocz(ac_stats_size)))
+            return AVERROR(ENOMEM);
+    }
+
     if (!(avctx->stats_out = av_mallocz(256))               ||
         !FF_ALLOCZ_TYPED_ARRAY(s->q_intra_matrix,          32) ||
         !FF_ALLOCZ_TYPED_ARRAY(s->q_chroma_intra_matrix,   32) ||
@@ -998,6 +1032,10 @@ av_cold int ff_mpv_encode_end(AVCodecContext *avctx)
 
     av_frame_free(&s->new_picture);
 
+    if (s->msmpeg4_version) {
+        MSMPEG4EncContext *ms = (MSMPEG4EncContext *)s;
+        av_freep(&ms->ac_stats);
+    }
     av_freep(&avctx->stats_out);
 
     av_freep(&s->p_mv_table_base);
@@ -1798,6 +1836,8 @@ int ff_mpv_encode_picture(AVCodecContext *avctx, AVPacket *pkt,
 
             init_put_bits(&s->thread_context[i]->pb, start, end - start);
         }
+        /* FFedit: initialize s->pb to the same as thread 0. */
+        s->pb = s->thread_context[0]->pb;
 
         s->pict_type = s->new_picture->pict_type;
         //emms_c();
@@ -1849,6 +1889,8 @@ vbv_retry:
                     s->time_base       = s->last_time_base;
                     s->last_non_b_time = s->time - s->pp_time;
                 }
+                /* FFedit: reset main context's PutBitContext. */
+                init_put_bits(&s->pb, s->pb.buf, s->pb.buf_end - s->pb.buf);
                 for (i = 0; i < context_count; i++) {
                     PutBitContext *pb = &s->thread_context[i]->pb;
                     init_put_bits(pb, pb->buf, pb->buf_end - pb->buf);
@@ -3516,7 +3558,11 @@ static void merge_context_after_encode(MpegEncContext *dst, MpegEncContext *src)
             MERGE(dct_error_sum[1][i]);
         }
     }
+}
+#undef MERGE
 
+static void merge_pb_after_encode(MpegEncContext *dst, MpegEncContext *src)
+{
     av_assert1(put_bits_count(&src->pb) % 8 ==0);
     av_assert1(put_bits_count(&dst->pb) % 8 ==0);
     ff_copy_bits(&dst->pb, src->pb.buf, put_bits_count(&src->pb));
@@ -3627,7 +3673,7 @@ static int encode_picture(MpegEncContext *s)
         return -1;
 
     s->mb_intra=0; //for the rate distortion & bit compare functions
-    for(i=1; i<context_count; i++){
+    for(i=0; i<context_count; i++){
         ret = ff_update_duplicate_context(s->thread_context[i], s);
         if (ret < 0)
             return ret;
@@ -3655,7 +3701,7 @@ static int encode_picture(MpegEncContext *s)
             s->avctx->execute(s->avctx, mb_var_thread, &s->thread_context[0], NULL, context_count, sizeof(void*));
         }
     }
-    for(i=1; i<context_count; i++){
+    for(i=0; i<context_count; i++){
         merge_context_after_me(s, s->thread_context[i]);
     }
     s->mc_mb_var_sum = s->me.mc_mb_var_sum_temp;
@@ -3842,16 +3888,38 @@ static int encode_picture(MpegEncContext *s)
     }
     bits= put_bits_count(&s->pb);
     s->header_bits= bits - s->last_bits;
-
-    for(i=1; i<context_count; i++){
+    for(i=0; i<context_count; i++){
         update_duplicate_context_after_me(s->thread_context[i], s);
     }
+    /* FFedit: The PutBitContext used to encode the picture header is
+     *         passed to thread 0. This way, there is no padding
+     *         between the picture header and the first slice. There
+     *         will be padding between subsequent slices though.
+     *         We have to copy the PutBitContext from the main context
+     *         to thread 0 here before encoding, and then copy the
+     *         PutBitContext back to the main context after encoding.
+     */
+    s->thread_context[0]->pb = s->pb;
     s->avctx->execute(s->avctx, encode_thread, &s->thread_context[0], NULL, context_count, sizeof(void*));
+    /* FFedit: Merge PutBitContexts from all threads into main context.
+     *         See note above. */
+    s->pb = s->thread_context[0]->pb;
     for(i=1; i<context_count; i++){
         if (s->pb.buf_end == s->thread_context[i]->pb.buf)
             set_put_bits_buffer_size(&s->pb, FFMIN(s->thread_context[i]->pb.buf_end - s->pb.buf, INT_MAX/8-BUF_BITS));
-        merge_context_after_encode(s, s->thread_context[i]);
+        merge_pb_after_encode(s, s->thread_context[i]);
     }
+    /* FFmpeg */
+    for(i=0; i<context_count; i++)
+        merge_context_after_encode(s, s->thread_context[i]);
+    /* FFedit: Copy tex_pb and pb2 back from context 0 to the main
+     *         context so that the "encoded partitioned frame too
+     *         large" error is not triggered.
+     *         NOTE: The values will become stale in subsequent calls
+     *               to encode_picture.
+     */
+    s->tex_pb = s->thread_context[0]->tex_pb;
+    s->pb2    = s->thread_context[0]->pb2;
     emms_c();
     return 0;
 }

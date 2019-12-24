@@ -33,6 +33,12 @@
 
 #include "mpegvideo.h"
 
+typedef struct SpeedHQEncContext {
+    MpegEncContext m;
+
+    int slice_start;
+} SpeedHQEncContext;
+
 int  ff_speedhq_encode_init(MpegEncContext *s);
 void ff_speedhq_encode_close(MpegEncContext *s);
 void ff_speedhq_encode_mb(MpegEncContext *s, int16_t block[12][64]);

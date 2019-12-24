@@ -219,7 +219,6 @@ int ff_mpv_common_frame_size_change(MpegEncContext *s)
         goto fail;
 
     memset(s->thread_context, 0, sizeof(s->thread_context));
-    s->thread_context[0]   = s;
 
     if (s->width && s->height) {
         err = ff_mpv_init_duplicate_contexts(s);

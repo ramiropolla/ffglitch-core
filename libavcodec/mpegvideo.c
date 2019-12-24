@@ -40,6 +40,7 @@
 #include "mpegutils.h"
 #include "mpegvideo.h"
 #include "mpegvideodata.h"
+#include "codec_internal.h"
 
 static void dct_unquantize_mpeg1_intra_c(MpegEncContext *s,
                                    int16_t *block, int n, int qscale)
@@ -414,8 +415,8 @@ int ff_mpv_init_duplicate_contexts(MpegEncContext *s)
     /* We initialize the copies before the original so that
      * fields allocated in init_duplicate_context are NULL after
      * copying. This prevents double-frees upon allocation error. */
-    for (int i = 1; i < nb_slices; i++) {
-        s->thread_context[i] = av_memdup(s, sizeof(MpegEncContext));
+    for (int i = 0; i < nb_slices; i++) {
+        s->thread_context[i] = av_memdup(s, ffcodec(s->avctx->codec)->priv_data_size);
         if (!s->thread_context[i])
             return AVERROR(ENOMEM);
         if ((ret = init_duplicate_context(s->thread_context[i])) < 0)
@@ -426,8 +427,7 @@ int ff_mpv_init_duplicate_contexts(MpegEncContext *s)
             (s->mb_height * (i + 1) + nb_slices / 2) / nb_slices;
     }
     s->start_mb_y = 0;
-    s->end_mb_y   = nb_slices > 1 ? (s->mb_height + nb_slices / 2) / nb_slices
-                                  : s->mb_height;
+    s->end_mb_y   = 0;
     return init_duplicate_context(s);
 }
 
@@ -453,7 +453,7 @@ static void free_duplicate_context(MpegEncContext *s)
 
 static void free_duplicate_contexts(MpegEncContext *s)
 {
-    for (int i = 1; i < s->slice_context_count; i++) {
+    for (int i = 0; i < s->slice_context_count; i++) {
         free_duplicate_context(s->thread_context[i]);
         av_freep(&s->thread_context[i]);
     }
@@ -493,7 +493,7 @@ int ff_update_duplicate_context(MpegEncContext *dst, const MpegEncContext *src)
     int i, ret;
     // FIXME copy only needed parts
     backup_duplicate_context(&bak, dst);
-    memcpy(dst, src, sizeof(MpegEncContext));
+    memcpy(dst, src, ffcodec(src->avctx->codec)->priv_data_size);
     backup_duplicate_context(dst, &bak);
     for (i = 0; i < 12; i++) {
         dst->pblocks[i] = &dst->block[i];
@@ -738,7 +738,6 @@ av_cold int ff_mpv_common_init(MpegEncContext *s)
 
     s->context_initialized = 1;
     memset(s->thread_context, 0, sizeof(s->thread_context));
-    s->thread_context[0]   = s;
     s->slice_context_count = nb_slices;
 
 //     if (s->width && s->height) {
