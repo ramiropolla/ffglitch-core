@@ -1167,7 +1167,7 @@ static av_cold int ipvideo_decode_init(AVCodecContext *avctx)
     s->is_16bpp = avctx->bits_per_coded_sample == 16;
     avctx->pix_fmt = s->is_16bpp ? AV_PIX_FMT_RGB555 : AV_PIX_FMT_PAL8;
 
-    ff_hpeldsp_init(&s->hdsp, avctx->flags);
+    ff_hpeldsp_init(&s->hdsp, avctx);
 
     s->last_frame        = av_frame_alloc();
     s->second_last_frame = av_frame_alloc();

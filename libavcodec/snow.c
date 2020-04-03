@@ -437,7 +437,7 @@ av_cold int ff_snow_common_init(AVCodecContext *avctx){
     s->spatial_decomposition_count = 1;
 
     ff_me_cmp_init(&s->mecc, avctx);
-    ff_hpeldsp_init(&s->hdsp, avctx->flags);
+    ff_hpeldsp_init(&s->hdsp, avctx);
     ff_videodsp_init(&s->vdsp, 8);
     ff_dwt_init(&s->dwt);
     ff_h264qpel_init(&s->h264qpel, 8);

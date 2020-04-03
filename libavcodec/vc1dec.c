@@ -537,7 +537,7 @@ static av_cold int vc1_decode_init(AVCodecContext *avctx)
 
     ff_blockdsp_init(&s->bdsp, avctx);
     ff_h264chroma_init(&v->h264chroma, 8);
-    ff_qpeldsp_init(&s->qdsp);
+    ff_qpeldsp_init(&s->qdsp, avctx);
 
     // Must happen after calling ff_vc1_decode_end
     // to avoid de-allocating the sprite_output_frame

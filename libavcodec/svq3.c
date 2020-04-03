@@ -1156,7 +1156,7 @@ static av_cold int svq3_decode_init(AVCodecContext *avctx)
 
     avctx->bits_per_raw_sample = 8;
 
-    ff_hpeldsp_init(&s->hdsp, avctx->flags);
+    ff_hpeldsp_init(&s->hdsp, avctx);
     ff_tpeldsp_init(&s->tdsp);
 
     avctx->pix_fmt     = AV_PIX_FMT_YUVJ420P;

@@ -521,7 +521,7 @@ static av_cold int svq1_encode_init(AVCodecContext *avctx)
         return AVERROR(EINVAL);
     }
 
-    ff_hpeldsp_init(&s->hdsp, avctx->flags);
+    ff_hpeldsp_init(&s->hdsp, avctx);
     ff_me_cmp_init(&s->mecc, avctx);
     ff_mpegvideoencdsp_init(&s->m.mpvencdsp, avctx);
 

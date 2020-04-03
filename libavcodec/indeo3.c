@@ -1058,7 +1058,7 @@ static av_cold int decode_init(AVCodecContext *avctx)
 
     build_requant_tab();
 
-    ff_hpeldsp_init(&ctx->hdsp, avctx->flags);
+    ff_hpeldsp_init(&ctx->hdsp, avctx);
 
     return allocate_frame_buffers(ctx, avctx, avctx->width, avctx->height);
 }

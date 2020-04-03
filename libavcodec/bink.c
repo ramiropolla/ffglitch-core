@@ -1378,7 +1378,7 @@ static av_cold int decode_init(AVCodecContext *avctx)
     avctx->color_range = c->version == 'k' ? AVCOL_RANGE_JPEG : AVCOL_RANGE_MPEG;
 
     ff_blockdsp_init(&c->bdsp, avctx);
-    ff_hpeldsp_init(&c->hdsp, avctx->flags);
+    ff_hpeldsp_init(&c->hdsp, avctx);
     ff_binkdsp_init(&c->binkdsp);
 
     if ((ret = init_bundles(c)) < 0) {

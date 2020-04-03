@@ -25,6 +25,7 @@
 #include "idctdsp.h"
 #include "simple_idct.h"
 #include "xvididct.h"
+#include "ffedit.h"
 
 av_cold void ff_init_scantable(uint8_t *permutation, ScanTable *st,
                                const uint8_t *src_scantable)
@@ -235,6 +236,13 @@ static void ff_jref_idct1_add(uint8_t *dest, ptrdiff_t line_size, int16_t *block
     dest[0] = av_clip_uint8(dest[0] + ((block[0] + 4)>>3));
 }
 
+static void ffe_idct_put(uint8_t *dest, ptrdiff_t line_size, int16_t *block) {}
+static void ffe_idct_add(uint8_t *dest, ptrdiff_t line_size, int16_t *block) {}
+static void ffe_idct(int16_t *data) {}
+static void ffe_put_pixels_clamped(const int16_t *block, uint8_t *av_restrict pixels, ptrdiff_t line_size) {}
+static void ffe_put_signed_pixels_clamped(const int16_t *block, uint8_t *av_restrict pixels, ptrdiff_t line_size) {}
+static void ffe_add_pixels_clamped(const int16_t *block, uint8_t *av_restrict pixels, ptrdiff_t line_size) {}
+
 av_cold void ff_idctdsp_init(IDCTDSPContext *c, AVCodecContext *avctx)
 {
     const unsigned high_bit_depth = avctx->bits_per_raw_sample > 8;
@@ -315,6 +323,17 @@ av_cold void ff_idctdsp_init(IDCTDSPContext *c, AVCodecContext *avctx)
         ff_idctdsp_init_x86(c, avctx, high_bit_depth);
     if (ARCH_MIPS)
         ff_idctdsp_init_mips(c, avctx, high_bit_depth);
+
+    if ( (avctx->ffedit_apply & (1 << FFEDIT_FEAT_LAST)) != 0 )
+    {
+        c->put_pixels_clamped        = ffe_put_pixels_clamped;
+        c->put_signed_pixels_clamped = ffe_put_signed_pixels_clamped;
+        c->add_pixels_clamped        = ffe_add_pixels_clamped;
+        c->idct                      = ffe_idct;
+        c->idct_put                  = ffe_idct_put;
+        c->idct_add                  = ffe_idct_add;
+        c->perm_type                 = FF_IDCT_PERM_NONE;
+    }
 
     ff_init_scantable_permutation(c->idct_permutation,
                                   c->perm_type);

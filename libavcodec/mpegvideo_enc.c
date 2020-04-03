@@ -944,7 +944,7 @@ FF_ENABLE_DEPRECATION_WARNINGS
     ff_me_cmp_init(&s->mecc, avctx);
     ff_mpegvideoencdsp_init(&s->mpvencdsp, avctx);
     ff_pixblockdsp_init(&s->pdsp, avctx);
-    ff_qpeldsp_init(&s->qdsp);
+    ff_qpeldsp_init(&s->qdsp, avctx);
 
     if (s->msmpeg4_version) {
         FF_ALLOCZ_OR_GOTO(s->avctx, s->ac_stats,

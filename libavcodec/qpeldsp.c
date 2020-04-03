@@ -33,6 +33,7 @@
 #include "copy_block.h"
 #include "qpeldsp.h"
 #include "diracdsp.h"
+#include "ffedit.h"
 
 #define BIT_DEPTH 8
 #include "hpel_template.c"
@@ -780,7 +781,9 @@ DIRAC_MC(put)
 DIRAC_MC(avg)
 #endif
 
-av_cold void ff_qpeldsp_init(QpelDSPContext *c)
+static void ffe_qpel_mc_func(uint8_t *dst, const uint8_t *src, ptrdiff_t stride) {}
+
+av_cold void ff_qpeldsp_init(QpelDSPContext *c, AVCodecContext *avctx)
 {
 #define dspfunc(PFX, IDX, NUM)                              \
     c->PFX ## _pixels_tab[IDX][0]  = PFX ## NUM ## _mc00_c; \
@@ -813,4 +816,17 @@ av_cold void ff_qpeldsp_init(QpelDSPContext *c)
         ff_qpeldsp_init_x86(c);
     if (ARCH_MIPS)
         ff_qpeldsp_init_mips(c);
+
+    if ( (avctx->ffedit_apply & (1 << FFEDIT_FEAT_LAST)) != 0 )
+    {
+        for ( int i = 0; i < 2; i++ )
+        {
+            for ( int j = 0; j < 16; j++ )
+            {
+                c->put_qpel_pixels_tab[i][j] = ffe_qpel_mc_func;
+                c->avg_qpel_pixels_tab[i][j] = ffe_qpel_mc_func;
+                c->put_no_rnd_qpel_pixels_tab[i][j] = ffe_qpel_mc_func;
+            }
+        }
+    }
 }

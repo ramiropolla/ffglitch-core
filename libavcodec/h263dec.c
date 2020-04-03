@@ -146,7 +146,7 @@ av_cold int ff_h263_decode_init(AVCodecContext *avctx)
     }
 
     ff_h263dsp_init(&s->h263dsp);
-    ff_qpeldsp_init(&s->qdsp);
+    ff_qpeldsp_init(&s->qdsp, avctx);
     ff_h263_decode_init_vlc();
 
     return 0;

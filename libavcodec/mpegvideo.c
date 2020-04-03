@@ -284,7 +284,7 @@ static av_cold int dct_init(MpegEncContext *s)
 {
     ff_blockdsp_init(&s->bdsp, s->avctx);
     ff_h264chroma_init(&s->h264chroma, 8); //for lowres
-    ff_hpeldsp_init(&s->hdsp, s->avctx->flags);
+    ff_hpeldsp_init(&s->hdsp, s->avctx);
     ff_mpegvideodsp_init(&s->mdsp);
     ff_videodsp_init(&s->vdsp, s->avctx->bits_per_raw_sample);
 
@@ -2053,7 +2053,7 @@ void mpv_reconstruct_mb_internal(MpegEncContext *s, int16_t block[12][64],
                     if (s->mv_dir & MV_DIR_BACKWARD) {
                         MPV_motion_lowres(s, dest_y, dest_cb, dest_cr, 1, s->next_picture.f->data, op_pix);
                     }
-                }else{
+                }else if ( (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_LAST)) == 0 ){
                     op_qpix = s->me.qpel_put;
                     if ((!s->no_rounding) || s->pict_type==AV_PICTURE_TYPE_B){
                         op_pix = s->hdsp.put_pixels_tab;

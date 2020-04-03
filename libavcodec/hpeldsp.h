@@ -31,6 +31,9 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#include "avcodec.h"
+#include "ffedit.h"
+
 /* add and put pixel (decoding) */
 // blocksizes for hpel_pixels_func are 8x4,8x8 16x8 16x16
 // h for hpel_pixels_func is limited to {width/2, width} but never larger
@@ -94,7 +97,7 @@ typedef struct HpelDSPContext {
     op_pixels_func avg_no_rnd_pixels_tab[4];
 } HpelDSPContext;
 
-void ff_hpeldsp_init(HpelDSPContext *c, int flags);
+void ff_hpeldsp_init(HpelDSPContext *c, AVCodecContext *avctx);
 
 void ff_hpeldsp_init_aarch64(HpelDSPContext *c, int flags);
 void ff_hpeldsp_init_alpha(HpelDSPContext *c, int flags);

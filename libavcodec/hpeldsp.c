@@ -335,8 +335,12 @@ PIXOP2(put, op_put)
 #undef op_avg
 #undef op_put
 
-av_cold void ff_hpeldsp_init(HpelDSPContext *c, int flags)
+static void ffe_op_pixels_func(uint8_t *block, const uint8_t *pixels, ptrdiff_t line_size, int h) {}
+
+av_cold void ff_hpeldsp_init(HpelDSPContext *c, AVCodecContext *avctx)
 {
+    int flags = avctx->flags;
+
 #define hpel_funcs(prefix, idx, num) \
     c->prefix ## _pixels_tab idx [0] = prefix ## _pixels ## num ## _8_c; \
     c->prefix ## _pixels_tab idx [1] = prefix ## _pixels ## num ## _x2_8_c; \
@@ -367,4 +371,18 @@ av_cold void ff_hpeldsp_init(HpelDSPContext *c, int flags)
         ff_hpeldsp_init_x86(c, flags);
     if (ARCH_MIPS)
         ff_hpeldsp_init_mips(c, flags);
+
+    if ( (avctx->ffedit_apply & (1 << FFEDIT_FEAT_LAST)) != 0 )
+    {
+        for ( int i = 0; i < 4; i++ )
+        {
+            for ( int j = 0; j < 4; j++ )
+            {
+                c->put_pixels_tab[i][j] = ffe_op_pixels_func;
+                c->avg_pixels_tab[i][j] = ffe_op_pixels_func;
+                c->put_no_rnd_pixels_tab[i][j] = ffe_op_pixels_func;
+            }
+            c->avg_no_rnd_pixels_tab[i] = ffe_op_pixels_func;
+        }
+    }
 }

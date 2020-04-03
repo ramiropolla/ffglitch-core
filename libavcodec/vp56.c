@@ -789,7 +789,7 @@ av_cold int ff_vp56_init_context(AVCodecContext *avctx, VP56Context *s,
     if (avctx->skip_alpha) avctx->pix_fmt = AV_PIX_FMT_YUV420P;
 
     ff_h264chroma_init(&s->h264chroma, 8);
-    ff_hpeldsp_init(&s->hdsp, avctx->flags);
+    ff_hpeldsp_init(&s->hdsp, avctx);
     ff_videodsp_init(&s->vdsp, 8);
     ff_vp3dsp_init(&s->vp3dsp, avctx->flags);
     for (i = 0; i < 64; i++) {

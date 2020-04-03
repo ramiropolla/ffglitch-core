@@ -774,7 +774,7 @@ static av_cold int svq1_decode_init(AVCodecContext *avctx)
     s->height           = avctx->height + 3 & ~3;
     avctx->pix_fmt      = AV_PIX_FMT_YUV410P;
 
-    ff_hpeldsp_init(&s->hdsp, avctx->flags);
+    ff_hpeldsp_init(&s->hdsp, avctx);
 
     INIT_VLC_STATIC(&svq1_block_type, 2, 4,
                     &ff_svq1_block_type_vlc[0][1], 2, 1,

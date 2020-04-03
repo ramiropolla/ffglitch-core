@@ -151,7 +151,7 @@ static av_cold int mimic_decode_init(AVCodecContext *avctx)
     }
     ff_blockdsp_init(&ctx->bdsp, avctx);
     ff_bswapdsp_init(&ctx->bbdsp);
-    ff_hpeldsp_init(&ctx->hdsp, avctx->flags);
+    ff_hpeldsp_init(&ctx->hdsp, avctx);
     ff_idctdsp_init(&ctx->idsp, avctx);
     ff_init_scantable(ctx->idsp.idct_permutation, &ctx->scantable, col_zag);
 
