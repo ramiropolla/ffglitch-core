@@ -274,8 +274,8 @@ static void gray8(uint8_t *dst, const uint8_t *src, ptrdiff_t linesize, int h)
 /* init common dct for both encoder and decoder */
 static av_cold int dct_init(MpegEncContext *s)
 {
-    ff_blockdsp_init(&s->bdsp);
-    ff_hpeldsp_init(&s->hdsp, s->avctx->flags);
+    ff_blockdsp_init(&s->bdsp, s->avctx);
+    ff_hpeldsp_init(&s->hdsp, s->avctx);
     ff_videodsp_init(&s->vdsp, s->avctx->bits_per_raw_sample);
 
     if (s->avctx->debug & FF_DEBUG_NOMC) {

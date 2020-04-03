@@ -823,7 +823,7 @@ static av_cold int svq1_decode_init(AVCodecContext *avctx)
     s->height           = avctx->height + 3 & ~3;
     avctx->pix_fmt      = AV_PIX_FMT_YUV410P;
 
-    ff_hpeldsp_init(&s->hdsp, avctx->flags);
+    ff_hpeldsp_init(&s->hdsp, avctx);
 
     ff_thread_once(&init_static_once, svq1_static_init);
 

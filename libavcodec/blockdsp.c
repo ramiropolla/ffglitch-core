@@ -22,6 +22,7 @@
 #include "config.h"
 #include "libavutil/attributes.h"
 #include "blockdsp.h"
+#include "ffedit.h"
 
 static void clear_block_c(int16_t *block)
 {
@@ -55,7 +56,12 @@ static void fill_block8_c(uint8_t *block, uint8_t value, ptrdiff_t line_size,
     }
 }
 
-av_cold void ff_blockdsp_init(BlockDSPContext *c)
+static void ffe_clear_block(int16_t *block) {}
+static void ffe_clear_blocks(int16_t *blocks) {}
+static void ffe_fill_block16(uint8_t *block, uint8_t value, ptrdiff_t line_size, int h) {}
+static void ffe_fill_block8(uint8_t *block, uint8_t value, ptrdiff_t line_size, int h) {}
+
+av_cold void ff_blockdsp_init(BlockDSPContext *c, AVCodecContext *avctx)
 {
     c->clear_block  = clear_block_c;
     c->clear_blocks = clear_blocks_c;
@@ -76,4 +82,12 @@ av_cold void ff_blockdsp_init(BlockDSPContext *c)
 #elif ARCH_MIPS
     ff_blockdsp_init_mips(c);
 #endif
+
+    if ( (avctx->ffedit_flags & FFEDIT_FLAGS_PARSE_ONLY) != 0 )
+    {
+        c->clear_block  = ffe_clear_block;
+        c->clear_blocks = ffe_clear_blocks;
+        c->fill_block_tab[0] = ffe_fill_block16;
+        c->fill_block_tab[1] = ffe_fill_block8;
+    }
 }

@@ -304,7 +304,7 @@ static av_cold int decode_init(AVCodecContext *avctx)
     }
 
     ff_asv_common_init(avctx);
-    ff_blockdsp_init(&a->bdsp);
+    ff_blockdsp_init(&a->bdsp, avctx);
     ff_idctdsp_init(&a->idsp, avctx);
     ff_permute_scantable(a->permutated_scantable, ff_asv_scantab,
                          a->idsp.idct_permutation);

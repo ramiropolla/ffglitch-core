@@ -134,9 +134,9 @@ static av_cold int mimic_decode_init(AVCodecContext *avctx)
     ctx->prev_index = 0;
     ctx->cur_index  = 15;
 
-    ff_blockdsp_init(&ctx->bdsp);
+    ff_blockdsp_init(&ctx->bdsp, avctx);
     ff_bswapdsp_init(&ctx->bbdsp);
-    ff_hpeldsp_init(&ctx->hdsp, avctx->flags);
+    ff_hpeldsp_init(&ctx->hdsp, avctx);
     ff_idctdsp_init(&ctx->idsp, avctx);
     ff_permute_scantable(ctx->permutated_scantable, col_zag, ctx->idsp.idct_permutation);
 

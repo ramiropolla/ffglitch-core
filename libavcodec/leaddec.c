@@ -79,7 +79,7 @@ static av_cold int lead_decode_init(AVCodecContext * avctx)
     if (avctx->extradata_size < 20)
         return AVERROR_INVALIDDATA;
 
-    ff_blockdsp_init(&s->bdsp);
+    ff_blockdsp_init(&s->bdsp, avctx);
     ff_idctdsp_init(&s->idsp, avctx);
     ff_permute_scantable(s->permutated_scantable, ff_zigzag_direct, s->idsp.idct_permutation);
 

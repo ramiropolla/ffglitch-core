@@ -794,7 +794,7 @@ av_cold int ff_cavs_init(AVCodecContext *avctx)
     AVSContext *h = avctx->priv_data;
     uint8_t permutation[64];
 
-    ff_blockdsp_init(&h->bdsp);
+    ff_blockdsp_init(&h->bdsp, avctx);
     ff_h264chroma_init(&h->h264chroma, 8);
     ff_videodsp_init(&h->vdsp, 8);
     ff_cavsdsp_init(&h->cdsp);

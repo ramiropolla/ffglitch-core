@@ -66,7 +66,7 @@ static av_cold int decode_init(AVCodecContext *avctx)
     MadContext *s = avctx->priv_data;
     s->avctx = avctx;
     avctx->pix_fmt = AV_PIX_FMT_YUV420P;
-    ff_blockdsp_init(&s->bdsp);
+    ff_blockdsp_init(&s->bdsp, avctx);
     ff_bswapdsp_init(&s->bbdsp);
     ff_mpeg12_init_vlcs();
 

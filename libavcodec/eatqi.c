@@ -59,7 +59,7 @@ static av_cold int tqi_decode_init(AVCodecContext *avctx)
 {
     TqiContext *t = avctx->priv_data;
 
-    ff_blockdsp_init(&t->bdsp);
+    ff_blockdsp_init(&t->bdsp, avctx);
     ff_bswapdsp_init(&t->bsdsp);
 
     avctx->framerate = (AVRational){ 15, 1 };

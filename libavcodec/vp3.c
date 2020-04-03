@@ -2380,6 +2380,7 @@ static av_cold int vp3_decode_init(AVCodecContext *avctx)
     int c_width;
     int c_height;
     int y_fragment_count, c_fragment_count;
+    int flags;
 
     ret = init_frames(s);
     if (ret < 0)
@@ -2404,7 +2405,10 @@ static av_cold int vp3_decode_init(AVCodecContext *avctx)
     if (avctx->codec_id != AV_CODEC_ID_THEORA)
         avctx->pix_fmt = AV_PIX_FMT_YUV420P;
     avctx->chroma_sample_location = AVCHROMA_LOC_CENTER;
-    ff_hpeldsp_init(&s->hdsp, avctx->flags | AV_CODEC_FLAG_BITEXACT);
+    flags = avctx->flags;
+    avctx->flags |= AV_CODEC_FLAG_BITEXACT;
+    ff_hpeldsp_init(&s->hdsp, avctx);
+    avctx->flags = flags;
     ff_videodsp_init(&s->vdsp, 8);
     ff_vp3dsp_init(&s->vp3dsp, avctx->flags);
 

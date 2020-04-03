@@ -184,7 +184,7 @@ static av_cold int encode_init(AVCodecContext *avctx)
     }
 
     // Must be before ff_snow_common_init()
-    ff_hpeldsp_init(&s->hdsp, avctx->flags);
+    ff_hpeldsp_init(&s->hdsp, avctx);
     if ((ret = ff_snow_common_init(avctx)) < 0) {
         return ret;
     }

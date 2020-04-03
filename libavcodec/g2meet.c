@@ -182,7 +182,7 @@ static av_cold int jpg_init(AVCodecContext *avctx, JPGContext *c)
     if (ret)
         return ret;
 
-    ff_blockdsp_init(&c->bdsp);
+    ff_blockdsp_init(&c->bdsp, avctx);
     ff_idctdsp_init(&c->idsp, avctx);
     ff_permute_scantable(c->permutated_scantable, ff_zigzag_direct,
                          c->idsp.idct_permutation);

@@ -610,7 +610,7 @@ av_cold void ff_vc1_init_common(VC1Context *v)
     ff_vc1dsp_init(&v->vc1dsp);
 
     /* For error resilience */
-    ff_qpeldsp_init(&s->qdsp);
+    ff_qpeldsp_init(&s->qdsp, s->avctx);
 
     /* VLC tables */
     ff_thread_once(&init_static_once, vc1_init_static);
@@ -719,7 +719,7 @@ static av_cold int vc1_decode_init(AVCodecContext *avctx)
     if (v->profile == PROFILE_ADVANCED)
         avctx->level = v->level;
 
-    ff_blockdsp_init(&s->bdsp);
+    ff_blockdsp_init(&s->bdsp, avctx);
     ff_h264chroma_init(&v->h264chroma, 8);
 
     avctx->has_b_frames = !!avctx->max_b_frames;

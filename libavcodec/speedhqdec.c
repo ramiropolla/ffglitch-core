@@ -569,7 +569,7 @@ static av_cold int speedhq_decode_init(AVCodecContext *avctx)
     if (ret)
         return AVERROR_UNKNOWN;
 
-    ff_blockdsp_init(&s->bdsp);
+    ff_blockdsp_init(&s->bdsp, avctx);
     ff_idctdsp_init(&s->idsp, avctx);
     ff_permute_scantable(s->permutated_intra_scantable, ff_zigzag_direct,
                          s->idsp.idct_permutation);

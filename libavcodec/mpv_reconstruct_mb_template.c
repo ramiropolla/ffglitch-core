@@ -143,7 +143,7 @@ void mpv_reconstruct_mb_internal(MpegEncContext *s, int16_t block[12][64],
                 if (s->mv_dir & MV_DIR_BACKWARD) {
                     MPV_motion_lowres(s, dest_y, dest_cb, dest_cr, 1, s->next_picture.f->data, op_pix);
                 }
-            } else {
+            } else if ( (s->avctx->ffedit_flags & FFEDIT_FLAGS_PARSE_ONLY) == 0 ) {
                 op_pixels_func (*op_pix)[4];
                 qpel_mc_func (*op_qpix)[16];
 

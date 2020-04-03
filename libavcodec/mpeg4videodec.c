@@ -3799,7 +3799,7 @@ static av_cold int decode_init(AVCodecContext *avctx)
 
     avctx->chroma_sample_location = AVCHROMA_LOC_LEFT;
 
-    ff_qpeldsp_init(&s->qdsp);
+    ff_qpeldsp_init(&s->qdsp, avctx);
     ff_mpeg4videodsp_init(&ctx->mdsp);
 
     ff_thread_once(&init_static_once, mpeg4_init_static);
