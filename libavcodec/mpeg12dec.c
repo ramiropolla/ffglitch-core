@@ -424,6 +424,7 @@ static int mpeg_decode_mb(MpegEncContext *s, int16_t block[12][64])
     int i, j, k, cbp, val, mb_type, motion_type;
     const int mb_block_count = 4 + (1 << s->chroma_format);
     AVFrame *f = s->current_picture_ptr->f;
+    ffe_mv_mb_ctx mbctx;
     int ret;
 
     ff_tlog(s->avctx, "decode_mb: x=%d y=%d\n", s->mb_x, s->mb_y);
@@ -514,16 +515,16 @@ static int mpeg_decode_mb(MpegEncContext *s, int16_t block[12][64])
             if (s->picture_structure != PICT_FRAME)
                 skip_bits1(&s->gb);  /* field select */
 
-            ffe_mpeg12_mv_init_mb(s, 1, 1);
-            ffe_mv_select(f, 0, 0);
+            ffe_mpeg12_mv_init_mb(&mbctx, s, 1, 1);
+            ffe_mv_select(&mbctx, f, 0, 0);
 
             s->mv[0][0][0]      =
             s->last_mv[0][0][0] =
-            s->last_mv[0][1][0] = ffe_decode_mpegmv(s, s->mpeg_f_code[0][0],
+            s->last_mv[0][1][0] = ffe_decode_mpegmv(&mbctx, s, s->mpeg_f_code[0][0],
                                                     s->last_mv[0][0][0], 0);
             s->mv[0][0][1]      =
             s->last_mv[0][0][1] =
-            s->last_mv[0][1][1] = ffe_decode_mpegmv(s, s->mpeg_f_code[0][1],
+            s->last_mv[0][1][1] = ffe_decode_mpegmv(&mbctx, s, s->mpeg_f_code[0][1],
                                                     s->last_mv[0][0][1], 1);
 
             check_marker(s->avctx, &s->gb, "after concealment_motion_vectors");
@@ -600,21 +601,21 @@ static int mpeg_decode_mb(MpegEncContext *s, int16_t block[12][64])
                 if (s->picture_structure == PICT_FRAME) {
                     mb_type   |= MB_TYPE_16x16;
                     s->mv_type = MV_TYPE_16X16;
-                    ffe_mpeg12_mv_init_mb(s, 2, 1);
+                    ffe_mpeg12_mv_init_mb(&mbctx, s, 2, 1);
                     for (i = 0; i < 2; i++) {
                         if (USES_LIST(mb_type, i)) {
-                            ffe_mv_select(f, i, 0);
+                            ffe_mv_select(&mbctx, f, i, 0);
 
                             /* MT_FRAME */
                             s->mv[i][0][0]      =
                             s->last_mv[i][0][0] =
                             s->last_mv[i][1][0] =
-                                ffe_decode_mpegmv(s, s->mpeg_f_code[i][0],
+                                ffe_decode_mpegmv(&mbctx, s, s->mpeg_f_code[i][0],
                                                   s->last_mv[i][0][0], 0);
                             s->mv[i][0][1]      =
                             s->last_mv[i][0][1] =
                             s->last_mv[i][1][1] =
-                                ffe_decode_mpegmv(s, s->mpeg_f_code[i][1],
+                                ffe_decode_mpegmv(&mbctx, s, s->mpeg_f_code[i][1],
                                                   s->last_mv[i][0][1], 1);
                             /* full_pel: only for MPEG-1 */
                             if (s->full_pel[i]) {
@@ -626,15 +627,15 @@ static int mpeg_decode_mb(MpegEncContext *s, int16_t block[12][64])
                 } else {
                     mb_type   |= MB_TYPE_16x8 | MB_TYPE_INTERLACED;
                     s->mv_type = MV_TYPE_16X8;
-                    ffe_mpeg12_mv_init_mb(s, 2, 2);
+                    ffe_mpeg12_mv_init_mb(&mbctx, s, 2, 2);
                     for (i = 0; i < 2; i++) {
                         if (USES_LIST(mb_type, i)) {
                             /* MT_16X8 */
                             for (j = 0; j < 2; j++) {
                                 s->field_select[i][j] = get_bits1(&s->gb);
-                                ffe_mv_select(f, i, j);
+                                ffe_mv_select(&mbctx, f, i, j);
                                 for (k = 0; k < 2; k++) {
-                                    val = ffe_decode_mpegmv(s, s->mpeg_f_code[i][k],
+                                    val = ffe_decode_mpegmv(&mbctx, s, s->mpeg_f_code[i][k],
                                                             s->last_mv[i][j][k], k);
                                     s->last_mv[i][j][k] = val;
                                     s->mv[i][j][k]      = val;
@@ -648,18 +649,18 @@ static int mpeg_decode_mb(MpegEncContext *s, int16_t block[12][64])
                 s->mv_type = MV_TYPE_FIELD;
                 if (s->picture_structure == PICT_FRAME) {
                     mb_type |= MB_TYPE_16x8 | MB_TYPE_INTERLACED;
-                    ffe_mpeg12_mv_init_mb(s, 2, 2);
+                    ffe_mpeg12_mv_init_mb(&mbctx, s, 2, 2);
                     for (i = 0; i < 2; i++) {
                         if (USES_LIST(mb_type, i)) {
                             for (j = 0; j < 2; j++) {
                                 s->field_select[i][j] = get_bits1(&s->gb);
-                                ffe_mv_select(f, i, j);
-                                val = ffe_decode_mpegmv(s, s->mpeg_f_code[i][0],
+                                ffe_mv_select(&mbctx, f, i, j);
+                                val = ffe_decode_mpegmv(&mbctx, s, s->mpeg_f_code[i][0],
                                                         s->last_mv[i][j][0], 0);
                                 s->last_mv[i][j][0] = val;
                                 s->mv[i][j][0]      = val;
                                 ff_tlog(s->avctx, "fmx=%d\n", val);
-                                val = ffe_decode_mpegmv(s, s->mpeg_f_code[i][1],
+                                val = ffe_decode_mpegmv(&mbctx, s, s->mpeg_f_code[i][1],
                                                         s->last_mv[i][j][1] >> 1, 1);
                                 s->last_mv[i][j][1] = 2 * val;
                                 s->mv[i][j][1]      = val;
@@ -670,13 +671,13 @@ static int mpeg_decode_mb(MpegEncContext *s, int16_t block[12][64])
                 } else {
                     av_assert0(!s->progressive_sequence);
                     mb_type |= MB_TYPE_16x16 | MB_TYPE_INTERLACED;
-                    ffe_mpeg12_mv_init_mb(s, 2, 2);
+                    ffe_mpeg12_mv_init_mb(&mbctx, s, 2, 2);
                     for (i = 0; i < 2; i++) {
                         if (USES_LIST(mb_type, i)) {
                             s->field_select[i][0] = get_bits1(&s->gb);
-                            ffe_mv_select(f, i, 0);
+                            ffe_mv_select(&mbctx, f, i, 0);
                             for (k = 0; k < 2; k++) {
-                                val = ffe_decode_mpegmv(s, s->mpeg_f_code[i][k],
+                                val = ffe_decode_mpegmv(&mbctx, s, s->mpeg_f_code[i][k],
                                                         s->last_mv[i][0][k], k);
                                 s->last_mv[i][0][k] = val;
                                 s->last_mv[i][1][k] = val;
@@ -692,19 +693,19 @@ static int mpeg_decode_mb(MpegEncContext *s, int16_t block[12][64])
                     return AVERROR_INVALIDDATA;
                 }
                 s->mv_type = MV_TYPE_DMV;
-                ffe_mpeg12_mv_init_mb(s, 2, 1);
+                ffe_mpeg12_mv_init_mb(&mbctx, s, 2, 1);
                 for (i = 0; i < 2; i++) {
                     if (USES_LIST(mb_type, i)) {
                         int dmx, dmy, mx, my, m;
                         const int my_shift = s->picture_structure == PICT_FRAME;
-                        ffe_mv_select(f, i, 0);
+                        ffe_mv_select(&mbctx, f, i, 0);
 
-                        mx = ffe_decode_mpegmv(s, s->mpeg_f_code[i][0],
+                        mx = ffe_decode_mpegmv(&mbctx, s, s->mpeg_f_code[i][0],
                                                s->last_mv[i][0][0], 0);
                         s->last_mv[i][0][0] = mx;
                         s->last_mv[i][1][0] = mx;
                         dmx = get_dmv(s);
-                        my  = ffe_decode_mpegmv(s, s->mpeg_f_code[i][1],
+                        my  = ffe_decode_mpegmv(&mbctx, s, s->mpeg_f_code[i][1],
                                                 s->last_mv[i][0][1] >> my_shift, 0);
                         dmy = get_dmv(s);
 

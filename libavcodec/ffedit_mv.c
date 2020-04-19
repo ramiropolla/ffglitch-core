@@ -15,6 +15,7 @@ static const AVClass ffe_mv_class = {
 
 /*-------------------------------------------------------------------*/
 void ffe_mv_export_init_mb(
+        ffe_mv_mb_ctx *mbctx,
         json_ctx_t *jctx,
         AVFrame *f,
         int mb_y,
@@ -29,7 +30,7 @@ void ffe_mv_export_init_mb(
         return;
 
     ctx = json_userdata_get(jframe);
-    ctx->nb_blocks = nb_blocks;
+    mbctx->nb_blocks = nb_blocks;
 
     for ( size_t i = 0; i < nb_directions; i++ )
     {
@@ -56,12 +57,13 @@ void ffe_mv_export_init_mb(
         }
 
         json_array_set(jmb_y, mb_x, jmb_x);
-        ctx->jmb[i] = jmb_x;
+        mbctx->jmb[i] = jmb_x;
     }
 }
 
 /*-------------------------------------------------------------------*/
 void ffe_mv_import_init_mb(
+        ffe_mv_mb_ctx *mbctx,
         json_ctx_t *jctx,
         AVFrame *f,
         int mb_y,
@@ -76,7 +78,7 @@ void ffe_mv_import_init_mb(
         return;
 
     ctx = json_userdata_get(jframe);
-    ctx->nb_blocks = nb_blocks;
+    mbctx->nb_blocks = nb_blocks;
 
     for ( size_t i = 0; i < nb_directions; i++ )
     {
@@ -87,12 +89,13 @@ void ffe_mv_import_init_mb(
             continue;
         jmb_y = json_array_get(jdata, mb_y);
         jmb_x = json_array_get(jmb_y, mb_x);
-        ctx->jmb[i] = jmb_x;
+        mbctx->jmb[i] = jmb_x;
     }
 }
 
 /*-------------------------------------------------------------------*/
 void ffe_mv_select(
+        ffe_mv_mb_ctx *mbctx,
         AVFrame *f,
         int direction,
         int blockn)
@@ -104,37 +107,35 @@ void ffe_mv_select(
         return;
 
     ctx = json_userdata_get(jframe);
-    ctx->cur = ctx->jmb[direction];
-    ctx->pcount = &ctx->count[direction];
-    if ( ctx->nb_blocks > 1 )
-        ctx->cur = json_array_get(ctx->cur, blockn);
+    mbctx->cur = mbctx->jmb[direction];
+    mbctx->pcount = &ctx->count[direction];
+    if ( mbctx->nb_blocks > 1 )
+        mbctx->cur = json_array_get(mbctx->cur, blockn);
 }
 
 /*-------------------------------------------------------------------*/
 int ffe_mv_get(
+        ffe_mv_mb_ctx *mbctx,
         AVFrame *f,
         int x_or_y)
 {
-    json_t *jframe = f->ffedit_sd[FFEDIT_FEAT_MV];
-    ffe_mv_ctx *ctx = json_userdata_get(jframe);
-    return json_array_get_int(ctx->cur, x_or_y);
+    return json_array_get_int(mbctx->cur, x_or_y);
 }
 
 /*-------------------------------------------------------------------*/
 void ffe_mv_set(
+        ffe_mv_mb_ctx *mbctx,
         AVFrame *f,
         int x_or_y,
         int val)
 {
-    json_t *jframe = f->ffedit_sd[FFEDIT_FEAT_MV];
-    ffe_mv_ctx *ctx = json_userdata_get(jframe);
-    if ( is_json_null(ctx->cur) )
+    if ( is_json_null(mbctx->cur) )
     {
-        json_make_array_of_ints(f->jctx, ctx->cur, 2);
-        json_set_pflags(ctx->cur, JSON_PFLAGS_NO_LF | JSON_PFLAGS_NO_SPACE);
+        json_make_array_of_ints(f->jctx, mbctx->cur, 2);
+        json_set_pflags(mbctx->cur, JSON_PFLAGS_NO_LF | JSON_PFLAGS_NO_SPACE);
     }
-    json_array_set_int(f->jctx, ctx->cur, x_or_y, val);
-    (*ctx->pcount)++;
+    json_array_set_int(f->jctx, mbctx->cur, x_or_y, val);
+    atomic_fetch_add(mbctx->pcount, 1);
 }
 
 /*-------------------------------------------------------------------*/
@@ -162,9 +163,9 @@ void ffe_mv_export_init(
     ctx->data[0] = ffe_jblock_new(jctx, mb_width, mb_height, JSON_PFLAGS_NO_LF);
     ctx->data[1] = ffe_jblock_new(jctx, mb_width, mb_height, JSON_PFLAGS_NO_LF);
 
-    ctx->count[0] = 0;
+    atomic_init(&ctx->count[0], 0);
     json_object_add(jframe, "forward", ctx->data[0]);
-    ctx->count[1] = 0;
+    atomic_init(&ctx->count[1], 0);
     json_object_add(jframe, "backward", ctx->data[1]);
 
     f->ffedit_sd[FFEDIT_FEAT_MV] = jframe;
@@ -175,9 +176,9 @@ void ffe_mv_export_cleanup(json_ctx_t *jctx, AVFrame *f)
 {
     json_t *jframe = f->ffedit_sd[FFEDIT_FEAT_MV];
     ffe_mv_ctx *ctx = json_userdata_get(jframe);
-    if ( ctx->count[0] == 0 )
+    if ( atomic_load(&ctx->count[0]) == 0 )
         json_object_del(jframe, "forward");
-    if ( ctx->count[1] == 0 )
+    if ( atomic_load(&ctx->count[1]) == 0 )
         json_object_del(jframe, "backward");
     json_object_done(jctx, jframe);
 }

@@ -140,18 +140,21 @@ ffe_mpeg12_import_mv_init(MpegEncContext *s, AVFrame *f)
 /* export */
 
 static void ffe_mpeg12_mv_init_mb(
+        ffe_mv_mb_ctx *mbctx,
         MpegEncContext *s,
         int nb_directions,
         int nb_blocks)
 {
     AVFrame *f = s->current_picture_ptr->f;
     if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_MV)) != 0 )
-        ffe_mv_export_init_mb(f->jctx, f, s->mb_y, s->mb_x, nb_directions, nb_blocks);
+        ffe_mv_export_init_mb(mbctx, f->jctx, f, s->mb_y, s->mb_x, nb_directions, nb_blocks);
     if ( (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_MV)) != 0 )
-        ffe_mv_import_init_mb(f->jctx, f, s->mb_y, s->mb_x, nb_directions, nb_blocks);
+        ffe_mv_import_init_mb(mbctx, f->jctx, f, s->mb_y, s->mb_x, nb_directions, nb_blocks);
 }
 
+//---------------------------------------------------------------------
 static int ffe_decode_mpegmv(
+        ffe_mv_mb_ctx *mbctx,
         MpegEncContext *s,
         int fcode,
         int pred,
@@ -168,14 +171,14 @@ static int ffe_decode_mpegmv(
         return code;
 
     if ( (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_MV)) != 0 )
-        code = ffe_mv_get(f, x_or_y);
+        code = ffe_mv_get(mbctx, f, x_or_y);
     if ( (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_MV)) != 0 )
     {
         ff_mpeg1_encode_motion(s, code - pred, fcode);
         ffe_transplicate_restore(&s->ffe_xp, &s->pb);
     }
     if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_MV)) != 0 )
-        ffe_mv_set(f, x_or_y, code);
+        ffe_mv_set(mbctx, f, x_or_y, code);
 
     return code;
 }
