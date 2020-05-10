@@ -829,6 +829,7 @@ AVCodec ff_h263_decoder = {
     .decode         = ff_h263_decode_frame,
     .capabilities   = AV_CODEC_CAP_DRAW_HORIZ_BAND | AV_CODEC_CAP_DR1 |
                       AV_CODEC_CAP_FFEDIT_BITSTREAM |
+                      AV_CODEC_CAP_FFEDIT_SLICE_THREADS |
                       AV_CODEC_CAP_TRUNCATED | AV_CODEC_CAP_DELAY,
     .caps_internal  = FF_CODEC_CAP_SKIP_FRAME_FILL_PARAM,
     .flush          = ff_mpeg_flush,
@@ -848,6 +849,7 @@ AVCodec ff_h263p_decoder = {
     .decode         = ff_h263_decode_frame,
     .capabilities   = AV_CODEC_CAP_DRAW_HORIZ_BAND | AV_CODEC_CAP_DR1 |
                       AV_CODEC_CAP_FFEDIT_BITSTREAM |
+                      AV_CODEC_CAP_FFEDIT_SLICE_THREADS |
                       AV_CODEC_CAP_TRUNCATED | AV_CODEC_CAP_DELAY,
     .caps_internal  = FF_CODEC_CAP_SKIP_FRAME_FILL_PARAM,
     .flush          = ff_mpeg_flush,
