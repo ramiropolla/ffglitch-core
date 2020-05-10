@@ -1581,6 +1581,7 @@ static int mpeg4_decode_mb(MpegEncContext *s, int16_t block[6][64])
             mb_type = MB_TYPE_DIRECT2 | MB_TYPE_SKIP | MB_TYPE_L0L1;
             cbp     = 0;
         } else {
+            AVFrame *f = s->current_picture_ptr->f;
             modb2   = get_bits1(&s->gb);
             mb_type = get_vlc2(&s->gb, mb_type_b_vlc.table, MB_TYPE_B_VLC_BITS, 1);
             if (mb_type < 0) {
@@ -1625,8 +1626,10 @@ static int mpeg4_decode_mb(MpegEncContext *s, int16_t block[6][64])
                 s->mv_type = MV_TYPE_16X16;
 
                 if (USES_LIST(mb_type, 0)) {
+                    AVFrame *f = s->current_picture_ptr->f;
                     s->mv_dir = MV_DIR_FORWARD;
 
+                    ffe_mv_select(&mbctx, f, 0, 0);
                     mx = ffe_mpeg4_decode_motion(&mbctx, s, s->last_mv[0][0][0], s->f_code, 0);
                     my = ffe_mpeg4_decode_motion(&mbctx, s, s->last_mv[0][0][1], s->f_code, 1);
                     s->last_mv[0][1][0] =
@@ -1640,6 +1643,7 @@ static int mpeg4_decode_mb(MpegEncContext *s, int16_t block[6][64])
                 if (USES_LIST(mb_type, 1)) {
                     s->mv_dir |= MV_DIR_BACKWARD;
 
+                    ffe_mv_select(&mbctx, f, 1, 0);
                     mx = ffe_mpeg4_decode_motion(&mbctx, s, s->last_mv[1][0][0], s->b_code, 0);
                     my = ffe_mpeg4_decode_motion(&mbctx, s, s->last_mv[1][0][1], s->b_code, 1);
                     s->last_mv[1][1][0] =
@@ -1685,7 +1689,9 @@ static int mpeg4_decode_mb(MpegEncContext *s, int16_t block[6][64])
                 mx =
                 my = 0;
             } else {
+                AVFrame *f = s->current_picture_ptr->f;
                 ffe_mpeg4_mv_init_mb(&mbctx, s, 2, 1);
+                ffe_mv_select(&mbctx, f, 1, 0);
                 mx = ffe_mpeg4_decode_motion(&mbctx, s, 0, 1, 0);
                 my = ffe_mpeg4_decode_motion(&mbctx, s, 0, 1, 1);
             }
