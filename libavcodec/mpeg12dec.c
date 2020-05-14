@@ -2194,6 +2194,7 @@ static void mpeg_decode_user_data(AVCodecContext *avctx,
         uint32_t start_code = -1;
         const uint8_t *next_chunk = avpriv_find_start_code(p, buf_end, &start_code);
         next_chunk -= 4;
+        ffe_transplicate_bytes(&s2->ffe_xp, p - 4, 4);
         ffe_transplicate_bytes(&s2->ffe_xp, p, next_chunk - p);
     }
 
