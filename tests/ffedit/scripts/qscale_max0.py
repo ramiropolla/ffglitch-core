@@ -12,5 +12,5 @@ with open(sys.argv[1], 'r') as f:
             # if ffedit exported qscale
             if "qscale" in frame:
                 qscale = frame["qscale"]["slice"]
-                qscale[0] = 63
+                qscale[0]["0"] = 63
     print json.dumps(data)
