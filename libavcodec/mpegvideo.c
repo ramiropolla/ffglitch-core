@@ -510,6 +510,7 @@ int ff_mpeg_update_thread_context(AVCodecContext *dst,
         s->avctx                 = dst;
         s->bitstream_buffer      = NULL;
         s->bitstream_buffer_size = s->allocated_bitstream_buffer_size = 0;
+        memset(&s->ffe_xp, 0, sizeof(s->ffe_xp));
 
         if (s1->context_initialized){
 //             s->picture_range_start  += MAX_PICTURE_COUNT;
