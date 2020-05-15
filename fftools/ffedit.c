@@ -407,12 +407,6 @@ static int ffedit_decode(
         return ret;
     }
 
-    if ( ectx != NULL && dctx->ffedit_out != NULL )
-    {
-        ffe_output_packet(ectx, ipkt->pos, ipkt->size, dctx->ffedit_out, dctx->ffedit_out_size);
-        av_freep(&dctx->ffedit_out);
-    }
-
     while ( ret >= 0 )
     {
         ret = avcodec_receive_frame(dctx, iframe);
@@ -422,6 +416,12 @@ static int ffedit_decode(
         {
             av_log(NULL, AV_LOG_FATAL, "receive_frame() failed\n");
             return ret;
+        }
+
+        if ( ectx != NULL && dctx->ffedit_out != NULL )
+        {
+            ffe_output_packet(ectx, dctx->ffedit_in_pos, dctx->ffedit_in_size, dctx->ffedit_out, dctx->ffedit_out_size);
+            av_freep(&dctx->ffedit_out);
         }
 
         if ( is_exporting )

@@ -86,6 +86,8 @@ void ffe_transplicate_flush(
         return;
     bitcount = put_bits_count(xp->pb);
     flush_put_bits(xp->pb);
+    avctx->ffedit_in_pos = pkt->pos;
+    avctx->ffedit_in_size = pkt->size;
     avctx->ffedit_out_size = (bitcount + 7) >> 3;
     avctx->ffedit_out = av_malloc(avctx->ffedit_out_size);
     memcpy(avctx->ffedit_out, xp->data, avctx->ffedit_out_size);

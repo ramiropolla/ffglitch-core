@@ -1655,6 +1655,8 @@ typedef struct AVCodecContext {
      */
     unsigned int codec_tag;
 
+    int64_t ffedit_in_pos;
+    size_t ffedit_in_size;
     void *ffedit_out;
     size_t ffedit_out_size;
 
