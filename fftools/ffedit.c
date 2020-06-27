@@ -352,8 +352,10 @@ static int open_decoders(FFEditOutputContext *ectx)
             av_dict_set(&opts, "threads", threads, 0);
         else if ( (decoder->capabilities & AV_CODEC_CAP_FFEDIT_SLICE_THREADS) != 0 )
             av_dict_set(&opts, "threads", "auto", 0);
-        else
-            av_dict_set(&opts, "thread_type", "frame", 0);
+
+        /* disable frame-based multithreading. it causes all sorts of
+         * hard-to-debug issues (many seen with mpeg4). */
+        av_dict_set(&opts, "thread_type", "slice", 0);
 
         /* select features */
         for ( size_t j = 0; j < FFEDIT_FEAT_LAST; j++ )
