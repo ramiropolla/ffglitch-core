@@ -116,6 +116,8 @@ libavformat/file_open.c
 libavformat/golomb_tab.c
 libavformat/log2_tab.c
 libavformat/rangecoder_dec.c
+libavutil/quickjs/libunicode-table.h
+libavutil/quickjs/unicode_gen_def.h
 libswresample/log2_tab.c
 libswscale/log2_tab.c
 tools/uncoded_frame.c
@@ -159,6 +161,18 @@ libavcodec/xvidcore/utils/mem_align.h
 libavcodec/xvidcore/utils/mem_transfer.h
 libavcodec/xvidcore/utils/timer.h
 libavcodec/xvidcore/xvid.h
+libavutil/quickjs/cutils.h
+libavutil/quickjs/libbf.h
+libavutil/quickjs/libregexp-opcode.h
+libavutil/quickjs/libregexp.h
+libavutil/quickjs/libunicode-table.h
+libavutil/quickjs/libunicode.h
+libavutil/quickjs/list.h
+libavutil/quickjs/quickjs-atom.h
+libavutil/quickjs/quickjs-libc.h
+libavutil/quickjs/quickjs-opcode.h
+libavutil/quickjs/quickjs.h
+libavutil/quickjs/unicode_gen_def.h
 tools/decode_simple.h
 Use of av_clip() where av_clip_uintp2() could be used:
 Use of av_clip() where av_clip_intp2() could be used:
