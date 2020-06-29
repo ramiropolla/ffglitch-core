@@ -83,7 +83,7 @@ static char *json_parse_string(json_ctx_t *jctx, json_t *jso, char *buf)
     return buf;
 }
 
-static char *parse_number(int64_t *pout, char *buf)
+static char *parse_number(json_ctx_t *jctx, int64_t *pout, char *buf)
 {
     uint64_t uval = 0;
     int is_negative = (*buf == '-');
@@ -93,6 +93,9 @@ static char *parse_number(int64_t *pout, char *buf)
     while ( *buf >= '0' && *buf <= '9' )
         uval = (uval * 10) + *buf++ - '0';
 
+    if ( *buf == '.' )
+        return set_error(jctx, "number (floats are not supported)");
+
     *pout = is_negative ? -uval : uval;
 
     return buf;
@@ -101,7 +104,7 @@ static char *parse_number(int64_t *pout, char *buf)
 static char *json_parse_number(json_ctx_t *jctx, json_t *jso, char *buf)
 {
     jso->flags = JSON_TYPE_NUMBER;
-    return parse_number(&jso->val, buf);
+    return parse_number(jctx, &jso->val, buf);
 }
 
 static char *json_parse_null(json_ctx_t *jctx, json_t *jso, char *buf)
