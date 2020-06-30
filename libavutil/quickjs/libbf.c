@@ -1055,6 +1055,7 @@ limb_t mp_add_ui(limb_t *tab, limb_t b, size_t n)
     return k;
 }
 
+static
 limb_t mp_sub(limb_t *res, const limb_t *op1, const limb_t *op2, 
               mp_size_t n, limb_t carry)
 {
@@ -1091,6 +1092,7 @@ static limb_t mp_neg(limb_t *res, const limb_t *op2, mp_size_t n, limb_t carry)
     return k;
 }
 
+static
 limb_t mp_sub_ui(limb_t *tab, limb_t b, mp_size_t n)
 {
     mp_size_t i;
@@ -5535,6 +5537,7 @@ static inline limb_t fast_shr_dec(limb_t a, int shift)
 /* division and remainder by 10^shift */
 #define fast_shr_rem_dec(q, r, a, shift) q = fast_shr_dec(a, shift), r = a - q * mp_pow_dec[shift]
     
+static
 limb_t mp_add_dec(limb_t *res, const limb_t *op1, const limb_t *op2, 
                   mp_size_t n, limb_t carry)
 {
@@ -5555,6 +5558,7 @@ limb_t mp_add_dec(limb_t *res, const limb_t *op1, const limb_t *op2,
     return k;
 }
 
+static
 limb_t mp_add_ui_dec(limb_t *tab, limb_t b, mp_size_t n)
 {
     limb_t base = BF_DEC_BASE;
@@ -5575,6 +5579,7 @@ limb_t mp_add_ui_dec(limb_t *tab, limb_t b, mp_size_t n)
     return k;
 }
 
+static
 limb_t mp_sub_dec(limb_t *res, const limb_t *op1, const limb_t *op2, 
                   mp_size_t n, limb_t carry)
 {
@@ -5594,6 +5599,7 @@ limb_t mp_sub_dec(limb_t *res, const limb_t *op1, const limb_t *op2,
     return k;
 }
 
+static
 limb_t mp_sub_ui_dec(limb_t *tab, limb_t b, mp_size_t n)
 {
     limb_t base = BF_DEC_BASE;
@@ -5615,6 +5621,7 @@ limb_t mp_sub_ui_dec(limb_t *tab, limb_t b, mp_size_t n)
 }
 
 /* taba[] = taba[] * b + l. 0 <= b, l <= base - 1. Return the high carry */
+static
 limb_t mp_mul1_dec(limb_t *tabr, const limb_t *taba, mp_size_t n, 
                    limb_t b, limb_t l)
 {
@@ -5632,6 +5639,7 @@ limb_t mp_mul1_dec(limb_t *tabr, const limb_t *taba, mp_size_t n,
 
 /* tabr[] += taba[] * b. 0 <= b <= base - 1. Return the value to add
    to the high word */
+static
 limb_t mp_add_mul1_dec(limb_t *tabr, const limb_t *taba, mp_size_t n,
                        limb_t b)
 {
@@ -5651,6 +5659,7 @@ limb_t mp_add_mul1_dec(limb_t *tabr, const limb_t *taba, mp_size_t n,
 
 /* tabr[] -= taba[] * b. 0 <= b <= base - 1. Return the value to
    substract to the high word. */
+static
 limb_t mp_sub_mul1_dec(limb_t *tabr, const limb_t *taba, mp_size_t n,
                        limb_t b)
 {
@@ -5677,6 +5686,7 @@ limb_t mp_sub_mul1_dec(limb_t *tabr, const limb_t *taba, mp_size_t n,
 }
 
 /* size of the result : op1_size + op2_size. */
+static
 void mp_mul_basecase_dec(limb_t *result, 
                          const limb_t *op1, mp_size_t op1_size, 
                          const limb_t *op2, mp_size_t op2_size) 
@@ -5694,6 +5704,7 @@ void mp_mul_basecase_dec(limb_t *result,
 
 /* taba[] = (taba[] + r*base^na) / b. 0 <= b < base. 0 <= r <
    b. Return the remainder. */
+static
 limb_t mp_div1_dec(limb_t *tabr, const limb_t *taba, mp_size_t na, 
                    limb_t b, limb_t r)
 {
@@ -6033,6 +6044,7 @@ static limb_t mp_sqrtrem_rec_dec(limb_t *tabs, limb_t *taba, limb_t n,
    r) with s=floor(sqrt(a)) and r=a-s^2. 0 <= r <= 2 * s. tabs has n
    limbs. r is returned in the lower n limbs of taba. Its r[n] is the
    returned value of the function. */
+static
 int mp_sqrtrem_dec(bf_context_t *s, limb_t *tabs, limb_t *taba, limb_t n)
 {
     limb_t tmp_buf1[8];

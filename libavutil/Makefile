@@ -186,6 +186,21 @@ OBJS-$(CONFIG_VULKAN)                   += hwcontext_vulkan.o
 
 OBJS += $(COMPAT_OBJS:%=../compat/%)
 
+# quickjs
+OBJS += quickjs/cutils.o
+OBJS += quickjs/libbf.o
+OBJS += quickjs/libregexp.o
+OBJS += quickjs/libunicode.o
+OBJS += quickjs/quickjs-libc.o
+OBJS += quickjs/quickjs.o
+
+$(SUBDIR)quickjs/cutils.o:       CFLAGS += -D_GNU_SOURCE -DCONFIG_VERSION=\"2020-04-12\" -DCONFIG_BIGNUM
+$(SUBDIR)quickjs/libbf.o:        CFLAGS += -D_GNU_SOURCE -DCONFIG_VERSION=\"2020-04-12\" -DCONFIG_BIGNUM
+$(SUBDIR)quickjs/libregexp.o:    CFLAGS += -D_GNU_SOURCE -DCONFIG_VERSION=\"2020-04-12\" -DCONFIG_BIGNUM
+$(SUBDIR)quickjs/libunicode.o:   CFLAGS += -D_GNU_SOURCE -DCONFIG_VERSION=\"2020-04-12\" -DCONFIG_BIGNUM
+$(SUBDIR)quickjs/quickjs-libc.o: CFLAGS += -D_GNU_SOURCE -DCONFIG_VERSION=\"2020-04-12\" -DCONFIG_BIGNUM
+$(SUBDIR)quickjs/quickjs.o:      CFLAGS += -D_GNU_SOURCE -DCONFIG_VERSION=\"2020-04-12\" -DCONFIG_BIGNUM
+
 # Windows resource file
 SLIBOBJS-$(HAVE_GNU_WINDRES)            += avutilres.o
 
