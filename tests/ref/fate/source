@@ -143,6 +143,8 @@ libavutil/json.c
 libavutil/json.h
 libavutil/json_dump.c
 libavutil/json_parse.c
+libavutil/quickjs/libunicode-table.h
+libavutil/quickjs/unicode_gen_def.h
 libswresample/log2_tab.c
 libswscale/log2_tab.c
 tools/uncoded_frame.c
@@ -199,5 +201,17 @@ libavcodec/xvidcore/utils/mem_transfer.h
 libavcodec/xvidcore/utils/timer.h
 libavcodec/xvidcore/xvid.h
 libavutil/json.h
+libavutil/quickjs/cutils.h
+libavutil/quickjs/libbf.h
+libavutil/quickjs/libregexp-opcode.h
+libavutil/quickjs/libregexp.h
+libavutil/quickjs/libunicode-table.h
+libavutil/quickjs/libunicode.h
+libavutil/quickjs/list.h
+libavutil/quickjs/quickjs-atom.h
+libavutil/quickjs/quickjs-libc.h
+libavutil/quickjs/quickjs-opcode.h
+libavutil/quickjs/quickjs.h
+libavutil/quickjs/unicode_gen_def.h
 Use of av_clip() where av_clip_uintp2() could be used:
 Use of av_clip() where av_clip_intp2() could be used:
