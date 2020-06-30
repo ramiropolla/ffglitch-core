@@ -2054,7 +2054,7 @@ void mpv_reconstruct_mb_internal(MpegEncContext *s, int16_t block[12][64],
                     if (s->mv_dir & MV_DIR_BACKWARD) {
                         MPV_motion_lowres(s, dest_y, dest_cb, dest_cr, 1, s->next_picture.f->data, op_pix);
                     }
-                }else if ( (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_LAST)) == 0 ){
+                }else if ( s->avctx->ffedit_export == 0 && s->avctx->ffedit_apply == 0 ){
                     op_qpix = s->me.qpel_put;
                     if ((!s->no_rounding) || s->pict_type==AV_PICTURE_TYPE_B){
                         op_pix = s->hdsp.put_pixels_tab;

@@ -324,7 +324,7 @@ av_cold void ff_idctdsp_init(IDCTDSPContext *c, AVCodecContext *avctx)
     if (ARCH_MIPS)
         ff_idctdsp_init_mips(c, avctx, high_bit_depth);
 
-    if ( (avctx->ffedit_apply & (1 << FFEDIT_FEAT_LAST)) != 0 )
+    if ( avctx->ffedit_export != 0 || avctx->ffedit_apply != 0 )
     {
         c->put_pixels_clamped        = ffe_put_pixels_clamped;
         c->put_signed_pixels_clamped = ffe_put_signed_pixels_clamped;

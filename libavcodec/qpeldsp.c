@@ -817,7 +817,7 @@ av_cold void ff_qpeldsp_init(QpelDSPContext *c, AVCodecContext *avctx)
     if (ARCH_MIPS)
         ff_qpeldsp_init_mips(c);
 
-    if ( (avctx->ffedit_apply & (1 << FFEDIT_FEAT_LAST)) != 0 )
+    if ( avctx->ffedit_export != 0 || avctx->ffedit_apply != 0 )
     {
         for ( int i = 0; i < 2; i++ )
         {

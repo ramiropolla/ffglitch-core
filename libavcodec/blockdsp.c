@@ -82,7 +82,7 @@ av_cold void ff_blockdsp_init(BlockDSPContext *c, AVCodecContext *avctx)
     if (ARCH_MIPS)
         ff_blockdsp_init_mips(c);
 
-    if ( (avctx->ffedit_apply & (1 << FFEDIT_FEAT_LAST)) != 0 )
+    if ( avctx->ffedit_export != 0 || avctx->ffedit_apply != 0 )
     {
         c->clear_block  = ffe_clear_block;
         c->clear_blocks = ffe_clear_blocks;

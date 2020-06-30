@@ -372,7 +372,7 @@ av_cold void ff_hpeldsp_init(HpelDSPContext *c, AVCodecContext *avctx)
     if (ARCH_MIPS)
         ff_hpeldsp_init_mips(c, flags);
 
-    if ( (avctx->ffedit_apply & (1 << FFEDIT_FEAT_LAST)) != 0 )
+    if ( avctx->ffedit_export != 0 || avctx->ffedit_apply != 0 )
     {
         for ( int i = 0; i < 4; i++ )
         {
