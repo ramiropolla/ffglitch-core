@@ -9,9 +9,6 @@
 #include <stdio.h>
 #include <inttypes.h>
 
-#include "config.h"
-#include "libavutil/thread.h"
-
 typedef struct json_t json_t;
 
 typedef struct {
@@ -59,18 +56,20 @@ typedef struct {
     size_t bytes_left;
 } json_allocator_t;
 
-typedef struct {
+typedef struct json_ctx_t json_ctx_t;
+
+struct json_ctx_t {
     json_allocator_t data;
     json_allocator_t str;
 
     const char *error;
 
-#if HAVE_THREADS
-    pthread_mutex_t mutex;
-#endif
-} json_ctx_t;
+    /* for multi-threading */
+    json_ctx_t *next;
+};
 
 void json_ctx_start(json_ctx_t *jctx);
+json_ctx_t *json_ctx_start_thread(json_ctx_t *jctx, int n);
 void *json_allocator_get(json_ctx_t *jctx, size_t len);
 void *json_allocator_get0(json_ctx_t *jctx, size_t len);
 void *json_allocator_dup(json_ctx_t *jctx, const void *src, size_t len);
