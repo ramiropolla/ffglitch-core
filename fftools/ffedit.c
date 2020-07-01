@@ -345,6 +345,7 @@ static int open_decoders(FFEditOutputContext *ectx)
 
         dctxs[i] = avcodec_alloc_context3(decoder);
         dctx = dctxs[i];
+        dctx->jctx = &jctx;
         avcodec_parameters_to_context(dctx, fctx->streams[i]->codecpar);
 
         /* enable threads if ffedit supports it for this codec */
@@ -481,7 +482,6 @@ static int transplicate(FFEditOutputContext *ectx)
             continue;
 
         memset(ipkt->ffedit_sd, 0x00, sizeof(ipkt->ffedit_sd));
-        ipkt->jctx = &jctx;
         if ( is_applying )
         {
             size_t idx = frames_idx[stream_index];

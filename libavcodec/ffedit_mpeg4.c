@@ -37,7 +37,7 @@ ffe_mpeg4_export_info(MpegEncContext *s, int mb_type)
         *ptr++ = (mb_type & MB_TYPE_SKIP)       ? 'S' : ' ';
         *ptr = '\0';
 
-        jso = json_string_new(f->jctx, buf);
+        jso = json_string_new(s->jctx, buf);
         ffe_jmb_set(jmb_type, 0, s->mb_y, s->mb_x, 0, jso);
     }
 }
@@ -55,9 +55,9 @@ ffe_mpeg4_mv_init_mb(
 {
     AVFrame *f = s->current_picture_ptr->f;
     if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_MV)) != 0 )
-        ffe_mv_export_init_mb(mbctx, f->jctx, f, s->mb_y, s->mb_x, nb_directions, nb_blocks);
+        ffe_mv_export_init_mb(mbctx, s->jctx, f, s->mb_y, s->mb_x, nb_directions, nb_blocks);
     if ( (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_MV)) != 0 )
-        ffe_mv_import_init_mb(mbctx, f->jctx, f, s->mb_y, s->mb_x, nb_directions, nb_blocks);
+        ffe_mv_import_init_mb(mbctx, s->jctx, f, s->mb_y, s->mb_x, nb_directions, nb_blocks);
 }
 
 //---------------------------------------------------------------------
@@ -102,7 +102,7 @@ ffe_mpeg4_decode_motion(
         ffe_transplicate_restore(&s->ffe_xp, &s->pb);
     }
     if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_MV)) != 0 )
-        ffe_mv_set(mbctx, f, x_or_y, code);
+        ffe_mv_set(mbctx, s->jctx, x_or_y, code);
 
     return code;
 }

@@ -47,16 +47,15 @@ ffe_dct_scan_new(MJpegDecodeContext *s)
     //  "chroma_max": int
     // }
 
-    AVFrame *f = s->picture_ptr;
-    json_t *jluma_max = json_int_new(f->jctx, s->huff_max_dc_luminance);
-    json_t *jchroma_max = json_int_new(f->jctx, s->huff_max_dc_chrominance);
+    json_t *jluma_max = json_int_new(s->jctx, s->huff_max_dc_luminance);
+    json_t *jchroma_max = json_int_new(s->jctx, s->huff_max_dc_chrominance);
     json_t *jscan;
     int pflags = 0;
 
     if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_Q_DC)) != 0 )
         pflags = JSON_PFLAGS_NO_LF;
 
-    jscan = ffe_jmb_new(f->jctx,
+    jscan = ffe_jmb_new(s->jctx,
                         s->mb_width, s->mb_height,
                         s->nb_components,
                         s->v_scount, s->h_scount,
@@ -71,8 +70,8 @@ ffe_dct_scan_new(MJpegDecodeContext *s)
     {
         json_object_add(jscan, "dc_luma_max", jluma_max);
         json_object_add(jscan, "dc_chroma_max", jchroma_max);
-        jluma_max = json_int_new(f->jctx, s->huff_max_ac_luminance);
-        jchroma_max = json_int_new(f->jctx, s->huff_max_ac_chrominance);
+        jluma_max = json_int_new(s->jctx, s->huff_max_ac_luminance);
+        jchroma_max = json_int_new(s->jctx, s->huff_max_ac_chrominance);
         json_object_add(jscan, "ac_luma_max", jluma_max);
         json_object_add(jscan, "ac_chroma_max", jchroma_max);
     }
@@ -158,15 +157,15 @@ ffe_dct_set(
         json_t *jmb = ffe_jmb_get(jso, component, mb_y, mb_x, block);
         if ( jmb == NULL )
         {
-            jmb = json_array_of_ints_new(f->jctx, 64);
+            jmb = json_array_of_ints_new(s->jctx, 64);
             json_set_pflags(jmb, JSON_PFLAGS_NO_LF);
             ffe_jmb_set(jso, component, mb_y, mb_x, block, jmb);
         }
-        json_array_set_int(f->jctx, jmb, i, code);
+        json_array_set_int(s->jctx, jmb, i, code);
     }
     else
     {
-        json_t *jval = json_int_new(f->jctx, code);
+        json_t *jval = json_int_new(s->jctx, code);
         ffe_jmb_set(jso, component, mb_y, mb_x, block, jval);
     }
 }
@@ -221,7 +220,7 @@ ffe_dct_zero_fill(
     json_t *jframe = f->ffedit_sd[feature];
     json_t *jso = jframe;
     json_t *jarr = ffe_jmb_get(jso, component, mb_y, mb_x, block);
-    ffe_json_array_zero_fill(f->jctx, jarr, 64);
+    ffe_json_array_zero_fill(s->jctx, jarr, 64);
 }
 
 //---------------------------------------------------------------------
@@ -310,9 +309,9 @@ ffe_mjpeg_dqt_init(MJpegDecodeContext *s, ffe_dqt_ctx_t *dctx)
         //          [ ] # dqt
         // }
         AVFrame *f = s->picture_ptr;
-        json_t *jframe = json_object_new(f->jctx);
-        dctx->jdata = json_array_new(f->jctx);
-        json_array_alloc(f->jctx, dctx->jdata, 4);
+        json_t *jframe = json_object_new(s->jctx);
+        dctx->jdata = json_array_new(s->jctx);
+        json_array_alloc(s->jctx, dctx->jdata, 4);
         json_object_add(jframe, "data", dctx->jdata);
         f->ffedit_sd[FFEDIT_FEAT_DQT] = jframe;
     }
@@ -330,11 +329,9 @@ ffe_mjpeg_dqt_init(MJpegDecodeContext *s, ffe_dqt_ctx_t *dctx)
 static void
 ffe_mjpeg_dqt_table(MJpegDecodeContext *s, ffe_dqt_ctx_t *dctx, int index)
 {
-    AVFrame *f = s->picture_ptr;
-
     if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_DQT)) != 0 )
     {
-        dctx->jcur = json_array_of_ints_new(f->jctx, 64);
+        dctx->jcur = json_array_of_ints_new(s->jctx, 64);
         if ( dctx->max_index < index )
             dctx->max_index = index;
         json_array_set(dctx->jdata, index, dctx->jcur);
@@ -356,11 +353,10 @@ ffe_mjpeg_dqt_val(
         int precision,
         int i)
 {
-    AVFrame *f = s->picture_ptr;
     int code = get_bits(&s->gb, precision);
 
     if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_DQT)) != 0 )
-        json_array_set_int(f->jctx, dctx->jcur, i, code);
+        json_array_set_int(s->jctx, dctx->jcur, i, code);
     else if ( (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_DQT)) != 0 )
         code = json_array_get_int(dctx->jcur, i);
 
@@ -419,8 +415,8 @@ ffe_mjpeg_dht_init(MJpegDecodeContext *s, ffe_dht_ctx_t *dctx)
         //  ]
         // }
         AVFrame *f = s->picture_ptr;
-        json_t *jframe = json_object_new(f->jctx);
-        dctx->jtables = json_array_new(f->jctx);
+        json_t *jframe = json_object_new(s->jctx);
+        dctx->jtables = json_array_new(s->jctx);
         json_object_add(jframe, "tables", dctx->jtables);
         f->ffedit_sd[FFEDIT_FEAT_DHT] = jframe;
     }
@@ -550,28 +546,27 @@ ffe_mjpeg_dht_export(
 {
     if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_DHT)) != 0 )
     {
-        AVFrame *f = s->picture_ptr;
-        json_t *jtable = json_object_new(f->jctx);
-        json_t *jclass = json_int_new(f->jctx, class);
-        json_t *jindex = json_int_new(f->jctx, index);
-        json_t *jbits = json_array_new(f->jctx);
+        json_t *jtable = json_object_new(s->jctx);
+        json_t *jclass = json_int_new(s->jctx, class);
+        json_t *jindex = json_int_new(s->jctx, index);
+        json_t *jbits = json_array_new(s->jctx);
         int val_idx = 0;
 
-        json_array_alloc(f->jctx, jbits, 16);
+        json_array_alloc(s->jctx, jbits, 16);
 
         json_array_add(dctx->jtables, jtable);
         dctx->table_count++;
         json_object_add(jtable, "class", jclass);
         json_object_add(jtable, "index", jindex);
         json_object_add(jtable, "bits", jbits);
-        json_object_done(f->jctx, jtable);
+        json_object_done(s->jctx, jtable);
 
         for ( size_t i = 0; i < 16; i++ )
         {
-            json_t *jvals = json_array_of_ints_new(f->jctx, bits_table[1+i]);
+            json_t *jvals = json_array_of_ints_new(s->jctx, bits_table[1+i]);
             json_set_pflags(jvals, JSON_PFLAGS_NO_LF);
             for ( int j = 0; j < bits_table[1+i]; j++ )
-                json_array_set_int(f->jctx, jvals, j, val_table[val_idx++]);
+                json_array_set_int(s->jctx, jvals, j, val_table[val_idx++]);
             json_array_set(jbits, i, jvals);
         }
     }
@@ -637,12 +632,9 @@ static void
 ffe_mjpeg_frame_unref(AVFrame *f)
 {
     void *ffedit_sd[FFEDIT_FEAT_LAST] = { 0 };
-    void *jctx = NULL;
     memcpy(ffedit_sd, f->ffedit_sd, sizeof(ffedit_sd));
-    jctx = f->jctx;
     av_frame_unref(f);
     memcpy(f->ffedit_sd, ffedit_sd, sizeof(ffedit_sd));
-    f->jctx = jctx;
 }
 
 //---------------------------------------------------------------------
@@ -650,15 +642,14 @@ static void
 ffe_mjpeg_init(MJpegDecodeContext *s)
 {
     memcpy(s->picture_ptr->ffedit_sd, s->ffedit_sd, sizeof(s->ffedit_sd));
-    s->picture_ptr->jctx = s->jctx;
 }
 
 //---------------------------------------------------------------------
 static void
-ffe_mjpeg_prepare_frame(MJpegDecodeContext *s, AVPacket *avpkt)
+ffe_mjpeg_prepare_frame(AVCodecContext *avctx, MJpegDecodeContext *s, AVPacket *avpkt)
 {
     memcpy(s->ffedit_sd, avpkt->ffedit_sd, sizeof(s->ffedit_sd));
-    s->jctx = avpkt->jctx;
+    s->jctx = avctx->jctx;
     ffe_mjpeg_init(s);
 }
 

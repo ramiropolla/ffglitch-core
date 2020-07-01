@@ -436,7 +436,7 @@ int ff_h263_decode_frame(AVCodecContext *avctx, void *data, int *got_frame,
     PutBitContext *transplicate_pb;
     PutBitContext retry_pb;
 
-    ffe_h263_prepare_frame(s, avpkt);
+    ffe_h263_prepare_frame(avctx, s, avpkt);
 
     /* no supplementary picture */
     if (buf_size == 0) {

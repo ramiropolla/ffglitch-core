@@ -2639,7 +2639,7 @@ static int mpeg_decode_frame(AVCodecContext *avctx, void *data,
     AVFrame *picture = data;
     MpegEncContext *s2 = &s->mpeg_enc_ctx;
 
-    ffe_mpeg12_prepare_frame(s2, avpkt);
+    ffe_mpeg12_prepare_frame(avctx, s2, avpkt);
 
     if (buf_size == 0 || (buf_size == 4 && AV_RB32(buf) == SEQ_END_CODE)) {
         /* special case for last picture */

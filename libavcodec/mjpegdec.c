@@ -2345,7 +2345,7 @@ int ff_mjpeg_decode_frame(AVCodecContext *avctx, void *data, int *got_frame,
     int ret = 0;
     int is16bit;
 
-    ffe_mjpeg_prepare_frame(s, avpkt);
+    ffe_mjpeg_prepare_frame(avctx, s, avpkt);
 
     if ( (avctx->ffedit_apply & (1 << FFEDIT_FEAT_LAST)) != 0 )
     {

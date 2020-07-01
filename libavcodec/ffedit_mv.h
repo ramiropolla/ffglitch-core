@@ -56,7 +56,7 @@ int ffe_mv_get(
         int x_or_y);
 void ffe_mv_set(
         ffe_mv_mb_ctx *mbctx,
-        AVFrame *f,
+        json_ctx_t *jctx,
         int x_or_y,
         int val);
 void ffe_mv_export_init(

@@ -125,16 +125,16 @@ int ffe_mv_get(
 /*-------------------------------------------------------------------*/
 void ffe_mv_set(
         ffe_mv_mb_ctx *mbctx,
-        AVFrame *f,
+        json_ctx_t *jctx,
         int x_or_y,
         int val)
 {
     if ( is_json_null(mbctx->cur) )
     {
-        json_make_array_of_ints(f->jctx, mbctx->cur, 2);
+        json_make_array_of_ints(jctx, mbctx->cur, 2);
         json_set_pflags(mbctx->cur, JSON_PFLAGS_NO_LF | JSON_PFLAGS_NO_SPACE);
     }
-    json_array_set_int(f->jctx, mbctx->cur, x_or_y, val);
+    json_array_set_int(jctx, mbctx->cur, x_or_y, val);
     atomic_fetch_add(mbctx->pcount, 1);
 }
 
@@ -157,7 +157,7 @@ void ffe_mv_export_init(
     // }
 
     json_t *jframe = json_object_new(jctx);
-    ffe_mv_ctx *ctx = json_allocator_get0(f->jctx, sizeof(ffe_mv_ctx));
+    ffe_mv_ctx *ctx = json_allocator_get0(jctx, sizeof(ffe_mv_ctx));
     json_userdata_set(jframe, ctx);
 
     ctx->data[0] = ffe_jblock_new(jctx, mb_width, mb_height, JSON_PFLAGS_NO_LF);
@@ -187,7 +187,7 @@ void ffe_mv_export_cleanup(json_ctx_t *jctx, AVFrame *f)
 void ffe_mv_import_init(json_ctx_t *jctx, AVFrame *f)
 {
     json_t *jframe = f->ffedit_sd[FFEDIT_FEAT_MV];
-    ffe_mv_ctx *ctx = json_allocator_get0(f->jctx, sizeof(ffe_mv_ctx));
+    ffe_mv_ctx *ctx = json_allocator_get0(jctx, sizeof(ffe_mv_ctx));
     json_userdata_set(jframe, ctx);
     ctx->data[0] = json_object_get(jframe, "forward");
     ctx->data[1] = json_object_get(jframe, "backward");
