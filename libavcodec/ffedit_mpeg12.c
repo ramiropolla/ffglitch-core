@@ -720,7 +720,7 @@ ffe_mpeg12_export_mb_init(MpegEncContext *s, AVFrame *f)
     // }
 
     json_t *jframe = json_object_new(s->jctx);
-    ffe_mb_ctx *ctx = av_mallocz(sizeof(ffe_mb_ctx));
+    ffe_mb_ctx *ctx = json_allocator_get0(s->jctx, sizeof(ffe_mb_ctx));
     json_userdata_set(jframe, ctx);
 
     ctx->jdatas = json_array_new(s->jctx);
