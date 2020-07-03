@@ -36,19 +36,132 @@ static int file_overwrite;
 static int test_mode;
 static const char *threads;
 
-static json_ctx_t jctx;
-static json_t *jroot;
-static json_t *jstreams0;
-static json_t **jstreams;
-static int   nb_jstreams;
-static json_t **jstframes;
-static int   nb_jstframes;
+typedef struct {
+    json_ctx_t jctx;
+    json_t *jroot;
+    json_t *jstreams0;
+    json_t **jstreams;
+    int   nb_jstreams;
+    json_t **jstframes;
+    int   nb_jstframes;
+} FFEditJSONFile;
 
 /* TODO use avformat_match_stream_specifier */
 static int selected_features[FFEDIT_FEAT_LAST];
 static int selected_features_idx[FFEDIT_FEAT_LAST];
 static int features_selected;
 static int opt_feature(void *optctx, const char *opt, const char *arg);
+
+/* forward declarations */
+static char *read_file(const char *fname, size_t *psize);
+static void sha1sum(char *shasumstr, const char *buf, size_t size);
+
+static FFEditJSONFile *read_ffedit_json_file(const char *_apply_fname)
+{
+    FFEditJSONFile *jf = NULL;
+    size_t size;
+    char *buf;
+
+    jf = av_mallocz(sizeof(FFEditJSONFile));
+
+    buf = read_file(_apply_fname, &size);
+    if ( buf == NULL )
+    {
+        av_log(NULL, AV_LOG_FATAL,
+                "Could not open json file %s\n", _apply_fname);
+        exit(1);
+    }
+
+    json_ctx_start(&jf->jctx);
+    jf->jroot = json_parse(&jf->jctx, buf);
+    if ( jf->jroot == NULL )
+    {
+        av_log(NULL, AV_LOG_FATAL, "json_parse error: %s\n",
+                json_parse_error(&jf->jctx));
+        exit(1);
+    }
+    jf->jstreams0 = json_object_get(jf->jroot, "streams");
+
+    size = json_array_length(jf->jstreams0);
+    for ( size_t i = 0; i < size; i++ )
+    {
+        GROW_ARRAY(jf->jstreams, jf->nb_jstreams);
+        GROW_ARRAY(jf->jstframes, jf->nb_jstframes);
+        jf->jstreams[i] = json_array_get(jf->jstreams0, i);
+        jf->jstframes[i] = json_object_get(jf->jstreams[i], "frames");
+    }
+
+    free(buf);
+
+    return jf;
+}
+
+static FFEditJSONFile *prepare_ffedit_json_file(
+        const char *_export_fname,
+        const char *_input_filename,
+        int *_selected_features)
+{
+    FFEditJSONFile *jf = NULL;
+    json_t *jfname = NULL;
+    json_t *jfeatures = NULL;
+    size_t size;
+    char *buf;
+
+    // TODO check if file exists before overwritting
+    export_fp = fopen(_export_fname, "w");
+    if ( export_fp == NULL )
+    {
+        av_log(NULL, AV_LOG_FATAL,
+                "Could not open json file %s\n", _export_fname);
+        return NULL;
+    }
+
+    jf = av_mallocz(sizeof(FFEditJSONFile));
+
+    json_ctx_start(&jf->jctx);
+    jf->jroot = json_object_new(&jf->jctx);
+
+    if ( test_mode == 0 )
+    {
+        json_t *jversion = json_string_new(&jf->jctx, FFMPEG_VERSION);
+        json_object_add(jf->jroot, "ffedit_version", jversion);
+    }
+
+    jfname = json_string_new(&jf->jctx, av_basename(_input_filename));
+    json_object_add(jf->jroot, "filename", jfname);
+
+    buf = read_file(_input_filename, &size);
+    if ( buf != NULL )
+    {
+        json_t *jshasum = NULL;
+        char shasumstr[41];
+
+        sha1sum(shasumstr, buf, size);
+
+        free(buf);
+
+        jshasum = json_string_new(&jf->jctx, shasumstr);
+        json_object_add(jf->jroot, "sha1sum", jshasum);
+    }
+
+    jfeatures = json_array_new(&jf->jctx);
+    for ( size_t i = 0; i < FFEDIT_FEAT_LAST; i++ )
+    {
+        if ( _selected_features[i] )
+        {
+            const char *feat_str = ffe_feat_to_str(i);
+            json_t *jfeature = json_string_new(&jf->jctx, feat_str);
+            json_array_add(jfeatures, jfeature);
+        }
+    }
+    json_array_done(&jf->jctx, jfeatures);
+    json_object_add(jf->jroot, "features", jfeatures);
+
+    jf->jstreams0 = json_array_new(&jf->jctx);
+    json_object_add(jf->jroot, "streams", jf->jstreams0);
+
+    return jf;
+}
 
 static char nibble2char(uint8_t c)
 {
@@ -226,21 +339,21 @@ static int sort_by_pkt_pos(const void *j1, const void *j2)
     return i1 - i2;
 }
 
-static void close_files(FFEditOutputContext *ectx)
+static void close_files(FFEditOutputContext *ectx, FFEditJSONFile *jf)
 {
     /* write output json file if needed */
-    if ( export_fp != NULL && jstframes != NULL )
+    if ( export_fp != NULL && jf->jstframes != NULL )
     {
         for ( size_t i = 0; i < fctx->nb_streams; i++ )
-            json_array_sort(jstframes[i], sort_by_pkt_pos);
+            json_array_sort(jf->jstframes[i], sort_by_pkt_pos);
 
-        json_fputs(export_fp, jroot);
+        json_fputs(export_fp, jf->jroot);
         fclose(export_fp);
     }
 
     /* free json-c objects */
-    if ( jroot != NULL )
-        json_ctx_free(&jctx);
+    if ( jf != NULL && jf->jroot != NULL )
+        json_ctx_free(&jf->jctx);
 
     /* write glitched file if needed */
     if ( ectx != NULL )
@@ -258,6 +371,7 @@ static void close_files(FFEditOutputContext *ectx)
 
 static int open_files(
         FFEditOutputContext **pectx,
+        FFEditJSONFile *jf,
         const char *o_fname,
         const char *i_fname)
 {
@@ -308,19 +422,19 @@ static int open_files(
             av_log(NULL, AV_LOG_ERROR,
                    "Failed to find decoder for stream %zu. Skipping\n", i);
 
-        if ( jstreams0 != NULL && is_exporting )
+        if ( jf != NULL && jf->jstreams0 != NULL && is_exporting )
         {
-            json_t *jstream = json_object_new(&jctx);
-            json_t *jframes = json_array_new(&jctx);
+            json_t *jstream = json_object_new(&jf->jctx);
+            json_t *jframes = json_array_new(&jf->jctx);
 
-            GROW_ARRAY(jstreams, nb_jstreams);
-            GROW_ARRAY(jstframes, nb_jstframes);
+            GROW_ARRAY(jf->jstreams, jf->nb_jstreams);
+            GROW_ARRAY(jf->jstframes, jf->nb_jstframes);
 
-            jstreams[i] = jstream;
-            jstframes[i] = jframes;
+            jf->jstreams[i] = jstream;
+            jf->jstframes[i] = jframes;
 
             json_object_add(jstream, "frames", jframes);
-            json_array_add(jstreams0, jstream);
+            json_array_add(jf->jstreams0, jstream);
         }
     }
 
@@ -340,7 +454,7 @@ static int processing_needed(void)
     return 0;
 }
 
-static int open_decoders(FFEditOutputContext *ectx)
+static int open_decoders(FFEditOutputContext *ectx, FFEditJSONFile *jf)
 {
     int fret = -1;
 
@@ -366,7 +480,7 @@ static int open_decoders(FFEditOutputContext *ectx)
 
         dctxs[i] = avcodec_alloc_context3(decoder);
         dctx = dctxs[i];
-        dctx->jctx = &jctx;
+        dctx->jctx = &jf->jctx;
         avcodec_parameters_to_context(dctx, fctx->streams[i]->codecpar);
 
         /* enable threads if ffedit supports it for this codec */
@@ -417,6 +531,7 @@ static int open_decoders(FFEditOutputContext *ectx)
 
 static int ffedit_decode(
         FFEditOutputContext *ectx,
+        FFEditJSONFile *jf,
         AVCodecContext *dctx,
         AVFrame *iframe,
         AVPacket *ipkt,
@@ -450,11 +565,11 @@ static int ffedit_decode(
 
         if ( is_exporting )
         {
-            json_t *jframes = jstframes[stream_index];
-            json_t *jframe = json_object_new(&jctx);
-            json_t *jpkt_pos = json_int_new(&jctx, iframe->pkt_pos);
-            json_t *jpts = json_int_new(&jctx, iframe->pts);
-            json_t *jdts = json_int_new(&jctx, iframe->pkt_dts);
+            json_t *jframes = jf->jstframes[stream_index];
+            json_t *jframe = json_object_new(&jf->jctx);
+            json_t *jpkt_pos = json_int_new(&jf->jctx, iframe->pkt_pos);
+            json_t *jpts = json_int_new(&jf->jctx, iframe->pts);
+            json_t *jdts = json_int_new(&jf->jctx, iframe->pkt_dts);
 
             json_object_add(jframe, "pkt_pos", jpkt_pos);
             json_object_add(jframe, "pts", jpts);
@@ -475,7 +590,7 @@ static int ffedit_decode(
     return 0;
 }
 
-static int transplicate(FFEditOutputContext *ectx)
+static int transplicate(FFEditOutputContext *ectx, FFEditJSONFile *jf)
 {
     int fret = -1;
 
@@ -485,7 +600,7 @@ static int transplicate(FFEditOutputContext *ectx)
     size_t *frames_idx = NULL;
 
     if ( is_applying )
-        frames_idx = av_calloc(nb_jstframes, sizeof(size_t));
+        frames_idx = av_calloc(jf->nb_jstframes, sizeof(size_t));
 
     while ( 42 )
     {
@@ -507,7 +622,7 @@ static int transplicate(FFEditOutputContext *ectx)
         if ( is_applying )
         {
             size_t idx = frames_idx[stream_index];
-            json_t *jframes = jstframes[stream_index];
+            json_t *jframes = jf->jstframes[stream_index];
             json_t *jframe = json_array_get(jframes, idx);
 
             for ( size_t i = 0; i < FFEDIT_FEAT_LAST; i++ )
@@ -519,7 +634,7 @@ static int transplicate(FFEditOutputContext *ectx)
             frames_idx[stream_index]++;
         }
 
-        ret = ffedit_decode(ectx, dctx, iframe, ipkt, stream_index);
+        ret = ffedit_decode(ectx, jf, dctx, iframe, ipkt, stream_index);
         if ( ret < 0 )
         {
             av_log(NULL, AV_LOG_FATAL, "ffedit_decode() failed\n");
@@ -528,7 +643,7 @@ static int transplicate(FFEditOutputContext *ectx)
     }
 
     for ( size_t i = 0 ; i < fctx->nb_streams; i++ )
-        ffedit_decode(ectx, dctxs[i], iframe, NULL, i);
+        ffedit_decode(ectx, jf, dctxs[i], iframe, NULL, i);
 
     fret = 0;
 
@@ -559,6 +674,7 @@ static void print_features(void)
 int main(int argc, char *argv[])
 {
     FFEditOutputContext *ectx = NULL;
+    FFEditJSONFile *rootjf = NULL;
     int fret = -1;
     int ret;
 
@@ -606,98 +722,16 @@ int main(int argc, char *argv[])
 
     if ( is_exporting )
     {
-        json_t *jfname = NULL;
-        json_t *jfeatures = NULL;
-        size_t size;
-        char *buf;
-
-        // TODO check if file exists before overwritting
-        export_fp = fopen(export_fname, "w");
-        if ( export_fp == NULL )
-        {
-            av_log(NULL, AV_LOG_FATAL,
-                   "Could not open json file %s\n", export_fname);
+        rootjf = prepare_ffedit_json_file(export_fname, input_filename, selected_features);
+        if ( rootjf == NULL )
             goto the_end;
-        }
-
-        json_ctx_start(&jctx);
-        jroot = json_object_new(&jctx);
-
-        if ( test_mode == 0 )
-        {
-            json_t *jversion = json_string_new(&jctx, FFMPEG_VERSION);
-            json_object_add(jroot, "ffedit_version", jversion);
-        }
-
-        jfname = json_string_new(&jctx, av_basename(input_filename));
-        json_object_add(jroot, "filename", jfname);
-
-        buf = read_file(input_filename, &size);
-        if ( buf != NULL )
-        {
-            json_t *jshasum = NULL;
-            char shasumstr[41];
-
-            sha1sum(shasumstr, buf, size);
-
-            free(buf);
-
-            jshasum = json_string_new(&jctx, shasumstr);
-            json_object_add(jroot, "sha1sum", jshasum);
-        }
-
-        jfeatures = json_array_new(&jctx);
-        for ( size_t i = 0; i < FFEDIT_FEAT_LAST; i++ )
-        {
-            if ( selected_features[i] )
-            {
-                const char *feat_str = ffe_feat_to_str(i);
-                json_t *jfeature = json_string_new(&jctx, feat_str);
-                json_array_add(jfeatures, jfeature);
-            }
-        }
-        json_array_done(&jctx, jfeatures);
-        json_object_add(jroot, "features", jfeatures);
-
-        jstreams0 = json_array_new(&jctx);
-        json_object_add(jroot, "streams", jstreams0);
     }
     else if ( is_applying )
     {
-        size_t size;
-        char *buf;
-
-        buf = read_file(apply_fname, &size);
-        if ( buf == NULL )
-        {
-            av_log(NULL, AV_LOG_FATAL,
-                   "Could not open json file %s\n", apply_fname);
-            exit(1);
-        }
-
-        json_ctx_start(&jctx);
-        jroot = json_parse(&jctx, buf);
-        if ( jroot == NULL )
-        {
-            av_log(NULL, AV_LOG_FATAL, "json_parse error: %s\n",
-                   json_parse_error(&jctx));
-            exit(1);
-        }
-        jstreams0 = json_object_get(jroot, "streams");
-
-        size = json_array_length(jstreams0);
-        for ( size_t i = 0; i < size; i++ )
-        {
-            GROW_ARRAY(jstreams, nb_jstreams);
-            GROW_ARRAY(jstframes, nb_jstframes);
-            jstreams[i] = json_array_get(jstreams0, i);
-            jstframes[i] = json_object_get(jstreams[i], "frames");
-        }
-
-        free(buf);
+        rootjf = read_ffedit_json_file(apply_fname);
     }
 
-    ret = open_files(&ectx, output_filename, input_filename);
+    ret = open_files(&ectx, rootjf, output_filename, input_filename);
     if ( ret < 0 )
         goto the_end;
 
@@ -711,7 +745,7 @@ int main(int argc, char *argv[])
     {
         /* open all possible decoders */
         /* TODO allow selecting streams */
-        ret = open_decoders(ectx);
+        ret = open_decoders(ectx, rootjf);
         if ( ret < 0 )
         {
             av_log(NULL, AV_LOG_FATAL, "Error opening decoders.\n");
@@ -719,11 +753,14 @@ int main(int argc, char *argv[])
         }
 
         /* do the salmon dance */
-        fret = transplicate(ectx);
+        fret = transplicate(ectx, rootjf);
     }
 
 the_end:
-    close_files(ectx);
+    close_files(ectx, rootjf);
+
+    if ( rootjf != NULL )
+        av_free(rootjf);
 
     return fret;
 }
