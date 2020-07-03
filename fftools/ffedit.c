@@ -35,11 +35,11 @@ typedef struct {
     AVCodecContext **dctxs;
     int           nb_dctxs;
 
+    int is_exporting;
+    int is_applying; // implies importing
+
     FFEditOutputContext *ectx;
 } FFFile;
-
-static int is_exporting;
-static int is_applying; // implies importing
 
 typedef struct {
     json_ctx_t jctx;
@@ -459,13 +459,17 @@ static void fff_close_files(FFFile *fff, JSONFile *jf)
 
 static FFFile *fff_open_files(
         const char *o_fname,
-        const char *i_fname)
+        const char *i_fname,
+        const char *e_fname,
+        const char *a_fname)
 {
     FFFile *fff = NULL;
     int fret = -1;
     int ret;
 
     fff = av_mallocz(sizeof(FFFile));
+    fff->is_exporting = (e_fname != NULL);
+    fff->is_applying = (a_fname != NULL);
 
     fff->fctx = avformat_alloc_context();
 
@@ -521,10 +525,10 @@ the_end:
     return fff;
 }
 
-static int processing_needed(void)
+static int processing_needed(FFFile *fff)
 {
     if ( output_fname != NULL
-      || is_exporting )
+      || fff->is_exporting )
     {
         return 1;
     }
@@ -577,9 +581,9 @@ static int fff_open_decoders(FFFile *fff, JSONFile *jf)
               && (selected_features_idx[j] == i
                || selected_features_idx[j] == -1) )
             {
-                if ( is_exporting )
+                if ( fff->is_exporting )
                     dctx->ffedit_export |= (1 << j);
-                if ( is_applying )
+                if ( fff->is_applying )
                 {
                     dctx->ffedit_import |= (1 << j);
                     dctx->ffedit_apply |= (1 << j);
@@ -607,7 +611,7 @@ static int fff_open_decoders(FFFile *fff, JSONFile *jf)
 }
 
 static int ffedit_decode(
-        FFEditOutputContext *ectx,
+        FFFile *fff,
         JSONFile *jf,
         AVCodecContext *dctx,
         AVFrame *iframe,
@@ -634,13 +638,13 @@ static int ffedit_decode(
             return ret;
         }
 
-        if ( ectx != NULL && dctx->ffedit_out != NULL )
+        if ( fff->ectx != NULL && dctx->ffedit_out != NULL )
         {
-            ffe_output_packet(ectx, dctx->ffedit_in_pos, dctx->ffedit_in_size, dctx->ffedit_out, dctx->ffedit_out_size);
+            ffe_output_packet(fff->ectx, dctx->ffedit_in_pos, dctx->ffedit_in_size, dctx->ffedit_out, dctx->ffedit_out_size);
             av_freep(&dctx->ffedit_out);
         }
 
-        if ( is_exporting )
+        if ( fff->is_exporting )
             add_frame_to_ffedit_json_file(jf, iframe, stream_index);
     }
 
@@ -654,7 +658,7 @@ static int fff_transplicate(FFFile *fff, JSONFile *jf)
     AVPacket *ipkt = av_packet_alloc();
     AVFrame *iframe = av_frame_alloc();
 
-    if ( is_applying )
+    if ( fff->is_applying )
         reset_frames_idx_ffedit_json_file(jf);
 
     while ( 42 )
@@ -674,10 +678,10 @@ static int fff_transplicate(FFFile *fff, JSONFile *jf)
             continue;
 
         memset(ipkt->ffedit_sd, 0x00, sizeof(ipkt->ffedit_sd));
-        if ( is_applying )
+        if ( fff->is_applying )
             get_from_ffedit_json_file(jf, ipkt, stream_index);
 
-        ret = ffedit_decode(fff->ectx, jf, dctx, iframe, ipkt, stream_index);
+        ret = ffedit_decode(fff, jf, dctx, iframe, ipkt, stream_index);
         if ( ret < 0 )
         {
             av_log(NULL, AV_LOG_FATAL, "ffedit_decode() failed\n");
@@ -686,7 +690,7 @@ static int fff_transplicate(FFFile *fff, JSONFile *jf)
     }
 
     for ( size_t i = 0 ; i < fff->fctx->nb_streams; i++ )
-        ffedit_decode(fff->ectx, jf, fff->dctxs[i], iframe, NULL, i);
+        ffedit_decode(fff, jf, fff->dctxs[i], iframe, NULL, i);
 
     fret = 0;
 
@@ -732,9 +736,7 @@ int main(int argc, char *argv[])
     parse_options(NULL, argc, argv, options, opt_filenames);
 
     /* check options consistency */
-    is_exporting = (export_fname != NULL);
-    is_applying = (apply_fname != NULL);
-    if ( is_exporting && is_applying )
+    if ( (export_fname != NULL) && (apply_fname != NULL) )
     {
         av_log(NULL, AV_LOG_FATAL, "Only one of -e or -a may be used!\n");
         goto the_end;
@@ -761,11 +763,11 @@ int main(int argc, char *argv[])
         features_selected = 1;
     }
 
-    fff = fff_open_files(output_fname, input_fname);
+    fff = fff_open_files(output_fname, input_fname, export_fname, apply_fname);
     if ( fff == NULL )
         goto the_end;
 
-    if ( is_exporting )
+    if ( fff->is_exporting )
     {
         rootjf = prepare_ffedit_json_file(export_fname, input_fname, selected_features);
         if ( rootjf == NULL )
@@ -773,12 +775,12 @@ int main(int argc, char *argv[])
         for ( size_t i = 0; i < fff->fctx->nb_streams; i++ )
             add_stream_to_ffedit_json_file(rootjf, i);
     }
-    else if ( is_applying )
+    else if ( fff->is_applying )
     {
         rootjf = read_ffedit_json_file(apply_fname);
     }
 
-    if ( !processing_needed() )
+    if ( !processing_needed(fff) )
     {
         /* no processing needed. just print glitching features */
         fff_print_features(fff);
