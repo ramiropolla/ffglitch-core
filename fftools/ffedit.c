@@ -82,6 +82,8 @@ static char *read_file(const char *fname, size_t *psize)
 
 static const OptionDef options[] = {
     CMDUTILS_COMMON_OPTIONS
+    { "i", HAS_ARG | OPT_STRING, { &input_filename }, "input file (may be omitted)", "file" },
+    { "o", HAS_ARG | OPT_STRING, { &output_filename }, "output file (may be omitted)", "file" },
     { "a", HAS_ARG | OPT_STRING, { &apply_fname }, "apply data", "json file" },
     { "e", HAS_ARG | OPT_STRING, { &export_fname }, "export data", "json file" },
     { "f", HAS_ARG, { .func_arg = opt_feature }, "select feature (optionally specify stream with feat:#)", "feature" },
