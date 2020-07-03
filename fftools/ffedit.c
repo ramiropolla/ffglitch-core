@@ -50,7 +50,7 @@ typedef struct {
     FILE *export_fp;
 
     size_t *frames_idx;
-} FFEditJSONFile;
+} JSONFile;
 
 static int opt_feature(void *optctx, const char *opt, const char *arg);
 
@@ -59,13 +59,13 @@ static char *read_file(const char *fname, size_t *psize);
 static void sha1sum(char *shasumstr, const char *buf, size_t size);
 static int sort_by_pkt_pos(const void *j1, const void *j2);
 
-static FFEditJSONFile *read_ffedit_json_file(const char *_apply_fname)
+static JSONFile *read_ffedit_json_file(const char *_apply_fname)
 {
-    FFEditJSONFile *jf = NULL;
+    JSONFile *jf = NULL;
     size_t size;
     char *buf;
 
-    jf = av_mallocz(sizeof(FFEditJSONFile));
+    jf = av_mallocz(sizeof(JSONFile));
 
     buf = read_file(_apply_fname, &size);
     if ( buf == NULL )
@@ -101,28 +101,28 @@ static FFEditJSONFile *read_ffedit_json_file(const char *_apply_fname)
     return jf;
 }
 
-static void reset_frames_idx_ffedit_json_file(FFEditJSONFile *jf)
+static void reset_frames_idx_ffedit_json_file(JSONFile *jf)
 {
     memset(jf->frames_idx, 0x00, jf->nb_jstframes * sizeof(size_t));
 }
 
-static json_ctx_t *get_jctx_ffedit_json_file(FFEditJSONFile *jf)
+static json_ctx_t *get_jctx_ffedit_json_file(JSONFile *jf)
 {
     return &jf->jctx;
 }
 
-static FFEditJSONFile *prepare_ffedit_json_file(
+static JSONFile *prepare_ffedit_json_file(
         const char *_export_fname,
         const char *_input_filename,
         int *_selected_features)
 {
-    FFEditJSONFile *jf = NULL;
+    JSONFile *jf = NULL;
     json_t *jfname = NULL;
     json_t *jfeatures = NULL;
     size_t size;
     char *buf;
 
-    jf = av_mallocz(sizeof(FFEditJSONFile));
+    jf = av_mallocz(sizeof(JSONFile));
 
     // TODO check if file exists before overwritting
     jf->export_fp = fopen(_export_fname, "w");
@@ -179,7 +179,7 @@ static FFEditJSONFile *prepare_ffedit_json_file(
     return jf;
 }
 
-static void add_stream_to_ffedit_json_file(FFEditJSONFile *jf, size_t i)
+static void add_stream_to_ffedit_json_file(JSONFile *jf, size_t i)
 {
     json_t *jstream = json_object_new(&jf->jctx);
     json_t *jframes = json_array_new(&jf->jctx);
@@ -195,7 +195,7 @@ static void add_stream_to_ffedit_json_file(FFEditJSONFile *jf, size_t i)
 }
 
 static void add_frame_to_ffedit_json_file(
-        FFEditJSONFile *jf,
+        JSONFile *jf,
         AVFrame *iframe,
         int stream_index)
 {
@@ -221,7 +221,7 @@ static void add_frame_to_ffedit_json_file(
 }
 
 static void get_from_ffedit_json_file(
-        FFEditJSONFile *jf,
+        JSONFile *jf,
         AVPacket *ipkt,
         int stream_index)
 {
@@ -238,7 +238,7 @@ static void get_from_ffedit_json_file(
     jf->frames_idx[stream_index]++;
 }
 
-static void close_ffedit_json_file(FFEditJSONFile *jf)
+static void close_ffedit_json_file(JSONFile *jf)
 {
     /* write output json file if needed */
     if ( jf->export_fp != NULL && jf->jstframes != NULL )
@@ -435,7 +435,7 @@ static int sort_by_pkt_pos(const void *j1, const void *j2)
     return i1 - i2;
 }
 
-static void close_files(FFEditOutputContext *ectx, FFEditJSONFile *jf)
+static void close_files(FFEditOutputContext *ectx, JSONFile *jf)
 {
     if ( jf != NULL )
         close_ffedit_json_file(jf);
@@ -456,7 +456,7 @@ static void close_files(FFEditOutputContext *ectx, FFEditJSONFile *jf)
 
 static int open_files(
         FFEditOutputContext **pectx,
-        FFEditJSONFile *jf,
+        JSONFile *jf,
         const char *o_fname,
         const char *i_fname)
 {
@@ -527,7 +527,7 @@ static int processing_needed(void)
     return 0;
 }
 
-static int open_decoders(FFEditOutputContext *ectx, FFEditJSONFile *jf)
+static int open_decoders(FFEditOutputContext *ectx, JSONFile *jf)
 {
     int fret = -1;
 
@@ -604,7 +604,7 @@ static int open_decoders(FFEditOutputContext *ectx, FFEditJSONFile *jf)
 
 static int ffedit_decode(
         FFEditOutputContext *ectx,
-        FFEditJSONFile *jf,
+        JSONFile *jf,
         AVCodecContext *dctx,
         AVFrame *iframe,
         AVPacket *ipkt,
@@ -643,7 +643,7 @@ static int ffedit_decode(
     return 0;
 }
 
-static int transplicate(FFEditOutputContext *ectx, FFEditJSONFile *jf)
+static int transplicate(FFEditOutputContext *ectx, JSONFile *jf)
 {
     int fret = -1;
 
@@ -711,7 +711,7 @@ static void print_features(void)
 int main(int argc, char *argv[])
 {
     FFEditOutputContext *ectx = NULL;
-    FFEditJSONFile *rootjf = NULL;
+    JSONFile *rootjf = NULL;
     int fret = -1;
     int ret;
 
