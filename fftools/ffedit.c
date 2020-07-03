@@ -34,6 +34,8 @@ typedef struct {
     int    nb_decs;
     AVCodecContext **dctxs;
     int           nb_dctxs;
+
+    FFEditOutputContext *ectx;
 } FFFile;
 
 static int is_exporting;
@@ -436,19 +438,16 @@ static int sort_by_pkt_pos(const void *j1, const void *j2)
     return i1 - i2;
 }
 
-static void close_files(
-        FFEditOutputContext *ectx,
-        JSONFile *jf,
-        FFFile *fff)
+static void close_files(FFFile *fff, JSONFile *jf)
 {
     if ( jf != NULL )
         close_ffedit_json_file(jf, fff);
 
     /* write glitched file if needed */
-    if ( ectx != NULL )
+    if ( fff->ectx != NULL )
     {
-        ffe_output_flush(ectx);
-        ffe_output_freep(&ectx);
+        ffe_output_flush(fff->ectx);
+        ffe_output_freep(&fff->ectx);
     }
 
     /* close input file */
@@ -459,7 +458,6 @@ static void close_files(
 }
 
 static FFFile *open_files(
-        FFEditOutputContext **pectx,
         JSONFile *jf,
         const char *o_fname,
         const char *i_fname)
@@ -475,7 +473,7 @@ static FFFile *open_files(
     /* open output file for transplication if needed */
     if ( o_fname != NULL && strcmp(o_fname, "-") == 0 )
         o_fname = "pipe:";
-    if ( o_fname != NULL && ffe_output_open(pectx, fff->fctx, o_fname) < 0 )
+    if ( o_fname != NULL && ffe_output_open(&fff->ectx, fff->fctx, o_fname) < 0 )
         goto the_end;
 
     /* open input file */
@@ -537,10 +535,7 @@ static int processing_needed(void)
     return 0;
 }
 
-static int open_decoders(
-        FFEditOutputContext *ectx,
-        JSONFile *jf,
-        FFFile *fff)
+static int open_decoders(FFFile *fff, JSONFile *jf)
 {
     int fret = -1;
 
@@ -596,7 +591,7 @@ static int open_decoders(
             }
         }
         /* enable bitstream transplication */
-        if ( ectx != NULL )
+        if ( fff->ectx != NULL )
             dctx->ffedit_apply |= (1 << FFEDIT_FEAT_LAST);
 
         ret = avcodec_open2(dctx, decoder, &opts);
@@ -656,10 +651,7 @@ static int ffedit_decode(
     return 0;
 }
 
-static int transplicate(
-        FFEditOutputContext *ectx,
-        JSONFile *jf,
-        FFFile *fff)
+static int transplicate(FFFile *fff, JSONFile *jf)
 {
     int fret = -1;
 
@@ -689,7 +681,7 @@ static int transplicate(
         if ( is_applying )
             get_from_ffedit_json_file(jf, ipkt, stream_index);
 
-        ret = ffedit_decode(ectx, jf, dctx, iframe, ipkt, stream_index);
+        ret = ffedit_decode(fff->ectx, jf, dctx, iframe, ipkt, stream_index);
         if ( ret < 0 )
         {
             av_log(NULL, AV_LOG_FATAL, "ffedit_decode() failed\n");
@@ -698,7 +690,7 @@ static int transplicate(
     }
 
     for ( size_t i = 0 ; i < fff->fctx->nb_streams; i++ )
-        ffedit_decode(ectx, jf, fff->dctxs[i], iframe, NULL, i);
+        ffedit_decode(fff->ectx, jf, fff->dctxs[i], iframe, NULL, i);
 
     fret = 0;
 
@@ -726,7 +718,6 @@ static void print_features(FFFile *fff)
 
 int main(int argc, char *argv[])
 {
-    FFEditOutputContext *ectx = NULL;
     JSONFile *rootjf = NULL;
     FFFile *fff = NULL;
     int fret = -1;
@@ -785,7 +776,7 @@ int main(int argc, char *argv[])
         rootjf = read_ffedit_json_file(apply_fname);
     }
 
-    fff = open_files(&ectx, rootjf, output_filename, input_filename);
+    fff = open_files(rootjf, output_filename, input_filename);
     if ( fff == NULL )
         goto the_end;
 
@@ -799,7 +790,7 @@ int main(int argc, char *argv[])
     {
         /* open all possible decoders */
         /* TODO allow selecting streams */
-        ret = open_decoders(ectx, rootjf, fff);
+        ret = open_decoders(fff, rootjf);
         if ( ret < 0 )
         {
             av_log(NULL, AV_LOG_FATAL, "Error opening decoders.\n");
@@ -807,11 +798,11 @@ int main(int argc, char *argv[])
         }
 
         /* do the salmon dance */
-        fret = transplicate(ectx, rootjf, fff);
+        fret = transplicate(fff, rootjf);
     }
 
 the_end:
-    close_files(ectx, rootjf, fff);
+    close_files(fff, rootjf);
 
     if ( rootjf != NULL )
         av_free(rootjf);
