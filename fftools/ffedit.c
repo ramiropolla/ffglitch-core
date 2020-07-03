@@ -28,12 +28,13 @@ static int test_mode;
 static int file_overwrite;
 static const char *threads;
 
-/* don't you just love globals? */
-static AVFormatContext *fctx;
-static AVCodec **decs;
-static int    nb_decs;
-static AVCodecContext **dctxs;
-static int           nb_dctxs;
+typedef struct {
+    AVFormatContext *fctx;
+    AVCodec **decs;
+    int    nb_decs;
+    AVCodecContext **dctxs;
+    int           nb_dctxs;
+} FFFile;
 
 static int is_exporting;
 static int is_applying; // implies importing
@@ -238,12 +239,12 @@ static void get_from_ffedit_json_file(
     jf->frames_idx[stream_index]++;
 }
 
-static void close_ffedit_json_file(JSONFile *jf)
+static void close_ffedit_json_file(JSONFile *jf, FFFile *fff)
 {
     /* write output json file if needed */
     if ( jf->export_fp != NULL && jf->jstframes != NULL )
     {
-        for ( size_t i = 0; i < fctx->nb_streams; i++ )
+        for ( size_t i = 0; i < fff->fctx->nb_streams; i++ )
             json_array_sort(jf->jstframes[i], sort_by_pkt_pos);
 
         json_fputs(jf->export_fp, jf->jroot);
@@ -435,10 +436,13 @@ static int sort_by_pkt_pos(const void *j1, const void *j2)
     return i1 - i2;
 }
 
-static void close_files(FFEditOutputContext *ectx, JSONFile *jf)
+static void close_files(
+        FFEditOutputContext *ectx,
+        JSONFile *jf,
+        FFFile *fff)
 {
     if ( jf != NULL )
-        close_ffedit_json_file(jf);
+        close_ffedit_json_file(jf, fff);
 
     /* write glitched file if needed */
     if ( ectx != NULL )
@@ -448,40 +452,43 @@ static void close_files(FFEditOutputContext *ectx, JSONFile *jf)
     }
 
     /* close input file */
-    for ( size_t i = 0; i < nb_dctxs; i++ )
-        avcodec_free_context(&dctxs[i]);
-    if ( fctx != NULL )
-        avformat_close_input(&fctx);
+    for ( size_t i = 0; i < fff->nb_dctxs; i++ )
+        avcodec_free_context(&fff->dctxs[i]);
+    if ( fff->fctx != NULL )
+        avformat_close_input(&fff->fctx);
 }
 
-static int open_files(
+static FFFile *open_files(
         FFEditOutputContext **pectx,
         JSONFile *jf,
         const char *o_fname,
         const char *i_fname)
 {
+    FFFile *fff = NULL;
     int fret = -1;
     int ret;
 
-    fctx = avformat_alloc_context();
+    fff = av_mallocz(sizeof(FFFile));
+
+    fff->fctx = avformat_alloc_context();
 
     /* open output file for transplication if needed */
     if ( o_fname != NULL && strcmp(o_fname, "-") == 0 )
         o_fname = "pipe:";
-    if ( o_fname != NULL && ffe_output_open(pectx, fctx, o_fname) < 0 )
+    if ( o_fname != NULL && ffe_output_open(pectx, fff->fctx, o_fname) < 0 )
         goto the_end;
 
     /* open input file */
     if ( strcmp(i_fname, "-") == 0 )
         i_fname = "pipe:";
-    ret = avformat_open_input(&fctx, i_fname, NULL, NULL);
+    ret = avformat_open_input(&fff->fctx, i_fname, NULL, NULL);
     if ( ret < 0 )
     {
         av_log(NULL, AV_LOG_FATAL, "Could not open input file '%s'\n", i_fname);
         goto the_end;
     }
 
-    ret = avformat_find_stream_info(fctx, 0);
+    ret = avformat_find_stream_info(fff->fctx, 0);
     if ( ret < 0 )
     {
         av_log(NULL, AV_LOG_FATAL,
@@ -489,21 +496,21 @@ static int open_files(
         goto the_end;
     }
 
-    av_dump_format(fctx, 0, i_fname, 0);
+    av_dump_format(fff->fctx, 0, i_fname, 0);
 
-    if ( (fctx->iformat->flags & AVFMT_FFEDIT_BITSTREAM) == 0 )
+    if ( (fff->fctx->iformat->flags & AVFMT_FFEDIT_BITSTREAM) == 0 )
     {
         av_log(NULL, AV_LOG_FATAL, "Format '%s' not supported by ffedit.\n",
-               fctx->iformat->long_name);
+               fff->fctx->iformat->long_name);
         goto the_end;
     }
 
-    for ( size_t i = 0; i < fctx->nb_streams; i++ )
+    for ( size_t i = 0; i < fff->fctx->nb_streams; i++ )
     {
-        GROW_ARRAY(decs, nb_decs);
+        GROW_ARRAY(fff->decs, fff->nb_decs);
 
-        decs[i] = avcodec_find_decoder(fctx->streams[i]->codecpar->codec_id);
-        if ( decs[i] == NULL )
+        fff->decs[i] = avcodec_find_decoder(fff->fctx->streams[i]->codecpar->codec_id);
+        if ( fff->decs[i] == NULL )
             av_log(NULL, AV_LOG_ERROR,
                    "Failed to find decoder for stream %zu. Skipping\n", i);
 
@@ -514,7 +521,10 @@ static int open_files(
     fret = 0;
 
 the_end:
-    return fret;
+    if ( fret != 0 )
+        av_free(fff);
+
+    return fff;
 }
 
 static int processing_needed(void)
@@ -527,18 +537,21 @@ static int processing_needed(void)
     return 0;
 }
 
-static int open_decoders(FFEditOutputContext *ectx, JSONFile *jf)
+static int open_decoders(
+        FFEditOutputContext *ectx,
+        JSONFile *jf,
+        FFFile *fff)
 {
     int fret = -1;
 
-    for ( size_t i = 0; i < nb_decs; i++ )
+    for ( size_t i = 0; i < fff->nb_decs; i++ )
     {
-        AVCodec *decoder = decs[i];
+        AVCodec *decoder = fff->decs[i];
         AVDictionary *opts = NULL;
         AVCodecContext *dctx;
         int ret;
 
-        GROW_ARRAY(dctxs, nb_dctxs);
+        GROW_ARRAY(fff->dctxs, fff->nb_dctxs);
 
         if ( decoder == NULL )
             continue;
@@ -551,10 +564,10 @@ static int open_decoders(FFEditOutputContext *ectx, JSONFile *jf)
             continue;
         }
 
-        dctxs[i] = avcodec_alloc_context3(decoder);
-        dctx = dctxs[i];
+        fff->dctxs[i] = avcodec_alloc_context3(decoder);
+        dctx = fff->dctxs[i];
         dctx->jctx = get_jctx_ffedit_json_file(jf);
-        avcodec_parameters_to_context(dctx, fctx->streams[i]->codecpar);
+        avcodec_parameters_to_context(dctx, fff->fctx->streams[i]->codecpar);
 
         /* enable threads if ffedit supports it for this codec */
         if ( threads != NULL )
@@ -643,7 +656,10 @@ static int ffedit_decode(
     return 0;
 }
 
-static int transplicate(FFEditOutputContext *ectx, JSONFile *jf)
+static int transplicate(
+        FFEditOutputContext *ectx,
+        JSONFile *jf,
+        FFFile *fff)
 {
     int fret = -1;
 
@@ -659,13 +675,13 @@ static int transplicate(FFEditOutputContext *ectx, JSONFile *jf)
         int stream_index;
         int ret;
 
-        ret = av_read_frame(fctx, ipkt);
+        ret = av_read_frame(fff->fctx, ipkt);
         if ( ret < 0 ) // EOF or TODO error
             break;
 
         stream_index = ipkt->stream_index;
 
-        dctx = dctxs[stream_index];
+        dctx = fff->dctxs[stream_index];
         if ( dctx == NULL )
             continue;
 
@@ -681,8 +697,8 @@ static int transplicate(FFEditOutputContext *ectx, JSONFile *jf)
         }
     }
 
-    for ( size_t i = 0 ; i < fctx->nb_streams; i++ )
-        ffedit_decode(ectx, jf, dctxs[i], iframe, NULL, i);
+    for ( size_t i = 0 ; i < fff->fctx->nb_streams; i++ )
+        ffedit_decode(ectx, jf, fff->dctxs[i], iframe, NULL, i);
 
     fret = 0;
 
@@ -693,11 +709,11 @@ the_end:
     return fret;
 }
 
-static void print_features(void)
+static void print_features(FFFile *fff)
 {
-    for ( size_t i = 0; i < nb_decs; i++ )
+    for ( size_t i = 0; i < fff->nb_decs; i++ )
     {
-        AVCodec *decoder = decs[i];
+        AVCodec *decoder = fff->decs[i];
         if ( decoder != NULL )
         {
             printf("\nFFEdit support for codec '%s':\n", decoder->long_name);
@@ -712,6 +728,7 @@ int main(int argc, char *argv[])
 {
     FFEditOutputContext *ectx = NULL;
     JSONFile *rootjf = NULL;
+    FFFile *fff = NULL;
     int fret = -1;
     int ret;
 
@@ -768,21 +785,21 @@ int main(int argc, char *argv[])
         rootjf = read_ffedit_json_file(apply_fname);
     }
 
-    ret = open_files(&ectx, rootjf, output_filename, input_filename);
-    if ( ret < 0 )
+    fff = open_files(&ectx, rootjf, output_filename, input_filename);
+    if ( fff == NULL )
         goto the_end;
 
     if ( !processing_needed() )
     {
         /* no processing needed. just print glitching features */
-        print_features();
+        print_features(fff);
         fret = 0;
     }
     else
     {
         /* open all possible decoders */
         /* TODO allow selecting streams */
-        ret = open_decoders(ectx, rootjf);
+        ret = open_decoders(ectx, rootjf, fff);
         if ( ret < 0 )
         {
             av_log(NULL, AV_LOG_FATAL, "Error opening decoders.\n");
@@ -790,11 +807,11 @@ int main(int argc, char *argv[])
         }
 
         /* do the salmon dance */
-        fret = transplicate(ectx, rootjf);
+        fret = transplicate(ectx, rootjf, fff);
     }
 
 the_end:
-    close_files(ectx, rootjf);
+    close_files(ectx, rootjf, fff);
 
     if ( rootjf != NULL )
         av_free(rootjf);
