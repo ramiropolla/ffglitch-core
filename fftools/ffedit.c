@@ -438,7 +438,7 @@ static int sort_by_pkt_pos(const void *j1, const void *j2)
     return i1 - i2;
 }
 
-static void close_files(FFFile *fff, JSONFile *jf)
+static void fff_close_files(FFFile *fff, JSONFile *jf)
 {
     if ( jf != NULL )
         close_ffedit_json_file(jf, fff);
@@ -457,7 +457,7 @@ static void close_files(FFFile *fff, JSONFile *jf)
         avformat_close_input(&fff->fctx);
 }
 
-static FFFile *open_files(
+static FFFile *fff_open_files(
         const char *o_fname,
         const char *i_fname)
 {
@@ -531,7 +531,7 @@ static int processing_needed(void)
     return 0;
 }
 
-static int open_decoders(FFFile *fff, JSONFile *jf)
+static int fff_open_decoders(FFFile *fff, JSONFile *jf)
 {
     int fret = -1;
 
@@ -647,7 +647,7 @@ static int ffedit_decode(
     return 0;
 }
 
-static int transplicate(FFFile *fff, JSONFile *jf)
+static int fff_transplicate(FFFile *fff, JSONFile *jf)
 {
     int fret = -1;
 
@@ -697,7 +697,7 @@ the_end:
     return fret;
 }
 
-static void print_features(FFFile *fff)
+static void fff_print_features(FFFile *fff)
 {
     for ( size_t i = 0; i < fff->nb_decs; i++ )
     {
@@ -761,7 +761,7 @@ int main(int argc, char *argv[])
         features_selected = 1;
     }
 
-    fff = open_files(output_filename, input_filename);
+    fff = fff_open_files(output_filename, input_filename);
     if ( fff == NULL )
         goto the_end;
 
@@ -781,14 +781,14 @@ int main(int argc, char *argv[])
     if ( !processing_needed() )
     {
         /* no processing needed. just print glitching features */
-        print_features(fff);
+        fff_print_features(fff);
         fret = 0;
     }
     else
     {
         /* open all possible decoders */
         /* TODO allow selecting streams */
-        ret = open_decoders(fff, rootjf);
+        ret = fff_open_decoders(fff, rootjf);
         if ( ret < 0 )
         {
             av_log(NULL, AV_LOG_FATAL, "Error opening decoders.\n");
@@ -796,11 +796,11 @@ int main(int argc, char *argv[])
         }
 
         /* do the salmon dance */
-        fret = transplicate(fff, rootjf);
+        fret = fff_transplicate(fff, rootjf);
     }
 
 the_end:
-    close_files(fff, rootjf);
+    fff_close_files(fff, rootjf);
 
     if ( rootjf != NULL )
         av_free(rootjf);
