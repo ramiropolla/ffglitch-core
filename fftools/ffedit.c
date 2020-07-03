@@ -461,7 +461,8 @@ static FFFile *fff_open_files(
         const char *o_fname,
         const char *i_fname,
         const char *e_fname,
-        const char *a_fname)
+        const char *a_fname,
+        int *_selected_features)
 {
     FFFile *fff = NULL;
     int fret = -1;
@@ -514,6 +515,19 @@ static FFFile *fff_open_files(
         if ( fff->decs[i] == NULL )
             av_log(NULL, AV_LOG_ERROR,
                    "Failed to find decoder for stream %zu. Skipping\n", i);
+    }
+
+    if ( fff->is_exporting )
+    {
+        fff->rootjf = prepare_ffedit_json_file(e_fname, i_fname, _selected_features);
+        if ( fff->rootjf == NULL )
+            goto the_end;
+        for ( size_t i = 0; i < fff->fctx->nb_streams; i++ )
+            add_stream_to_ffedit_json_file(fff->rootjf, i);
+    }
+    else if ( fff->is_applying )
+    {
+        fff->ootjf = read_ffedit_json_file(a_fname);
     }
 
     fret = 0;
@@ -763,22 +777,9 @@ int main(int argc, char *argv[])
         features_selected = 1;
     }
 
-    fff = fff_open_files(output_fname, input_fname, export_fname, apply_fname);
+    fff = fff_open_files(output_fname, input_fname, export_fname, apply_fname, selected_features);
     if ( fff == NULL )
         goto the_end;
-
-    if ( fff->is_exporting )
-    {
-        rootjf = prepare_ffedit_json_file(export_fname, input_fname, selected_features);
-        if ( rootjf == NULL )
-            goto the_end;
-        for ( size_t i = 0; i < fff->fctx->nb_streams; i++ )
-            add_stream_to_ffedit_json_file(rootjf, i);
-    }
-    else if ( fff->is_applying )
-    {
-        rootjf = read_ffedit_json_file(apply_fname);
-    }
 
     if ( !processing_needed(fff) )
     {
