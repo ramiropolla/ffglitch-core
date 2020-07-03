@@ -80,6 +80,25 @@ static char *read_file(const char *fname, size_t *psize)
     return buf;
 }
 
+static void sha1sum(char *shasumstr, const char *buf, size_t size)
+{
+    struct AVSHA *sha;
+    uint8_t shasum[20];
+
+    sha = av_sha_alloc();
+    av_sha_init(sha, 160);
+    av_sha_update(sha, buf, size);
+    av_sha_final(sha, shasum);
+    av_free(sha);
+
+    for ( size_t i = 0; i < 20; i++ )
+    {
+        shasumstr[i*2+0] = nibble2char(shasum[i] >> 4);
+        shasumstr[i*2+1] = nibble2char(shasum[i] & 0xF);
+    }
+    shasumstr[40] = '\0';
+}
+
 static const OptionDef options[] = {
     CMDUTILS_COMMON_OPTIONS
     { "i", HAS_ARG | OPT_STRING, { &input_filename }, "input file (may be omitted)", "file" },
@@ -616,24 +635,11 @@ int main(int argc, char *argv[])
         if ( buf != NULL )
         {
             json_t *jshasum = NULL;
-            struct AVSHA *sha;
             char shasumstr[41];
-            uint8_t shasum[20];
 
-            sha = av_sha_alloc();
-            av_sha_init(sha, 160);
-            av_sha_update(sha, buf, size);
-            av_sha_final(sha, shasum);
-            av_free(sha);
+            sha1sum(shasumstr, buf, size);
 
             free(buf);
-
-            for ( size_t i = 0; i < 20; i++ )
-            {
-                shasumstr[i*2+0] = nibble2char(shasum[i] >> 4);
-                shasumstr[i*2+1] = nibble2char(shasum[i] & 0xF);
-            }
-            shasumstr[40] = '\0';
 
             jshasum = json_string_new(&jctx, shasumstr);
             json_object_add(jroot, "sha1sum", jshasum);
