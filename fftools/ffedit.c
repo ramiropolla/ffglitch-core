@@ -458,7 +458,6 @@ static void close_files(FFFile *fff, JSONFile *jf)
 }
 
 static FFFile *open_files(
-        JSONFile *jf,
         const char *o_fname,
         const char *i_fname)
 {
@@ -511,9 +510,6 @@ static FFFile *open_files(
         if ( fff->decs[i] == NULL )
             av_log(NULL, AV_LOG_ERROR,
                    "Failed to find decoder for stream %zu. Skipping\n", i);
-
-        if ( is_exporting )
-            add_stream_to_ffedit_json_file(jf, i);
     }
 
     fret = 0;
@@ -765,20 +761,22 @@ int main(int argc, char *argv[])
         features_selected = 1;
     }
 
+    fff = open_files(output_filename, input_filename);
+    if ( fff == NULL )
+        goto the_end;
+
     if ( is_exporting )
     {
         rootjf = prepare_ffedit_json_file(export_fname, input_filename, selected_features);
         if ( rootjf == NULL )
             goto the_end;
+        for ( size_t i = 0; i < fff->fctx->nb_streams; i++ )
+            add_stream_to_ffedit_json_file(rootjf, i);
     }
     else if ( is_applying )
     {
         rootjf = read_ffedit_json_file(apply_fname);
     }
-
-    fff = open_files(rootjf, output_filename, input_filename);
-    if ( fff == NULL )
-        goto the_end;
 
     if ( !processing_needed() )
     {
