@@ -484,7 +484,8 @@ static int transplicate(FFEditOutputContext *ectx)
 
     size_t *frames_idx = NULL;
 
-    frames_idx = av_calloc(nb_jstframes, sizeof(size_t));
+    if ( is_applying )
+        frames_idx = av_calloc(nb_jstframes, sizeof(size_t));
 
     while ( 42 )
     {
