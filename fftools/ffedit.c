@@ -16,8 +16,8 @@ const char program_name[] = "ffedit";
 const int program_birth_year = 2000; // FFmpeg, that is
 
 /* command-line options */
-static const char *input_filename;
-static const char *output_filename;
+static const char *input_fname;
+static const char *output_fname;
 static const char *apply_fname;
 static const char *export_fname;
 /* TODO use avformat_match_stream_specifier */
@@ -116,7 +116,7 @@ static json_ctx_t *get_jctx_ffedit_json_file(JSONFile *jf)
 
 static JSONFile *prepare_ffedit_json_file(
         const char *_export_fname,
-        const char *_input_filename,
+        const char *_input_fname,
         int *_selected_features)
 {
     JSONFile *jf = NULL;
@@ -146,10 +146,10 @@ static JSONFile *prepare_ffedit_json_file(
         json_object_add(jf->jroot, "ffedit_version", jversion);
     }
 
-    jfname = json_string_new(&jf->jctx, av_basename(_input_filename));
+    jfname = json_string_new(&jf->jctx, av_basename(_input_fname));
     json_object_add(jf->jroot, "filename", jfname);
 
-    buf = read_file(_input_filename, &size);
+    buf = read_file(_input_fname, &size);
     if ( buf != NULL )
     {
         json_t *jshasum = NULL;
@@ -313,8 +313,8 @@ static void sha1sum(char *shasumstr, const char *buf, size_t size)
 
 static const OptionDef options[] = {
     CMDUTILS_COMMON_OPTIONS
-    { "i", HAS_ARG | OPT_STRING, { &input_filename }, "input file (may be omitted)", "file" },
-    { "o", HAS_ARG | OPT_STRING, { &output_filename }, "output file (may be omitted)", "file" },
+    { "i", HAS_ARG | OPT_STRING, { &input_fname }, "input file (may be omitted)", "file" },
+    { "o", HAS_ARG | OPT_STRING, { &output_fname }, "output file (may be omitted)", "file" },
     { "a", HAS_ARG | OPT_STRING, { &apply_fname }, "apply data", "json file" },
     { "e", HAS_ARG | OPT_STRING, { &export_fname }, "export data", "json file" },
     { "f", HAS_ARG, { .func_arg = opt_feature }, "select feature (optionally specify stream with feat:#)", "feature" },
@@ -400,13 +400,13 @@ static int opt_feature(void *optctx, const char *opt, const char *arg)
 
 static void opt_filenames(void *optctx, const char *filename)
 {
-    if ( input_filename == NULL )
+    if ( input_fname == NULL )
     {
-        input_filename = filename;
+        input_fname = filename;
     }
-    else if ( output_filename == NULL )
+    else if ( output_fname == NULL )
     {
-        output_filename = filename;
+        output_fname = filename;
     }
     else
     {
@@ -523,7 +523,7 @@ the_end:
 
 static int processing_needed(void)
 {
-    if ( output_filename != NULL
+    if ( output_fname != NULL
       || is_exporting )
     {
         return 1;
@@ -741,7 +741,7 @@ int main(int argc, char *argv[])
     }
 
     /* there must be one input */
-    if ( !input_filename )
+    if ( !input_fname )
     {
         av_log(NULL, AV_LOG_FATAL, "No input file specified!\n");
         goto the_end;
@@ -761,13 +761,13 @@ int main(int argc, char *argv[])
         features_selected = 1;
     }
 
-    fff = fff_open_files(output_filename, input_filename);
+    fff = fff_open_files(output_fname, input_fname);
     if ( fff == NULL )
         goto the_end;
 
     if ( is_exporting )
     {
-        rootjf = prepare_ffedit_json_file(export_fname, input_filename, selected_features);
+        rootjf = prepare_ffedit_json_file(export_fname, input_fname, selected_features);
         if ( rootjf == NULL )
             goto the_end;
         for ( size_t i = 0; i < fff->fctx->nb_streams; i++ )
