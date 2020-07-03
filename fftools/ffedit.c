@@ -15,9 +15,18 @@
 const char program_name[] = "ffedit";
 const int program_birth_year = 2000; // FFmpeg, that is
 
-/* only one input and one optional output file */
+/* command-line options */
 static const char *input_filename;
 static const char *output_filename;
+static const char *apply_fname;
+static const char *export_fname;
+/* TODO use avformat_match_stream_specifier */
+static int selected_features[FFEDIT_FEAT_LAST];
+static int selected_features_idx[FFEDIT_FEAT_LAST];
+static int features_selected;
+static int test_mode;
+static int file_overwrite;
+static const char *threads;
 
 /* don't you just love globals? */
 static AVFormatContext *fctx;
@@ -29,12 +38,7 @@ static int           nb_dctxs;
 static int is_exporting;
 static int is_applying; // implies importing
 
-static const char *export_fname;
 static FILE *export_fp;
-static const char *apply_fname;
-static int file_overwrite;
-static int test_mode;
-static const char *threads;
 
 typedef struct {
     json_ctx_t jctx;
@@ -46,10 +50,6 @@ typedef struct {
     int   nb_jstframes;
 } FFEditJSONFile;
 
-/* TODO use avformat_match_stream_specifier */
-static int selected_features[FFEDIT_FEAT_LAST];
-static int selected_features_idx[FFEDIT_FEAT_LAST];
-static int features_selected;
 static int opt_feature(void *optctx, const char *opt, const char *arg);
 
 /* forward declarations */
