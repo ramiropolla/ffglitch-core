@@ -55,6 +55,8 @@ typedef struct {
     FFEditOutputContext *ectx;
 
     JSONFile *jf;
+
+    int fret;
 } FFFile;
 
 static int opt_feature(void *optctx, const char *opt, const char *arg);
@@ -470,10 +472,10 @@ static FFFile *fff_open_files(
         int *_selected_features)
 {
     FFFile *fff = NULL;
-    int fret = -1;
     int ret;
 
     fff = av_mallocz(sizeof(FFFile));
+    fff->fret = -1;
     fff->is_exporting = (e_fname != NULL);
     fff->is_applying = (a_fname != NULL);
 
@@ -535,10 +537,10 @@ static FFFile *fff_open_files(
         fff->jf = read_ffedit_json_file(a_fname);
     }
 
-    fret = 0;
+    fff->fret = 0;
 
 the_end:
-    if ( fret != 0 )
+    if ( fff->fret != 0 )
         av_free(fff);
 
     return fff;
@@ -554,9 +556,9 @@ static int fff_processing_needed(FFFile *fff)
     return 0;
 }
 
-static int fff_open_decoders(FFFile *fff)
+static void fff_open_decoders(FFFile *fff)
 {
-    int fret = -1;
+    fff->fret = -1;
 
     for ( size_t i = 0; i < fff->nb_decs; i++ )
     {
@@ -623,10 +625,8 @@ static int fff_open_decoders(FFFile *fff)
             continue;
         }
 
-        fret = 0;
+        fff->fret = 0;
     }
-
-    return fret;
 }
 
 static int ffedit_decode(
@@ -669,12 +669,12 @@ static int ffedit_decode(
     return 0;
 }
 
-static int fff_transplicate(FFFile *fff)
+static void fff_transplicate(FFFile *fff)
 {
-    int fret = -1;
-
     AVPacket *ipkt = av_packet_alloc();
     AVFrame *iframe = av_frame_alloc();
+
+    fff->fret = -1;
 
     if ( fff->is_applying )
         reset_frames_idx_ffedit_json_file(fff->jf);
@@ -710,13 +710,11 @@ static int fff_transplicate(FFFile *fff)
     for ( size_t i = 0 ; i < fff->fctx->nb_streams; i++ )
         ffedit_decode(fff, fff->dctxs[i], iframe, NULL, i);
 
-    fret = 0;
+    fff->fret = 0;
 
 the_end:
     av_frame_free(&iframe);
     av_packet_free(&ipkt);
-
-    return fret;
 }
 
 static void fff_print_features(FFFile *fff)
@@ -732,13 +730,13 @@ static void fff_print_features(FFFile *fff)
                     printf("\t[%-10s]: %s\n", ffe_feat_to_str(j), ffe_feat_desc(j));
         }
     }
+    fff->fret = 0;
 }
 
 int main(int argc, char *argv[])
 {
     FFFile *fff = NULL;
     int fret = -1;
-    int ret;
 
     hack_musl_pthread_stack_size();
 
@@ -788,25 +786,29 @@ int main(int argc, char *argv[])
     {
         /* no processing needed. just print glitching features */
         fff_print_features(fff);
-        fret = 0;
     }
     else
     {
         /* open all possible decoders */
         /* TODO allow selecting streams */
-        ret = fff_open_decoders(fff);
-        if ( ret < 0 )
+        fff_open_decoders(fff);
+        if ( fff->fret < 0 )
         {
             av_log(NULL, AV_LOG_FATAL, "Error opening decoders.\n");
             goto the_end;
         }
 
         /* do the salmon dance */
-        fret = fff_transplicate(fff);
+        fff_transplicate(fff);
     }
 
 the_end:
-    fff_close_files(fff);
+    if ( fff != NULL )
+    {
+        fff_close_files(fff);
+        fret = fff->fret;
+        av_freep(&fff);
+    }
 
     return fret;
 }
