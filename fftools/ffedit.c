@@ -7,6 +7,7 @@
 #include "libavutil/avstring.h"
 #include "libavutil/ffversion.h"
 #include "libavutil/sha.h"
+#include "libavutil/thread.h"
 #include "libavformat/ffedit.h"
 #include "libavcodec/ffedit.h"
 
@@ -733,6 +734,30 @@ static void fff_print_features(FFFile *fff)
     fff->fret = 0;
 }
 
+static void fff_func(void *arg)
+{
+    FFFile *fff = (FFFile *) arg;
+    if ( !fff_processing_needed(fff) )
+    {
+        /* no processing needed. just print glitching features */
+        fff_print_features(fff);
+    }
+    else
+    {
+        /* open all possible decoders */
+        /* TODO allow selecting streams */
+        fff_open_decoders(fff);
+        if ( fff->fret < 0 )
+        {
+            av_log(NULL, AV_LOG_FATAL, "Error opening decoders.\n");
+            return;
+        }
+
+        /* do the salmon dance */
+        fff_transplicate(fff);
+    }
+}
+
 int main(int argc, char *argv[])
 {
     FFFile *fff = NULL;
@@ -782,25 +807,7 @@ int main(int argc, char *argv[])
     if ( fff == NULL )
         goto the_end;
 
-    if ( !fff_processing_needed(fff) )
-    {
-        /* no processing needed. just print glitching features */
-        fff_print_features(fff);
-    }
-    else
-    {
-        /* open all possible decoders */
-        /* TODO allow selecting streams */
-        fff_open_decoders(fff);
-        if ( fff->fret < 0 )
-        {
-            av_log(NULL, AV_LOG_FATAL, "Error opening decoders.\n");
-            goto the_end;
-        }
-
-        /* do the salmon dance */
-        fff_transplicate(fff);
-    }
+    fff_func(fff);
 
 the_end:
     if ( fff != NULL )
