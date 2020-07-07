@@ -544,9 +544,9 @@ the_end:
     return fff;
 }
 
-static int processing_needed(FFFile *fff)
+static int fff_processing_needed(FFFile *fff)
 {
-    if ( output_fname != NULL
+    if ( fff->ectx != NULL
       || fff->is_exporting )
     {
         return 1;
@@ -784,7 +784,7 @@ int main(int argc, char *argv[])
     if ( fff == NULL )
         goto the_end;
 
-    if ( !processing_needed(fff) )
+    if ( !fff_processing_needed(fff) )
     {
         /* no processing needed. just print glitching features */
         fff_print_features(fff);
