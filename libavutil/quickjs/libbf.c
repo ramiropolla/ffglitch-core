@@ -1055,7 +1055,6 @@ limb_t mp_add_ui(limb_t *tab, limb_t b, size_t n)
     return k;
 }
 
-static
 limb_t mp_sub(limb_t *res, const limb_t *op1, const limb_t *op2, 
               mp_size_t n, limb_t carry)
 {
@@ -1092,7 +1091,6 @@ static limb_t mp_neg(limb_t *res, const limb_t *op2, mp_size_t n, limb_t carry)
     return k;
 }
 
-static
 limb_t mp_sub_ui(limb_t *tab, limb_t b, mp_size_t n)
 {
     mp_size_t i;
@@ -3372,12 +3370,14 @@ slimb_t bf_mul_log2_radix(slimb_t a1, unsigned int radix, int is_inv,
 }
 
 /* 'n' is the number of output limbs */
-static void bf_integer_to_radix_rec(bf_t *pow_tab,
-                                    limb_t *out, const bf_t *a, limb_t n,
-                                    int level, limb_t n0, limb_t radixl,
-                                    unsigned int radixl_bits)
+static int bf_integer_to_radix_rec(bf_t *pow_tab,
+                                   limb_t *out, const bf_t *a, limb_t n,
+                                   int level, limb_t n0, limb_t radixl,
+                                   unsigned int radixl_bits)
 {
     limb_t n1, n2, q_prec;
+    int ret;
+    
     assert(n >= 1);
     if (n == 1) {
         out[0] = get_bits(a->tab, a->len, a->len * LIMB_BITS - a->expn);
@@ -3404,63 +3404,81 @@ static void bf_integer_to_radix_rec(bf_t *pow_tab,
         n1 = n - n2;
         B = &pow_tab[2 * level];
         B_inv = &pow_tab[2 * level + 1];
+        ret = 0;
         if (B->len == 0) {
             /* compute BASE^n2 */
-            bf_pow_ui_ui(B, radixl, n2, BF_PREC_INF, BF_RNDZ);
+            ret |= bf_pow_ui_ui(B, radixl, n2, BF_PREC_INF, BF_RNDZ);
             /* we use enough bits for the maximum possible 'n1' value,
                i.e. n2 + 1 */
-            bf_set_ui(&R, 1);
-            bf_div(B_inv, &R, B, (n2 + 1) * radixl_bits + 2, BF_RNDN);
+            ret |= bf_set_ui(&R, 1);
+            ret |= bf_div(B_inv, &R, B, (n2 + 1) * radixl_bits + 2, BF_RNDN);
         }
         //        printf("%d: n1=% " PRId64 " n2=%" PRId64 "\n", level, n1, n2);
         q_prec = n1 * radixl_bits;
-        bf_mul(&Q, a, B_inv, q_prec, BF_RNDN);
-        bf_rint(&Q, BF_RNDZ);
+        ret |= bf_mul(&Q, a, B_inv, q_prec, BF_RNDN);
+        ret |= bf_rint(&Q, BF_RNDZ);
         
-        bf_mul(&R, &Q, B, BF_PREC_INF, BF_RNDZ);
-        bf_sub(&R, a, &R, BF_PREC_INF, BF_RNDZ);
+        ret |= bf_mul(&R, &Q, B, BF_PREC_INF, BF_RNDZ);
+        ret |= bf_sub(&R, a, &R, BF_PREC_INF, BF_RNDZ);
+
+        if (ret & BF_ST_MEM_ERROR)
+            goto fail;
         /* adjust if necessary */
         q_add = 0;
         while (R.sign && R.len != 0) {
-            bf_add(&R, &R, B, BF_PREC_INF, BF_RNDZ);
+            if (bf_add(&R, &R, B, BF_PREC_INF, BF_RNDZ))
+                goto fail;
             q_add--;
         }
         while (bf_cmpu(&R, B) >= 0) {
-            bf_sub(&R, &R, B, BF_PREC_INF, BF_RNDZ);
+            if (bf_sub(&R, &R, B, BF_PREC_INF, BF_RNDZ))
+                goto fail;
             q_add++;
         }
         if (q_add != 0) {
-            bf_add_si(&Q, &Q, q_add, BF_PREC_INF, BF_RNDZ);
+            if (bf_add_si(&Q, &Q, q_add, BF_PREC_INF, BF_RNDZ))
+                goto fail;
         }
-        bf_integer_to_radix_rec(pow_tab, out + n2, &Q, n1, level + 1, n0,
-                                radixl, radixl_bits);
-        bf_integer_to_radix_rec(pow_tab, out, &R, n2, level + 1, n0,
-                                radixl, radixl_bits);
+        if (bf_integer_to_radix_rec(pow_tab, out + n2, &Q, n1, level + 1, n0,
+                                    radixl, radixl_bits))
+            goto fail;
+        if (bf_integer_to_radix_rec(pow_tab, out, &R, n2, level + 1, n0,
+                                    radixl, radixl_bits)) {
+        fail:
+            bf_delete(&Q);
+            bf_delete(&R);
+            return -1;
+        }
         bf_delete(&Q);
         bf_delete(&R);
     }
+    return 0;
 }
 
-static void bf_integer_to_radix(bf_t *r, const bf_t *a, limb_t radixl)
+/* return 0 if OK != 0 if memory error */
+static int bf_integer_to_radix(bf_t *r, const bf_t *a, limb_t radixl)
 {
     bf_context_t *s = r->ctx;
     limb_t r_len;
     bf_t *pow_tab;
-    int i, pow_tab_len;
+    int i, pow_tab_len, ret;
     
     r_len = r->len;
     pow_tab_len = (ceil_log2(r_len) + 2) * 2; /* XXX: check */
     pow_tab = bf_malloc(s, sizeof(pow_tab[0]) * pow_tab_len);
+    if (!pow_tab)
+        return -1;
     for(i = 0; i < pow_tab_len; i++)
         bf_init(r->ctx, &pow_tab[i]);
 
-    bf_integer_to_radix_rec(pow_tab, r->tab, a, r_len, 0, r_len, radixl,
-                            ceil_log2(radixl));
+    ret = bf_integer_to_radix_rec(pow_tab, r->tab, a, r_len, 0, r_len, radixl,
+                                  ceil_log2(radixl));
 
     for(i = 0; i < pow_tab_len; i++) {
         bf_delete(&pow_tab[i]);
     }
     bf_free(s, pow_tab);
+    return ret;
 }
 
 /* a must be >= 0. 'P' is the wanted number of digits in radix
@@ -3627,8 +3645,14 @@ static void output_digits(DynBuf *s, const bf_t *a1, int radix, limb_t n_digits,
         a = &a_s;
         bf_init(a1->ctx, a);
         n = (n_digits + digits_per_limb - 1) / digits_per_limb;
-        bf_resize(a, n);
-        bf_integer_to_radix(a, a1, radixl);
+        if (bf_resize(a, n)) {
+            dbuf_set_error(s);
+            goto done;
+        }
+        if (bf_integer_to_radix(a, a1, radixl)) {
+            dbuf_set_error(s);
+            goto done;
+        }
         radix_bits = 0;
         pos = n;
         pos_incr = 1;
@@ -3661,6 +3685,7 @@ static void output_digits(DynBuf *s, const bf_t *a1, int radix, limb_t n_digits,
         buf_pos += l;
         i += l;
     }
+ done:
     if (a != a1)
         bf_delete(a);
 }
@@ -5537,7 +5562,6 @@ static inline limb_t fast_shr_dec(limb_t a, int shift)
 /* division and remainder by 10^shift */
 #define fast_shr_rem_dec(q, r, a, shift) q = fast_shr_dec(a, shift), r = a - q * mp_pow_dec[shift]
     
-static
 limb_t mp_add_dec(limb_t *res, const limb_t *op1, const limb_t *op2, 
                   mp_size_t n, limb_t carry)
 {
@@ -5558,7 +5582,6 @@ limb_t mp_add_dec(limb_t *res, const limb_t *op1, const limb_t *op2,
     return k;
 }
 
-static
 limb_t mp_add_ui_dec(limb_t *tab, limb_t b, mp_size_t n)
 {
     limb_t base = BF_DEC_BASE;
@@ -5579,7 +5602,6 @@ limb_t mp_add_ui_dec(limb_t *tab, limb_t b, mp_size_t n)
     return k;
 }
 
-static
 limb_t mp_sub_dec(limb_t *res, const limb_t *op1, const limb_t *op2, 
                   mp_size_t n, limb_t carry)
 {
@@ -5599,7 +5621,6 @@ limb_t mp_sub_dec(limb_t *res, const limb_t *op1, const limb_t *op2,
     return k;
 }
 
-static
 limb_t mp_sub_ui_dec(limb_t *tab, limb_t b, mp_size_t n)
 {
     limb_t base = BF_DEC_BASE;
@@ -5621,7 +5642,6 @@ limb_t mp_sub_ui_dec(limb_t *tab, limb_t b, mp_size_t n)
 }
 
 /* taba[] = taba[] * b + l. 0 <= b, l <= base - 1. Return the high carry */
-static
 limb_t mp_mul1_dec(limb_t *tabr, const limb_t *taba, mp_size_t n, 
                    limb_t b, limb_t l)
 {
@@ -5639,7 +5659,6 @@ limb_t mp_mul1_dec(limb_t *tabr, const limb_t *taba, mp_size_t n,
 
 /* tabr[] += taba[] * b. 0 <= b <= base - 1. Return the value to add
    to the high word */
-static
 limb_t mp_add_mul1_dec(limb_t *tabr, const limb_t *taba, mp_size_t n,
                        limb_t b)
 {
@@ -5659,7 +5678,6 @@ limb_t mp_add_mul1_dec(limb_t *tabr, const limb_t *taba, mp_size_t n,
 
 /* tabr[] -= taba[] * b. 0 <= b <= base - 1. Return the value to
    substract to the high word. */
-static
 limb_t mp_sub_mul1_dec(limb_t *tabr, const limb_t *taba, mp_size_t n,
                        limb_t b)
 {
@@ -5686,7 +5704,6 @@ limb_t mp_sub_mul1_dec(limb_t *tabr, const limb_t *taba, mp_size_t n,
 }
 
 /* size of the result : op1_size + op2_size. */
-static
 void mp_mul_basecase_dec(limb_t *result, 
                          const limb_t *op1, mp_size_t op1_size, 
                          const limb_t *op2, mp_size_t op2_size) 
@@ -5704,7 +5721,6 @@ void mp_mul_basecase_dec(limb_t *result,
 
 /* taba[] = (taba[] + r*base^na) / b. 0 <= b < base. 0 <= r <
    b. Return the remainder. */
-static
 limb_t mp_div1_dec(limb_t *tabr, const limb_t *taba, mp_size_t na, 
                    limb_t b, limb_t r)
 {
@@ -6044,7 +6060,6 @@ static limb_t mp_sqrtrem_rec_dec(limb_t *tabs, limb_t *taba, limb_t n,
    r) with s=floor(sqrt(a)) and r=a-s^2. 0 <= r <= 2 * s. tabs has n
    limbs. r is returned in the lower n limbs of taba. Its r[n] is the
    returned value of the function. */
-static
 int mp_sqrtrem_dec(bf_context_t *s, limb_t *tabs, limb_t *taba, limb_t n)
 {
     limb_t tmp_buf1[8];
