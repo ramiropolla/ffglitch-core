@@ -168,20 +168,20 @@ static JSONFile *prepare_ffedit_json_file(
         json_object_add(jf->jroot, "sha1sum", jshasum);
     }
 
-    jfeatures = json_array_new(&jf->jctx);
+    jfeatures = json_dynamic_array_new(&jf->jctx);
     for ( size_t i = 0; i < FFEDIT_FEAT_LAST; i++ )
     {
         if ( _selected_features[i] )
         {
             const char *feat_str = ffe_feat_to_str(i);
             json_t *jfeature = json_string_new(&jf->jctx, feat_str);
-            json_array_add(jfeatures, jfeature);
+            json_dynamic_array_add(jfeatures, jfeature);
         }
     }
-    json_array_done(&jf->jctx, jfeatures);
+    json_dynamic_array_done(&jf->jctx, jfeatures);
     json_object_add(jf->jroot, "features", jfeatures);
 
-    jf->jstreams0 = json_array_new(&jf->jctx);
+    jf->jstreams0 = json_dynamic_array_new(&jf->jctx);
     json_object_add(jf->jroot, "streams", jf->jstreams0);
 
     return jf;
@@ -190,7 +190,7 @@ static JSONFile *prepare_ffedit_json_file(
 static void add_stream_to_ffedit_json_file(JSONFile *jf, size_t i)
 {
     json_t *jstream = json_object_new(&jf->jctx);
-    json_t *jframes = json_array_new(&jf->jctx);
+    json_t *jframes = json_dynamic_array_new(&jf->jctx);
 
     GROW_ARRAY(jf->jstreams, jf->nb_jstreams);
     GROW_ARRAY(jf->jstframes, jf->nb_jstframes);
@@ -199,7 +199,7 @@ static void add_stream_to_ffedit_json_file(JSONFile *jf, size_t i)
     jf->jstframes[i] = jframes;
 
     json_object_add(jstream, "frames", jframes);
-    json_array_add(jf->jstreams0, jstream);
+    json_dynamic_array_add(jf->jstreams0, jstream);
 }
 
 static void add_frame_to_ffedit_json_file(
@@ -225,7 +225,7 @@ static void add_frame_to_ffedit_json_file(
             json_object_add(jframe, key, jso);
     }
 
-    json_array_add(jframes, jframe);
+    json_dynamic_array_add(jframes, jframe);
 }
 
 static void get_from_ffedit_json_file(
@@ -532,6 +532,7 @@ static FFFile *fff_open_files(
             goto the_end;
         for ( size_t i = 0; i < fff->fctx->nb_streams; i++ )
             add_stream_to_ffedit_json_file(fff->jf, i);
+        json_dynamic_array_done(&fff->jf->jctx, fff->jf->jstreams0);
     }
     else if ( fff->is_applying )
     {
