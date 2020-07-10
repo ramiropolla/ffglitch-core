@@ -11,7 +11,17 @@ ffe_mpegvideo_jctx_init(MpegEncContext *s)
     /* set jctx */
     s->jctx = s->avctx->jctx;
     if ( s->jctx != NULL )
+    {
+        if ( s->avctx->ffedit_export != 0 )
+        {
+            /* create one jctx for each exported frame */
+            AVFrame *f = s->current_picture_ptr->f;
+            f->jctx = av_mallocz(sizeof(json_ctx_t));
+            json_ctx_start(f->jctx);
+            s->jctx = f->jctx;
+        }
         for ( size_t i = 0; i < MAX_THREADS; i++ )
             if ( s->thread_context[i] != NULL )
                 s->thread_context[i]->jctx = json_ctx_start_thread(s->jctx, i);
+    }
 }

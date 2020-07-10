@@ -30,7 +30,8 @@ static int file_overwrite;
 static const char *threads;
 
 typedef struct {
-    json_ctx_t jctx;
+    json_ctx_t *jctxs;
+    int      nb_jctxs;
     json_t *jroot;
     json_t *jstreams0;
     json_t **jstreams;
@@ -83,12 +84,13 @@ static JSONFile *read_ffedit_json_file(const char *_apply_fname)
         exit(1);
     }
 
-    json_ctx_start(&jf->jctx);
-    jf->jroot = json_parse(&jf->jctx, buf);
+    GROW_ARRAY(jf->jctxs, jf->nb_jctxs);
+    json_ctx_start(&jf->jctxs[0]);
+    jf->jroot = json_parse(&jf->jctxs[0], buf);
     if ( jf->jroot == NULL )
     {
         av_log(NULL, AV_LOG_FATAL, "json_parse error: %s\n",
-               json_parse_error(&jf->jctx));
+               json_parse_error(&jf->jctxs[0]));
         exit(1);
     }
     jf->jstreams0 = json_object_get(jf->jroot, "streams");
@@ -116,7 +118,7 @@ static void reset_frames_idx_ffedit_json_file(JSONFile *jf)
 
 static json_ctx_t *get_jctx_ffedit_json_file(JSONFile *jf)
 {
-    return &jf->jctx;
+    return &jf->jctxs[0];
 }
 
 static JSONFile *prepare_ffedit_json_file(
@@ -142,16 +144,17 @@ static JSONFile *prepare_ffedit_json_file(
         return NULL;
     }
 
-    json_ctx_start(&jf->jctx);
-    jf->jroot = json_object_new(&jf->jctx);
+    GROW_ARRAY(jf->jctxs, jf->nb_jctxs);
+    json_ctx_start(&jf->jctxs[0]);
+    jf->jroot = json_object_new(&jf->jctxs[0]);
 
     if ( test_mode == 0 )
     {
-        json_t *jversion = json_string_new(&jf->jctx, FFMPEG_VERSION);
+        json_t *jversion = json_string_new(&jf->jctxs[0], FFMPEG_VERSION);
         json_object_add(jf->jroot, "ffedit_version", jversion);
     }
 
-    jfname = json_string_new(&jf->jctx, av_basename(_input_fname));
+    jfname = json_string_new(&jf->jctxs[0], av_basename(_input_fname));
     json_object_add(jf->jroot, "filename", jfname);
 
     buf = read_file(_input_fname, &size);
@@ -164,24 +167,24 @@ static JSONFile *prepare_ffedit_json_file(
 
         av_free(buf);
 
-        jshasum = json_string_new(&jf->jctx, shasumstr);
+        jshasum = json_string_new(&jf->jctxs[0], shasumstr);
         json_object_add(jf->jroot, "sha1sum", jshasum);
     }
 
-    jfeatures = json_dynamic_array_new(&jf->jctx);
+    jfeatures = json_dynamic_array_new(&jf->jctxs[0]);
     for ( size_t i = 0; i < FFEDIT_FEAT_LAST; i++ )
     {
         if ( _selected_features[i] )
         {
             const char *feat_str = ffe_feat_to_str(i);
-            json_t *jfeature = json_string_new(&jf->jctx, feat_str);
+            json_t *jfeature = json_string_new(&jf->jctxs[0], feat_str);
             json_dynamic_array_add(jfeatures, jfeature);
         }
     }
-    json_dynamic_array_done(&jf->jctx, jfeatures);
+    json_dynamic_array_done(&jf->jctxs[0], jfeatures);
     json_object_add(jf->jroot, "features", jfeatures);
 
-    jf->jstreams0 = json_dynamic_array_new(&jf->jctx);
+    jf->jstreams0 = json_dynamic_array_new(&jf->jctxs[0]);
     json_object_add(jf->jroot, "streams", jf->jstreams0);
 
     return jf;
@@ -189,8 +192,8 @@ static JSONFile *prepare_ffedit_json_file(
 
 static void add_stream_to_ffedit_json_file(JSONFile *jf, size_t i)
 {
-    json_t *jstream = json_object_new(&jf->jctx);
-    json_t *jframes = json_dynamic_array_new(&jf->jctx);
+    json_t *jstream = json_object_new(&jf->jctxs[0]);
+    json_t *jframes = json_dynamic_array_new(&jf->jctxs[0]);
 
     GROW_ARRAY(jf->jstreams, jf->nb_jstreams);
     GROW_ARRAY(jf->jstframes, jf->nb_jstframes);
@@ -208,10 +211,10 @@ static void add_frame_to_ffedit_json_file(
         int stream_index)
 {
     json_t *jframes = jf->jstframes[stream_index];
-    json_t *jframe = json_object_new(&jf->jctx);
-    json_t *jpkt_pos = json_int_new(&jf->jctx, iframe->pkt_pos);
-    json_t *jpts = json_int_new(&jf->jctx, iframe->pts);
-    json_t *jdts = json_int_new(&jf->jctx, iframe->pkt_dts);
+    json_t *jframe = json_object_new(&jf->jctxs[0]);
+    json_t *jpkt_pos = json_int_new(&jf->jctxs[0], iframe->pkt_pos);
+    json_t *jpts = json_int_new(&jf->jctxs[0], iframe->pts);
+    json_t *jdts = json_int_new(&jf->jctxs[0], iframe->pkt_dts);
 
     json_object_add(jframe, "pkt_pos", jpkt_pos);
     json_object_add(jframe, "pts", jpts);
@@ -224,7 +227,7 @@ static void add_frame_to_ffedit_json_file(
         if ( jso != NULL )
             json_object_add(jframe, key, jso);
     }
-    json_object_done(&jf->jctx, jframe);
+    json_object_done(&jf->jctxs[0], jframe);
 
     json_dynamic_array_add(jframes, jframe);
 }
@@ -256,10 +259,10 @@ static void close_ffedit_json_file(JSONFile *jf, FFFile *fff)
         for ( size_t i = 0; i < fff->fctx->nb_streams; i++ )
         {
             for ( size_t j = 0; j < jf->nb_jstreams; j++ )
-                json_object_done(&jf->jctx, jf->jstreams[i]);
-            json_dynamic_array_done(&jf->jctx, jf->jstframes[i]);
+                json_object_done(&jf->jctxs[0], jf->jstreams[i]);
+            json_dynamic_array_done(&jf->jctxs[0], jf->jstframes[i]);
         }
-        json_object_done(&jf->jctx, jf->jroot);
+        json_object_done(&jf->jctxs[0], jf->jroot);
 
         for ( size_t i = 0; i < fff->fctx->nb_streams; i++ )
             json_array_sort(jf->jstframes[i], sort_by_pkt_pos);
@@ -270,7 +273,11 @@ static void close_ffedit_json_file(JSONFile *jf, FFFile *fff)
 
     /* free json-c objects */
     if ( jf->jroot != NULL )
-        json_ctx_free(&jf->jctx);
+    {
+        for ( size_t i = 0; i < jf->nb_jctxs; i++ )
+            json_ctx_free(&jf->jctxs[i]);
+        av_freep(&jf->jctxs);
+    }
 
     /* free temporary variables */
     if ( jf->frames_idx != NULL )
@@ -557,7 +564,7 @@ static FFFile *fff_open_files(
             goto the_end;
         for ( size_t i = 0; i < fff->fctx->nb_streams; i++ )
             add_stream_to_ffedit_json_file(fff->jf, i);
-        json_dynamic_array_done(&fff->jf->jctx, fff->jf->jstreams0);
+        json_dynamic_array_done(&fff->jf->jctxs[0], fff->jf->jstreams0);
     }
     else if ( fff->is_applying )
     {
@@ -609,7 +616,8 @@ static void fff_open_decoders(FFFile *fff)
 
         fff->dctxs[i] = avcodec_alloc_context3(decoder);
         dctx = fff->dctxs[i];
-        dctx->jctx = get_jctx_ffedit_json_file(fff->jf);
+        if ( fff->is_exporting || fff->is_applying )
+            dctx->jctx = get_jctx_ffedit_json_file(fff->jf);
         avcodec_parameters_to_context(dctx, fff->fctx->streams[i]->codecpar);
 
         /* enable threads if ffedit supports it for this codec */
@@ -690,7 +698,13 @@ static int ffedit_decode(
         }
 
         if ( fff->is_exporting )
+        {
+            int jctx_idx = fff->jf->nb_jctxs;
             add_frame_to_ffedit_json_file(fff->jf, iframe, stream_index);
+            GROW_ARRAY(fff->jf->jctxs, fff->jf->nb_jctxs);
+            fff->jf->jctxs[jctx_idx] = *(json_ctx_t *) iframe->jctx;
+            av_freep(&iframe->jctx);
+        }
     }
 
     return 0;

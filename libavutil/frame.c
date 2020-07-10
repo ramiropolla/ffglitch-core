@@ -383,6 +383,7 @@ FF_ENABLE_DEPRECATION_WARNINGS
 #endif
 
     memcpy(dst->ffedit_sd, src->ffedit_sd, sizeof(dst->ffedit_sd));
+    dst->jctx = src->jctx;
     for (i = 0; i < src->nb_side_data; i++) {
         const AVFrameSideData *sd_src = src->side_data[i];
         AVFrameSideData *sd_dst;
@@ -559,6 +560,7 @@ void av_frame_unref(AVFrame *frame)
         return;
 
     memset(frame->ffedit_sd, 0x00, sizeof(frame->ffedit_sd));
+    frame->jctx = NULL;
     wipe_side_data(frame);
 
     for (i = 0; i < FF_ARRAY_ELEMS(frame->buf); i++)
