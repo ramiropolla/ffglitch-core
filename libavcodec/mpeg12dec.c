@@ -2598,10 +2598,13 @@ static int decode_chunks(AVCodecContext *avctx, AVFrame *picture,
                         ret = ff_update_duplicate_context(thread_context, s2);
                         if (ret < 0)
                             return ret;
-                        ffe_transplicate_free(&thread_context->ffe_xp);
-                        ret = ffe_transplicate_init(avctx, &thread_context->ffe_xp, buf_size);
-                        if ( ret < 0 )
-                            return ret;
+                        if ( (avctx->ffedit_apply & (1 << FFEDIT_FEAT_LAST)) != 0 )
+                        {
+                            ffe_transplicate_free(&thread_context->ffe_xp);
+                            ret = ffe_transplicate_init(avctx, &thread_context->ffe_xp, buf_size);
+                            if ( ret < 0 )
+                                return ret;
+                        }
                         ffe_transplicate_init_get_bits(&thread_context->ffe_xp, &thread_context->gb, buf_ptr, input_size * 8);
                         s->slice_count++;
                     }
