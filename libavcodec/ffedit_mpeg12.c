@@ -773,7 +773,8 @@ ffe_mpeg_decode_mb(MpegEncContext *s, int16_t block[12][64])
 static void
 ffe_mpeg12_prepare_frame(AVCodecContext *avctx, MpegEncContext *s, AVPacket *avpkt)
 {
-    memcpy(s->ffedit_sd, avpkt->ffedit_sd, sizeof(s->ffedit_sd));
+    if ( s->avctx->ffedit_import != 0 )
+        memcpy(s->ffedit_sd, avpkt->ffedit_sd, sizeof(s->ffedit_sd));
 }
 
 static void

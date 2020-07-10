@@ -638,14 +638,16 @@ ffe_mjpeg_frame_unref(AVFrame *f)
 static void
 ffe_mjpeg_init(MJpegDecodeContext *s)
 {
-    memcpy(s->picture_ptr->ffedit_sd, s->ffedit_sd, sizeof(s->ffedit_sd));
+    if ( s->avctx->ffedit_import != 0 )
+        memcpy(s->picture_ptr->ffedit_sd, s->ffedit_sd, sizeof(s->ffedit_sd));
 }
 
 //---------------------------------------------------------------------
 static void
 ffe_mjpeg_prepare_frame(AVCodecContext *avctx, MJpegDecodeContext *s, AVPacket *avpkt)
 {
-    memcpy(s->ffedit_sd, avpkt->ffedit_sd, sizeof(s->ffedit_sd));
+    if ( s->avctx->ffedit_import != 0 )
+        memcpy(s->ffedit_sd, avpkt->ffedit_sd, sizeof(s->ffedit_sd));
     s->jctx = avctx->jctx;
     ffe_mjpeg_init(s);
 }

@@ -46,7 +46,8 @@ ffe_h263_export_info_init(MpegEncContext *s)
 static void
 ffe_h263_prepare_frame(AVCodecContext *avctx, MpegEncContext *s, AVPacket *avpkt)
 {
-    memcpy(s->ffedit_sd, avpkt->ffedit_sd, sizeof(s->ffedit_sd));
+    if ( s->avctx->ffedit_import != 0 )
+        memcpy(s->ffedit_sd, avpkt->ffedit_sd, sizeof(s->ffedit_sd));
 }
 
 //---------------------------------------------------------------------
