@@ -310,8 +310,7 @@ ffe_mjpeg_dqt_init(MJpegDecodeContext *s, ffe_dqt_ctx_t *dctx)
         // }
         AVFrame *f = s->picture_ptr;
         json_t *jframe = json_object_new(s->jctx);
-        dctx->jdata = json_array_new(s->jctx);
-        json_array_alloc(s->jctx, dctx->jdata, 4);
+        dctx->jdata = json_array_new(s->jctx, 4);
         json_object_add(jframe, "data", dctx->jdata);
         f->ffedit_sd[FFEDIT_FEAT_DQT] = jframe;
     }
@@ -416,7 +415,7 @@ ffe_mjpeg_dht_init(MJpegDecodeContext *s, ffe_dht_ctx_t *dctx)
         // }
         AVFrame *f = s->picture_ptr;
         json_t *jframe = json_object_new(s->jctx);
-        dctx->jtables = json_array_new(s->jctx);
+        dctx->jtables = json_dynamic_array_new(s->jctx);
         json_object_add(jframe, "tables", dctx->jtables);
         f->ffedit_sd[FFEDIT_FEAT_DHT] = jframe;
     }
@@ -549,12 +548,10 @@ ffe_mjpeg_dht_export(
         json_t *jtable = json_object_new(s->jctx);
         json_t *jclass = json_int_new(s->jctx, class);
         json_t *jindex = json_int_new(s->jctx, index);
-        json_t *jbits = json_array_new(s->jctx);
+        json_t *jbits = json_array_new(s->jctx, 16);
         int val_idx = 0;
 
-        json_array_alloc(s->jctx, jbits, 16);
-
-        json_array_add(dctx->jtables, jtable);
+        json_dynamic_array_add(dctx->jtables, jtable);
         dctx->table_count++;
         json_object_add(jtable, "class", jclass);
         json_object_add(jtable, "index", jindex);

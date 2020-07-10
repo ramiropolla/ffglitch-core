@@ -18,14 +18,12 @@ ffe_jblock_new(
 {
     // [ ] # line
     // [ ] # column
-    json_t *jlines = json_array_new(jctx);
+    json_t *jlines = json_array_new(jctx, height);
 
-    json_array_alloc(jctx, jlines, height);
     for ( size_t mb_y = 0; mb_y < height; mb_y++ )
     {
-        json_t *jcolumns = json_array_new(jctx);
+        json_t *jcolumns = json_array_new(jctx, width);
         json_set_pflags(jcolumns, pflags);
-        json_array_alloc(jctx, jcolumns, width);
         json_array_set(jlines, mb_y, jcolumns);
     }
 
@@ -73,9 +71,8 @@ ffe_jmb_new(
     // }
 
     json_t *jscan = json_object_new(jctx);
-    json_t *jdata = json_array_new(jctx);
+    json_t *jdata = json_array_new(jctx, nb_components);
 
-    json_array_alloc(jctx, jdata, nb_components);
     for ( size_t component = 0; component < nb_components; component++ )
     {
         size_t height = mb_height * v_count[component];

@@ -215,8 +215,7 @@ ffe_mpeg12_export_qscale_init(MpegEncContext *s, AVFrame *f)
     qscale_ctx *ctx = json_allocator_get0(s->jctx, sizeof(qscale_ctx));
     json_userdata_set(jframe, ctx);
 
-    ctx->slice = json_array_new(s->jctx);
-    json_array_alloc(s->jctx, ctx->slice, s->mb_height);
+    ctx->slice = json_array_new(s->jctx, s->mb_height);
     for ( size_t mb_y = 0; mb_y < s->mb_height; mb_y++ )
     {
         json_t *jcolumns = json_object_new(s->jctx);
@@ -723,10 +722,8 @@ ffe_mpeg12_export_mb_init(MpegEncContext *s, AVFrame *f)
     ffe_mb_ctx *ctx = json_allocator_get0(s->jctx, sizeof(ffe_mb_ctx));
     json_userdata_set(jframe, ctx);
 
-    ctx->jdatas = json_array_new(s->jctx);
-    ctx->jsizes = json_array_new(s->jctx);
-    json_array_alloc(s->jctx, ctx->jdatas, mb_count);
-    json_array_alloc(s->jctx, ctx->jsizes, mb_count);
+    ctx->jdatas = json_array_new(s->jctx, mb_count);
+    ctx->jsizes = json_array_new(s->jctx, mb_count);
     json_object_add(jframe, "data", ctx->jdatas);
     json_object_add(jframe, "sizes", ctx->jsizes);
     json_set_pflags(ctx->jsizes, JSON_PFLAGS_NO_LF);

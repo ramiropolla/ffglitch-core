@@ -259,39 +259,19 @@ int json_object_done(json_ctx_t *jctx, json_t *jso)
 }
 
 //---------------------------------------------------------------------
-// Dynamic array.
-// json_array_new();
-// json_array_add();
-// json_array_set();
-// json_array_get();
-
-json_t *json_array_new(json_ctx_t *jctx)
+// array (fixed)
+json_t *json_array_new(json_ctx_t *jctx, size_t len)
 {
     json_t *jso = alloc_json_t(jctx);
     jso->flags = JSON_TYPE_ARRAY;
-    jso->array = NULL;
-    return jso;
-}
-
-int json_array_add(json_t *jso, json_t *jval)
-{
-    size_t len = JSON_LEN(jso->flags);
-    size_t cur_i = len++;
-    jso->array = realloc(jso->array, len * sizeof(json_t *));
-    jso->array[cur_i] = jval;
-    json_set_len(jso, len);
-    return 0;
-}
-
-int json_array_alloc(json_ctx_t *jctx, json_t *jso, size_t len)
-{
     jso->array = json_allocator_get(jctx, len * sizeof(json_t *));
     for ( size_t i = 0; i < len; i++ )
         jso->array[i] = NULL;
     json_set_len(jso, len);
-    return 0;
+    return jso;
 }
 
+// array (common)
 int json_array_set(json_t *jso, size_t idx, json_t *jval)
 {
     if ( JSON_LEN(jso->flags) <= idx )
@@ -338,17 +318,34 @@ void json_array_sort(json_t *jso, int (* sort_fn)(const void *, const void *))
     qsort(jso->array, JSON_LEN(jso->flags), sizeof(json_t *), sort_fn);
 }
 
-int json_array_done(json_ctx_t *jctx, json_t *jso)
+// array (dynamic)
+json_t *json_dynamic_array_new(json_ctx_t *jctx)
+{
+    json_t *jso = alloc_json_t(jctx);
+    jso->flags = JSON_TYPE_ARRAY;
+    jso->array = NULL;
+    return jso;
+}
+
+int json_dynamic_array_add(json_t *jso, json_t *jval)
+{
+    size_t len = JSON_LEN(jso->flags);
+    size_t cur_i = len++;
+    jso->array = realloc(jso->array, len * sizeof(json_t *));
+    jso->array[cur_i] = jval;
+    json_set_len(jso, len);
+    return 0;
+}
+
+int json_dynamic_array_done(json_ctx_t *jctx, json_t *jso)
 {
     json_t **orig_array = jso->array;
-
     if ( orig_array != NULL )
     {
         size_t len = JSON_LEN(jso->flags);
         jso->array = json_allocator_dup(jctx, orig_array, len * sizeof(json_t *));
         free(orig_array);
     }
-
     return 0;
 }
 
@@ -383,6 +380,20 @@ json_t *json_int_new(json_ctx_t *jctx, int64_t val)
 int64_t json_int_val(json_t *jso)
 {
     return jso->val;
+}
+
+//---------------------------------------------------------------------
+json_t *json_bool_new(json_ctx_t *jctx, int val)
+{
+    json_t *jso = alloc_json_t(jctx);
+    jso->flags = JSON_TYPE_BOOL;
+    jso->val = (val != 0);
+    return jso;
+}
+
+int json_bool_val(json_t *jso)
+{
+    return (jso->val != 0);
 }
 
 //---------------------------------------------------------------------

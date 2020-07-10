@@ -40,9 +40,8 @@ void ffe_mv_export_init_mb(
 
         if ( nb_blocks > 1 )
         {
-            jmb_x = json_array_new(jctx);
+            jmb_x = json_array_new(jctx, nb_blocks);
             json_set_pflags(jmb_x, JSON_PFLAGS_NO_LF | JSON_PFLAGS_NO_SPACE);
-            json_array_alloc(jctx, jmb_x, nb_blocks);
             for ( size_t j = 0; j < nb_blocks; j++ )
             {
                 json_t *jblock = json_int_new(jctx, JSON_NULL);

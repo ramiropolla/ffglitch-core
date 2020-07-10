@@ -88,16 +88,22 @@ const char *json_parse_error(json_ctx_t *jctx);
 void json_userdata_set(json_t *jso, void *userdata);
 void *json_userdata_get(json_t *jso);
 
-json_t *json_array_new(json_ctx_t *jctx);
-int json_array_add(json_t *jso, json_t *jval);
-int json_array_alloc(json_ctx_t *jctx, json_t *jso, size_t len);
+//---------------------------------------------------------------------
+// array (fixed)
+json_t *json_array_new(json_ctx_t *jctx, size_t len);
+
+// array (common)
 int json_array_set(json_t *jso, size_t idx, json_t *jval);
 int json_array_set_int(json_ctx_t *jctx, json_t *jso, size_t idx, int64_t val);
 json_t *json_array_get(json_t *jso, size_t idx);
 int64_t json_array_get_int(json_t *jso, size_t idx);
 size_t json_array_length(json_t *jso);
 void json_array_sort(json_t *jso, int (* sort_fn)(const void *, const void *));
-int json_array_done(json_ctx_t *jctx, json_t *jso);
+
+// array (dynamic)
+json_t *json_dynamic_array_new(json_ctx_t *jctx);
+int json_dynamic_array_add(json_t *jso, json_t *jval);
+int json_dynamic_array_done(json_ctx_t *jctx, json_t *jso);
 
 int json_make_array_of_ints(json_ctx_t *jctx, json_t *jso, size_t len);
 json_t *json_array_of_ints_new(json_ctx_t *jctx, size_t len);
@@ -113,6 +119,9 @@ const char *json_string_get(json_t *jso);
 
 json_t *json_int_new(json_ctx_t *jctx, int64_t val);
 int64_t json_int_val(json_t *jso);
+
+json_t *json_bool_new(json_ctx_t *jctx, int val);
+int json_bool_val(json_t *jso);
 
 //---------------------------------------------------------------------
 // printer
