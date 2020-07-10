@@ -224,6 +224,7 @@ static void add_frame_to_ffedit_json_file(
         if ( jso != NULL )
             json_object_add(jframe, key, jso);
     }
+    json_object_done(&jf->jctx, jframe);
 
     json_dynamic_array_add(jframes, jframe);
 }
@@ -251,6 +252,15 @@ static void close_ffedit_json_file(JSONFile *jf, FFFile *fff)
     /* write output json file if needed */
     if ( jf->export_fp != NULL && jf->jstframes != NULL )
     {
+        /* close json_ctx_t dynamic objects */
+        for ( size_t i = 0; i < fff->fctx->nb_streams; i++ )
+        {
+            for ( size_t j = 0; j < jf->nb_jstreams; j++ )
+                json_object_done(&jf->jctx, jf->jstreams[i]);
+            json_dynamic_array_done(&jf->jctx, jf->jstframes[i]);
+        }
+        json_object_done(&jf->jctx, jf->jroot);
+
         for ( size_t i = 0; i < fff->fctx->nb_streams; i++ )
             json_array_sort(jf->jstframes[i], sort_by_pkt_pos);
 
@@ -407,11 +417,11 @@ static void opt_filenames(void *optctx, const char *filename)
 {
     if ( input_fname == NULL )
     {
-        input_fname = filename;
+        input_fname = av_strdup(filename);
     }
     else if ( output_fname == NULL )
     {
-        output_fname = filename;
+        output_fname = av_strdup(filename);
     }
     else
     {
@@ -446,10 +456,7 @@ static int sort_by_pkt_pos(const void *j1, const void *j2)
 static void fff_close_files(FFFile *fff)
 {
     if ( fff->jf != NULL )
-    {
         close_ffedit_json_file(fff->jf, fff);
-        av_freep(&fff->jf);
-    }
 
     /* write glitched file if needed */
     if ( fff->ectx != NULL )
@@ -463,6 +470,24 @@ static void fff_close_files(FFFile *fff)
         avcodec_free_context(&fff->dctxs[i]);
     if ( fff->fctx != NULL )
         avformat_close_input(&fff->fctx);
+}
+
+static int fff_terminate(FFFile *fff)
+{
+    int fret = fff->fret;
+    fff_close_files(fff);
+    if ( fff->jf != NULL )
+    {
+        av_freep(&fff->jf->jstreams);
+        av_freep(&fff->jf->jstframes);
+        av_freep(&fff->jf);
+    }
+    for ( size_t i = 0; i < fff->nb_dctxs; i++ )
+        av_freep(&fff->dctxs[i]);
+    av_freep(&fff->dctxs);
+    av_freep(&fff->decs);
+    av_freep(&fff);
+    return fret;
 }
 
 static FFFile *fff_open_files(
@@ -812,11 +837,13 @@ int main(int argc, char *argv[])
 
 the_end:
     if ( fff != NULL )
-    {
-        fff_close_files(fff);
-        fret = fff->fret;
-        av_freep(&fff);
-    }
+        fret = fff_terminate(fff);
+
+    av_freep(&input_fname);
+    av_freep(&output_fname);
+    av_freep(&apply_fname);
+    av_freep(&export_fname);
+    av_freep(&threads);
 
     return fret;
 }
