@@ -781,7 +781,9 @@ ffe_mpeg12_init(MpegEncContext *s)
 {
     AVFrame *f = s->current_picture_ptr->f;
 
-    ffe_mpegvideo_export_init(s);
+    ffe_mpegvideo_jctx_init(s);
+    if ( s->avctx->ffedit_import != 0 )
+        memcpy(f->ffedit_sd, s->ffedit_sd, sizeof(f->ffedit_sd));
 
     if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_INFO)) != 0 )
         ffe_mpeg12_export_info_init(s, f);

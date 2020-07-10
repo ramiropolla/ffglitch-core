@@ -6,11 +6,8 @@
 
 //---------------------------------------------------------------------
 static void
-ffe_mpegvideo_export_init(MpegEncContext *s)
+ffe_mpegvideo_jctx_init(MpegEncContext *s)
 {
-    AVFrame *f = s->current_picture_ptr->f;
-    memcpy(f->ffedit_sd, s->ffedit_sd, sizeof(f->ffedit_sd));
-
     /* set jctx */
     s->jctx = s->avctx->jctx;
     if ( s->jctx != NULL )
