@@ -116,11 +116,6 @@ static void reset_frames_idx_ffedit_json_file(JSONFile *jf)
     memset(jf->frames_idx, 0x00, jf->nb_jstframes * sizeof(size_t));
 }
 
-static json_ctx_t *get_jctx_ffedit_json_file(JSONFile *jf)
-{
-    return &jf->jctxs[0];
-}
-
 static JSONFile *prepare_ffedit_json_file(
         const char *_export_fname,
         const char *_input_fname,
