@@ -104,7 +104,7 @@ static JSONFile *read_ffedit_json_file(const char *_apply_fname)
 
     jf->frames_idx = av_calloc(jf->nb_jstframes, sizeof(size_t));
 
-    free(buf);
+    av_free(buf);
 
     return jf;
 }
@@ -162,7 +162,7 @@ static JSONFile *prepare_ffedit_json_file(
 
         sha1sum(shasumstr, buf, size);
 
-        free(buf);
+        av_free(buf);
 
         jshasum = json_string_new(&jf->jctx, shasumstr);
         json_object_add(jf->jroot, "sha1sum", jshasum);
@@ -286,7 +286,7 @@ static char *read_file(const char *fname, size_t *psize)
     size = ftell(fp);
     fseek(fp, 0, SEEK_SET);
 
-    buf = malloc(size+1);
+    buf = av_malloc(size+1);
     buf[size] = '\0';
 
     fread(buf, size, 1, fp);
