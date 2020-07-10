@@ -88,7 +88,7 @@ static JSONFile *read_ffedit_json_file(const char *_apply_fname)
     if ( jf->jroot == NULL )
     {
         av_log(NULL, AV_LOG_FATAL, "json_parse error: %s\n",
-                json_parse_error(&jf->jctx));
+               json_parse_error(&jf->jctx));
         exit(1);
     }
     jf->jstreams0 = json_object_get(jf->jroot, "streams");
