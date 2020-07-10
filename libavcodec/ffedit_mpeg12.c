@@ -6,6 +6,8 @@
 #include "ffedit_json.h"
 #include "ffedit_mv.h"
 
+#include "ffedit_mpegvideo.c"
+
 //---------------------------------------------------------------------
 // info
 //
@@ -772,14 +774,14 @@ static void
 ffe_mpeg12_prepare_frame(AVCodecContext *avctx, MpegEncContext *s, AVPacket *avpkt)
 {
     memcpy(s->ffedit_sd, avpkt->ffedit_sd, sizeof(s->ffedit_sd));
-    s->jctx = avctx->jctx;
 }
 
 static void
 ffe_mpeg12_init(MpegEncContext *s)
 {
     AVFrame *f = s->current_picture_ptr->f;
-    memcpy(f->ffedit_sd, s->ffedit_sd, sizeof(f->ffedit_sd));
+
+    ffe_mpegvideo_export_init(s);
 
     if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_INFO)) != 0 )
         ffe_mpeg12_export_info_init(s, f);

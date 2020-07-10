@@ -981,8 +981,6 @@ av_cold int ff_mpv_common_init(MpegEncContext *s)
         memset(&s->thread_context[i]->ffe_xp, 0, sizeof(s->thread_context[i]->ffe_xp));
         if (init_duplicate_context(s->thread_context[i]) < 0)
             goto fail;
-        if ( s->jctx != NULL )
-            s->thread_context[i]->jctx = json_ctx_start_thread(s->jctx, i);
         s->thread_context[i]->start_mb_y =
             (s->mb_height * (i) + nb_slices / 2) / nb_slices;
         s->thread_context[i]->end_mb_y   =
@@ -1112,8 +1110,6 @@ int ff_mpv_common_frame_size_change(MpegEncContext *s)
             memset(&s->thread_context[i]->ffe_xp, 0, sizeof(s->thread_context[i]->ffe_xp));
             if ((err = init_duplicate_context(s->thread_context[i])) < 0)
                 goto fail;
-            if ( s->jctx != NULL )
-                s->thread_context[i]->jctx = json_ctx_start_thread(s->jctx, i);
             s->thread_context[i]->start_mb_y =
                 (s->mb_height * (i) + nb_slices / 2) / nb_slices;
             s->thread_context[i]->end_mb_y   =
