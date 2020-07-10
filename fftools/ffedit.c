@@ -246,6 +246,7 @@ static void get_from_ffedit_json_file(
         const char *key = ffe_feat_to_str(i);
         ipkt->ffedit_sd[i] = json_object_get(jframe, key);
     }
+    ipkt->jctx = &jf->jctxs[0];
 
     jf->frames_idx[stream_index]++;
 }
@@ -616,8 +617,6 @@ static void fff_open_decoders(FFFile *fff)
 
         fff->dctxs[i] = avcodec_alloc_context3(decoder);
         dctx = fff->dctxs[i];
-        if ( fff->is_exporting || fff->is_applying )
-            dctx->jctx = get_jctx_ffedit_json_file(fff->jf);
         avcodec_parameters_to_context(dctx, fff->fctx->streams[i]->codecpar);
 
         /* enable threads if ffedit supports it for this codec */

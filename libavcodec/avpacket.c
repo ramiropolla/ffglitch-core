@@ -47,6 +47,7 @@ FF_ENABLE_DEPRECATION_WARNINGS
     pkt->side_data            = NULL;
     pkt->side_data_elems      = 0;
     memset(pkt->ffedit_sd, 0x00, sizeof(pkt->ffedit_sd));
+    pkt->jctx = NULL;
 }
 
 AVPacket *av_packet_alloc(void)
@@ -595,6 +596,7 @@ FF_ENABLE_DEPRECATION_WARNINGS
         memcpy(dst_data, src_data, size);
     }
     memcpy(dst->ffedit_sd, src->ffedit_sd, sizeof(dst->ffedit_sd));
+    dst->jctx = src->jctx;
 
     return 0;
 }

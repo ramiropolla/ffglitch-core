@@ -1548,6 +1548,9 @@ typedef struct AVPacket {
     AVPacketSideData *side_data;
     int side_data_elems;
 
+    /* ffedit JSON context */
+    void *jctx; // json_ctx_t *
+
     /* ffedit side data */
     void *ffedit_sd[32]; // should be at least [FFEDIT_FEAT_LAST]
 
@@ -3461,9 +3464,6 @@ typedef struct AVCodecContext {
      * - encoding: set by user
      */
     int export_side_data;
-
-    /* ffedit JSON context */
-    void *jctx; // json_ctx_t *
 } AVCodecContext;
 
 #if FF_API_CODEC_GET_SET

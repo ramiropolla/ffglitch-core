@@ -774,7 +774,10 @@ static void
 ffe_mpeg12_prepare_frame(AVCodecContext *avctx, MpegEncContext *s, AVPacket *avpkt)
 {
     if ( s->avctx->ffedit_import != 0 )
+    {
         memcpy(s->ffedit_sd, avpkt->ffedit_sd, sizeof(s->ffedit_sd));
+        s->jctx = avpkt->jctx;
+    }
 }
 
 static void

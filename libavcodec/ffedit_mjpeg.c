@@ -649,19 +649,18 @@ ffe_mjpeg_init(MJpegDecodeContext *s)
 static void
 ffe_mjpeg_prepare_frame(AVCodecContext *avctx, MJpegDecodeContext *s, AVPacket *avpkt)
 {
-    if ( s->avctx->ffedit_import != 0 )
-        memcpy(s->ffedit_sd, avpkt->ffedit_sd, sizeof(s->ffedit_sd));
-    s->jctx = avctx->jctx;
-    if ( s->jctx != NULL )
+    if ( avctx->ffedit_export != 0 )
     {
-        if ( avctx->ffedit_export != 0 )
-        {
-            /* create one jctx for each exported frame */
-            AVFrame *f = s->picture_ptr;
-            f->jctx = av_mallocz(sizeof(json_ctx_t));
-            json_ctx_start(f->jctx);
-            s->jctx = f->jctx;
-        }
+        /* create one jctx for each exported frame */
+        AVFrame *f = s->picture_ptr;
+        f->jctx = av_mallocz(sizeof(json_ctx_t));
+        json_ctx_start(f->jctx);
+        s->jctx = f->jctx;
+    }
+    else if ( avctx->ffedit_import != 0 )
+    {
+        memcpy(s->ffedit_sd, avpkt->ffedit_sd, sizeof(s->ffedit_sd));
+        s->jctx = avpkt->jctx;
     }
     ffe_mjpeg_init(s);
 }
