@@ -1,13 +1,18 @@
 
+#include <semaphore.h>
+
 #include "libavutil/json.h"
 
 #include "config.h"
 
 #include "libavutil/opt.h"
+#include "libavutil/avassert.h"
 #include "libavutil/avstring.h"
 #include "libavutil/ffversion.h"
 #include "libavutil/sha.h"
+#include "libavutil/time.h"
 #include "libavutil/thread.h"
+#include "libavutil/quickjs/quickjs-libc.h"
 #include "libavformat/ffedit.h"
 #include "libavcodec/ffedit.h"
 
@@ -21,6 +26,7 @@ static const char *input_fname;
 static const char *output_fname;
 static const char *apply_fname;
 static const char *export_fname;
+static const char *script_fname;
 /* TODO use avformat_match_stream_specifier */
 static int selected_features[FFEDIT_FEAT_LAST];
 static int selected_features_idx[FFEDIT_FEAT_LAST];
@@ -45,6 +51,21 @@ typedef struct {
 } JSONFile;
 
 typedef struct {
+    json_ctx_t jctx;
+    json_t *ffedit_sd[32];
+    int64_t pkt_pos;
+    int used;
+} JSONQueueElement;
+
+#define MAX_QUEUE 4
+typedef struct {
+    JSONQueueElement elements[MAX_QUEUE];
+    pthread_cond_t cond_empty;
+    pthread_cond_t cond_full;
+    pthread_mutex_t mutex;
+} JSONQueue;
+
+typedef struct {
     AVFormatContext *fctx;
     AVCodec **decs;
     int    nb_decs;
@@ -54,11 +75,24 @@ typedef struct {
     int is_exporting;
     int is_applying; // implies importing
 
+    int is_exporting_script;
+    int is_applying_script;
+
     FFEditOutputContext *ectx;
 
     JSONFile *jf;
 
     int fret;
+
+    /* for scripting */
+    JSONQueue *jq_in;
+    JSONQueue *jq_out;
+    sem_t qjs_sem;
+    JSRuntime *qjs_rt;
+    JSContext *qjs_ctx;
+    const char *s_fname;
+    char *qjs_buf;
+    size_t qjs_size;
 } FFFile;
 
 static int opt_feature(void *optctx, const char *opt, const char *arg);
@@ -236,6 +270,13 @@ static void get_from_ffedit_json_file(
     json_t *jframes = jf->jstframes[stream_index];
     json_t *jframe = json_array_get(jframes, idx);
 
+#if 0
+    // TODO check pkt_pos
+    int pkt_pos_from_json = json_int_val(json_object_get(jframe, "pkt_pos"));
+    if ( pkt_pos_from_json != ipkt->pos )
+        exit(1);
+#endif
+
     for ( size_t i = 0; i < FFEDIT_FEAT_LAST; i++ )
     {
         const char *key = ffe_feat_to_str(i);
@@ -244,6 +285,79 @@ static void get_from_ffedit_json_file(
     ipkt->jctx = &jf->jctxs[0];
 
     jf->frames_idx[stream_index]++;
+}
+
+static int element_sort_fn(const void *j1, const void *j2)
+{
+    const JSONQueueElement *el1 = (JSONQueueElement *) j1;
+    const JSONQueueElement *el2 = (JSONQueueElement *) j2;
+    int64_t diff64 = el1->pkt_pos - el2->pkt_pos;
+    return (int) diff64;
+}
+
+static void add_frame_to_ffedit_json_queue(JSONQueue *jq, AVFrame *iframe)
+{
+    int idx;
+
+    pthread_mutex_lock(&jq->mutex);
+
+    do
+    {
+        for ( idx = 0; idx < MAX_QUEUE; idx++ )
+        {
+            JSONQueueElement *element = &jq->elements[idx];
+            if ( !element->used )
+            {
+                memcpy(element->ffedit_sd, iframe->ffedit_sd, sizeof(element->ffedit_sd));
+                if ( iframe->jctx != NULL )
+                {
+                    memcpy(&element->jctx, iframe->jctx, sizeof(element->jctx));
+                    av_freep(&iframe->jctx);
+                }
+                element->pkt_pos = iframe->pkt_pos;
+                element->used = 1;
+                qsort(jq->elements, MAX_QUEUE, sizeof(JSONQueueElement), element_sort_fn);
+                break;
+            }
+        }
+        if ( idx == MAX_QUEUE )
+            pthread_cond_wait(&jq->cond_full, &jq->mutex);
+        else
+            pthread_cond_signal(&jq->cond_empty);
+    } while ( idx == MAX_QUEUE );
+
+    pthread_mutex_unlock(&jq->mutex);
+}
+
+static void get_from_ffedit_json_queue(JSONQueue *jq, AVPacket *ipkt)
+{
+    int idx = MAX_QUEUE;
+
+    pthread_mutex_lock(&jq->mutex);
+
+    do
+    {
+        for ( idx = 0; idx < MAX_QUEUE; idx++ )
+        {
+            JSONQueueElement *element = &jq->elements[idx];
+            if ( element->used
+              && (ipkt->pos == -1 || element->pkt_pos == ipkt->pos) )
+            {
+                memcpy(ipkt->ffedit_sd, element->ffedit_sd, sizeof(ipkt->ffedit_sd));
+                ipkt->jctx = av_mallocz(sizeof(json_ctx_t));
+                memcpy(ipkt->jctx, &element->jctx, sizeof(json_ctx_t));
+                ipkt->pos = element->pkt_pos;
+                element->used = 0;
+                break;
+            }
+        }
+        if ( idx == MAX_QUEUE )
+            pthread_cond_wait(&jq->cond_empty, &jq->mutex);
+        else
+            pthread_cond_signal(&jq->cond_full);
+    } while ( idx == MAX_QUEUE );
+
+    pthread_mutex_unlock(&jq->mutex);
 }
 
 static void close_ffedit_json_file(JSONFile *jf, FFFile *fff)
@@ -335,6 +449,7 @@ static const OptionDef options[] = {
     { "o", HAS_ARG | OPT_STRING, { &output_fname }, "output file (may be omitted)", "file" },
     { "a", HAS_ARG | OPT_STRING, { &apply_fname }, "apply data", "json file" },
     { "e", HAS_ARG | OPT_STRING, { &export_fname }, "export data", "json file" },
+    { "s", HAS_ARG | OPT_STRING, { &script_fname }, "run script", "javascript file" },
     { "f", HAS_ARG, { .func_arg = opt_feature }, "select feature (optionally specify stream with feat:#)", "feature" },
     { "t", OPT_BOOL, { &test_mode }, "test mode (bitexact output)" },
     { "y", OPT_BOOL, { &file_overwrite }, "overwrite output files" },
@@ -458,6 +573,9 @@ static int sort_by_pkt_pos(const void *j1, const void *j2)
 
 static void fff_close_files(FFFile *fff)
 {
+    if ( fff->qjs_buf != NULL )
+        av_free(fff->qjs_buf);
+
     if ( fff->jf != NULL )
         close_ffedit_json_file(fff->jf, fff);
 
@@ -498,6 +616,7 @@ static FFFile *fff_open_files(
         const char *i_fname,
         const char *e_fname,
         const char *a_fname,
+        const char *s_fname,
         int *_selected_features)
 {
     FFFile *fff = NULL;
@@ -507,6 +626,23 @@ static FFFile *fff_open_files(
     fff->fret = -1;
     fff->is_exporting = (e_fname != NULL);
     fff->is_applying = (a_fname != NULL);
+    if ( s_fname != NULL )
+    {
+        fff->is_applying_script = (o_fname != NULL);
+        fff->is_exporting_script = !fff->is_applying_script;
+
+        if ( fff->is_applying_script )
+        {
+            fff->s_fname = s_fname;
+            fff->qjs_buf = read_file(s_fname, &fff->qjs_size);
+            if ( fff->qjs_buf == NULL )
+            {
+                av_log(NULL, AV_LOG_FATAL,
+                       "Could not open script file %s\n", s_fname);
+                exit(1);
+            }
+        }
+    }
 
     fff->fctx = avformat_alloc_context();
 
@@ -579,7 +715,8 @@ the_end:
 static int fff_processing_needed(FFFile *fff)
 {
     if ( fff->ectx != NULL
-      || fff->is_exporting )
+      || fff->is_exporting
+      || fff->is_exporting_script )
     {
         return 1;
     }
@@ -631,9 +768,9 @@ static void fff_open_decoders(FFFile *fff)
               && (selected_features_idx[j] == i
                || selected_features_idx[j] == -1) )
             {
-                if ( fff->is_exporting )
+                if ( fff->is_exporting || fff->is_exporting_script )
                     dctx->ffedit_export |= (1 << j);
-                if ( fff->is_applying )
+                if ( fff->is_applying || fff->is_applying_script )
                 {
                     dctx->ffedit_import |= (1 << j);
                     dctx->ffedit_apply |= (1 << j);
@@ -699,6 +836,10 @@ static int ffedit_decode(
             fff->jf->jctxs[jctx_idx] = *(json_ctx_t *) iframe->jctx;
             av_freep(&iframe->jctx);
         }
+        else if ( fff->is_exporting_script )
+        {
+            add_frame_to_ffedit_json_queue(fff->jq_in, iframe);
+        }
     }
 
     return 0;
@@ -733,6 +874,8 @@ static void fff_transplicate(FFFile *fff)
         memset(ipkt->ffedit_sd, 0x00, sizeof(ipkt->ffedit_sd));
         if ( fff->is_applying )
             get_from_ffedit_json_file(fff->jf, ipkt, stream_index);
+        else if ( fff->is_applying_script )
+            get_from_ffedit_json_queue(fff->jq_out, ipkt);
 
         ret = ffedit_decode(fff, dctx, iframe, ipkt, stream_index);
         if ( ret < 0 )
@@ -768,7 +911,7 @@ static void fff_print_features(FFFile *fff)
     fff->fret = 0;
 }
 
-static void fff_func(void *arg)
+static void *fff_func(void *arg)
 {
     FFFile *fff = (FFFile *) arg;
     if ( !fff_processing_needed(fff) )
@@ -784,17 +927,329 @@ static void fff_func(void *arg)
         if ( fff->fret < 0 )
         {
             av_log(NULL, AV_LOG_FATAL, "Error opening decoders.\n");
-            return;
+            return NULL;
         }
 
         /* do the salmon dance */
         fff_transplicate(fff);
     }
+    return NULL;
+}
+
+static JSValue ffedit_to_quickjs(JSContext *ctx, json_t *jso)
+{
+    JSValue val = JS_NULL;
+    JSValue *parray;
+    if ( jso == NULL )
+        return JS_NULL;
+    switch ( JSON_TYPE(jso->flags) )
+    {
+    case JSON_TYPE_OBJECT:
+        val = JS_NewObject(ctx);
+        for ( size_t i = 0; i < JSON_LEN(jso->flags); i++ )
+            JS_SetPropertyStr(ctx, val, jso->obj->names[i], ffedit_to_quickjs(ctx, jso->obj->values[i]));
+        break;
+    case JSON_TYPE_ARRAY:
+#if 1
+        val = JS_NewFastArray(ctx, &parray, JSON_LEN(jso->flags));
+        for ( size_t i = 0; i < JSON_LEN(jso->flags); i++ )
+            parray[i] = ffedit_to_quickjs(ctx, jso->array[i]);
+#else
+        val = JS_NewArray(ctx);
+        for ( size_t i = 0; i < JSON_LEN(jso->flags); i++ )
+            JS_DefinePropertyValueUint32(ctx, val, i, ffedit_to_quickjs(ctx, jso->array[i]), JS_PROP_C_W_E);
+#endif
+        break;
+    case JSON_TYPE_ARRAY_OF_INTS:
+#if 1
+        val = JS_NewFastArray(ctx, &parray, JSON_LEN(jso->flags));
+        for ( size_t i = 0; i < JSON_LEN(jso->flags); i++ )
+        {
+            if ( jso->array_of_ints[i] == JSON_NULL )
+                parray[i] = JS_NULL;
+            else
+                parray[i] = JS_NewInt32(ctx, jso->array_of_ints[i]);
+        }
+#else
+        val = JS_NewArray(ctx);
+        for ( size_t i = 0; i < JSON_LEN(jso->flags); i++ )
+        {
+            if ( jso->array_of_ints[i] == JSON_NULL )
+                JS_DefinePropertyValueUint32(ctx, val, i, JS_NULL, JS_PROP_C_W_E);
+            else
+                JS_DefinePropertyValueUint32(ctx, val, i, JS_NewInt32(ctx, jso->array_of_ints[i]), JS_PROP_C_W_E);
+        }
+#endif
+        break;
+    case JSON_TYPE_STRING:
+        val = JS_NewString(ctx, jso->str);
+        break;
+    case JSON_TYPE_NUMBER:
+        if ( jso->val == JSON_NULL )
+            val = JS_NULL;
+        else
+            val = JS_NewInt64(ctx, jso->val);
+        break;
+    case JSON_TYPE_BOOL:
+        val = JS_NewBool(ctx, jso->val);
+        break;
+    }
+    return val;
+}
+
+static int64_t __JS_ToInt64(JSContext *ctx, JSValue val)
+{
+    int64_t i64;
+    JS_ToInt64(ctx, &i64, val);
+    return i64;
+}
+
+static json_t *quickjs_to_ffedit(json_ctx_t *jctx, JSContext *ctx, JSValue val)
+{
+    if ( JS_IsString(val) )
+        return json_string_new(jctx, JS_ToCString(ctx, val));
+    if ( JS_IsBool(val) )
+        return json_bool_new(jctx, JS_ToBool(ctx, val));
+    if ( JS_IsNumber(val) )
+        return json_int_new(jctx, __JS_ToInt64(ctx, val));
+    if ( JS_IsArray(ctx, val) )
+    {
+        int is_array_of_ints = 0;
+        JSValue length_val;
+        uint32_t length;
+        json_t *array;
+
+        JSValue *parray = NULL;
+
+        JS_GetFastArray(val, &parray, &length);
+
+        if ( parray == NULL )
+        {
+            length_val = JS_GetPropertyStr(ctx, val, "length");
+            JS_ToUint32(ctx, &length, length_val);
+            JS_FreeValue(ctx, length_val);
+
+            for ( size_t i = 0; i < length; i++ )
+            {
+                JSValue val_i = JS_GetPropertyUint32(ctx, val, i);
+                is_array_of_ints = JS_IsNumber(val_i);
+                JS_FreeValue(ctx, val_i);
+                if ( !is_array_of_ints )
+                    break;
+            }
+        }
+        else
+        {
+            for ( size_t i = 0; i < length; i++ )
+            {
+                is_array_of_ints = JS_IsNumber(parray[i]);
+                if ( !is_array_of_ints )
+                    break;
+            }
+        }
+
+        if ( is_array_of_ints )
+            array = json_array_of_ints_new(jctx, length);
+        else
+            array = json_array_new(jctx, length);
+
+        if ( parray == NULL )
+        {
+            for ( size_t i = 0; i < length; i++ )
+            {
+                JSValue val_i = JS_GetPropertyUint32(ctx, val, i);
+                if ( is_array_of_ints )
+                    json_array_set_int(jctx, array, i, __JS_ToInt64(ctx, val_i));
+                else
+                    json_array_set(array, i, quickjs_to_ffedit(jctx, ctx, val_i));
+                JS_FreeValue(ctx, val_i);
+            }
+        }
+        else
+        {
+            for ( size_t i = 0; i < length; i++ )
+            {
+                if ( is_array_of_ints )
+                    json_array_set_int(jctx, array, i, __JS_ToInt64(ctx, parray[i]));
+                else
+                    json_array_set(array, i, quickjs_to_ffedit(jctx, ctx, parray[i]));
+            }
+        }
+
+        return array;
+    }
+    if ( JS_IsObject(val) )
+    {
+        json_t *object = json_object_new(jctx);
+        JSPropertyEnum *tab;
+        uint32_t length;
+        JS_GetOwnPropertyNames(ctx, &tab, &length, val, JS_GPN_STRING_MASK | JS_GPN_ENUM_ONLY);
+        for ( size_t i = 0; i < length; i++ )
+        {
+            const char *str = JS_AtomToCString(ctx, tab[i].atom);
+            JSValue val_i = JS_GetProperty(ctx, val, tab[i].atom);
+            json_object_add(object, str, quickjs_to_ffedit(jctx, ctx, val_i));
+            JS_FreeValue(ctx, val_i);
+            JS_FreeAtom(ctx, tab[i].atom);
+        }
+        js_free(ctx, tab);
+        json_object_done(jctx, object);
+        return object;
+    }
+    return NULL;
+}
+
+static void *quickjs_func(void *arg)
+{
+#define TIME_QUICKJS 0
+#if TIME_QUICKJS
+    int64_t convert1 = 0;
+    int64_t call = 0;
+    int64_t convert2 = 0;
+    int64_t t0;
+    int64_t t1;
+#endif
+    FFFile *fff = (FFFile *) arg;
+    AVPacket ipkt;
+    AVFrame iframe;
+    JSValue global_object;
+    JSValue glitch_frame;
+    JSValue val;
+
+    /* TODO check for errors */
+    fff->qjs_rt = JS_NewRuntime();
+    js_std_init_handlers(fff->qjs_rt);
+    fff->qjs_ctx = JS_NewContextRaw(fff->qjs_rt);
+
+    /* loader for ES6 modules */
+    JS_SetModuleLoaderFunc(fff->qjs_rt, NULL, js_module_loader, NULL);
+    JS_AddIntrinsicBaseObjects(fff->qjs_ctx);
+    JS_AddIntrinsicDate(fff->qjs_ctx);
+    JS_AddIntrinsicEval(fff->qjs_ctx);
+    JS_AddIntrinsicStringNormalize(fff->qjs_ctx);
+    JS_AddIntrinsicRegExp(fff->qjs_ctx);
+    JS_AddIntrinsicJSON(fff->qjs_ctx);
+    JS_AddIntrinsicProxy(fff->qjs_ctx);
+    JS_AddIntrinsicMapSet(fff->qjs_ctx);
+    JS_AddIntrinsicTypedArrays(fff->qjs_ctx);
+    JS_AddIntrinsicPromise(fff->qjs_ctx);
+    JS_AddIntrinsicBigInt(fff->qjs_ctx);
+    js_std_add_helpers(fff->qjs_ctx, 0, NULL);
+
+    /* system modules */
+    js_init_module_std(fff->qjs_ctx, "std");
+    js_init_module_os(fff->qjs_ctx, "os");
+
+    val = JS_Eval(fff->qjs_ctx, fff->qjs_buf, fff->qjs_size, fff->s_fname, JS_EVAL_TYPE_GLOBAL);
+    if ( JS_IsException(val) )
+    {
+        js_std_dump_error(fff->qjs_ctx);
+        exit(1);
+    }
+    JS_FreeValue(fff->qjs_ctx, val);
+
+    global_object = JS_GetGlobalObject(fff->qjs_ctx);
+    glitch_frame = JS_GetPropertyStr(fff->qjs_ctx, global_object, "glitch_frame");
+    if ( JS_IsUndefined(glitch_frame) )
+    {
+        av_log(NULL, AV_LOG_FATAL, "function glitch_frame() not found in %s\n", fff->s_fname);
+        exit(1);
+    }
+
+    sem_post(&fff->qjs_sem);
+
+    while ( 42 )
+    {
+        json_t *jargs;
+        json_t *jframe;
+        JSValue args;
+        JSValue val;
+
+        /* get earliest packet from input queue */
+        ipkt.pos = -1;
+        get_from_ffedit_json_queue(fff->jq_in, &ipkt);
+
+        /* check for poison pill */
+        if ( ipkt.pos == -1 )
+            break;
+
+#if TIME_QUICKJS
+        t0 = av_gettime_relative();
+#endif
+        /* convert json to quickjs */
+        jargs = json_object_new(ipkt.jctx);
+        for ( size_t i = 0; i < FFEDIT_FEAT_LAST; i++ )
+            if ( ipkt.ffedit_sd[i] != NULL )
+                json_object_add(jargs, ffe_feat_to_str(i), ipkt.ffedit_sd[i]);
+        json_object_done(ipkt.jctx, jargs);
+        args = ffedit_to_quickjs(fff->qjs_ctx, jargs);
+        /* free jctx from ipkt, we no longer need it */
+        json_ctx_free(ipkt.jctx);
+
+#if TIME_QUICKJS
+        t1 = av_gettime_relative();
+        convert1 += (t1 - t0);
+        t0 = t1;
+#endif
+
+        /* call glitch_frame() with data */
+        val = JS_Call(fff->qjs_ctx, glitch_frame, JS_UNDEFINED, 1, &args);
+        if ( JS_IsException(val) )
+        {
+            js_std_dump_error(fff->qjs_ctx);
+            exit(1);
+        }
+        JS_FreeValue(fff->qjs_ctx, val);
+
+#if TIME_QUICKJS
+        t1 = av_gettime_relative();
+        call += (t1 - t0);
+        t0 = t1;
+#endif
+
+        /* convert json back to ffedit */
+        iframe.jctx = av_mallocz(sizeof(json_ctx_t));
+        json_ctx_start(iframe.jctx);
+        jframe = quickjs_to_ffedit(iframe.jctx, fff->qjs_ctx, args);
+        for ( size_t i = 0; i < FFEDIT_FEAT_LAST; i++ )
+        {
+            const char *key = ffe_feat_to_str(i);
+            iframe.ffedit_sd[i] = json_object_get(jframe, key);
+        }
+        iframe.pkt_pos = ipkt.pos;
+        JS_FreeValue(fff->qjs_ctx, args);
+
+#if TIME_QUICKJS
+        t1 = av_gettime_relative();
+        convert2 += (t1 - t0);
+        t0 = t1;
+#endif
+
+        /* add back to output queue */
+        add_frame_to_ffedit_json_queue(fff->jq_out, &iframe);
+    }
+
+#if TIME_QUICKJS
+    printf("time taken convert1 %" PRId64 " call %" PRId64 " convert2 %" PRId64 "\n", convert1, call, convert2);
+#endif
+
+    JS_FreeValue(fff->qjs_ctx, glitch_frame);
+    JS_FreeValue(fff->qjs_ctx, global_object);
+
+    /* free quickjs */
+    js_std_free_handlers(fff->qjs_rt);
+    JS_FreeContext(fff->qjs_ctx);
+    JS_FreeRuntime(fff->qjs_rt);
+
+    return NULL;
 }
 
 int main(int argc, char *argv[])
 {
     FFFile *fff = NULL;
+    FFFile *fscript = NULL;
+    pthread_t script_in_thread;
+    pthread_t quickjs_thread;
     int fret = -1;
 
     hack_musl_pthread_stack_size();
@@ -815,6 +1270,16 @@ int main(int argc, char *argv[])
         av_log(NULL, AV_LOG_FATAL, "Only one of -e or -a may be used!\n");
         goto the_end;
     }
+    if ( (script_fname != NULL) && ((export_fname != NULL) || (apply_fname != NULL)) )
+    {
+        av_log(NULL, AV_LOG_FATAL, "Only one of -s or -e and -a may be used!\n");
+        goto the_end;
+    }
+    if ( (script_fname != NULL) && (output_fname == NULL) )
+    {
+        av_log(NULL, AV_LOG_FATAL, "Output file required when using scripts!\n");
+        goto the_end;
+    }
 
     /* there must be one input */
     if ( !input_fname )
@@ -823,6 +1288,7 @@ int main(int argc, char *argv[])
         goto the_end;
     }
 
+    /* TODO review this */
     if ( features_selected == 0 )
     {
         /* select all features by default */
@@ -837,11 +1303,63 @@ int main(int argc, char *argv[])
         features_selected = 1;
     }
 
-    fff = fff_open_files(output_fname, input_fname, export_fname, apply_fname, selected_features);
+    /* open files for main thread */
+    fff = fff_open_files(output_fname, input_fname, export_fname, apply_fname, script_fname, selected_features);
     if ( fff == NULL )
         goto the_end;
 
+    /* start script thread if needed */
+    if ( script_fname != NULL )
+    {
+        fscript = fff_open_files(NULL, input_fname, NULL, NULL, script_fname, selected_features);
+        if ( fscript == NULL )
+            goto the_end;
+
+        /* initialize queues */
+        fscript->jq_in = av_mallocz(sizeof(JSONQueue));
+        pthread_mutex_init(&fscript->jq_in->mutex, NULL);
+        pthread_cond_init(&fscript->jq_in->cond_empty, NULL);
+        pthread_cond_init(&fscript->jq_in->cond_full, NULL);
+        fff->jq_in = fscript->jq_in;
+        fscript->jq_out = av_mallocz(sizeof(JSONQueue));
+        pthread_mutex_init(&fscript->jq_out->mutex, NULL);
+        pthread_cond_init(&fscript->jq_out->cond_empty, NULL);
+        pthread_cond_init(&fscript->jq_out->cond_full, NULL);
+        fff->jq_out = fscript->jq_out;
+
+        sem_init(&fff->qjs_sem, 0, 1);
+
+        pthread_create(&quickjs_thread, NULL, quickjs_func, fff);
+        pthread_create(&script_in_thread, NULL, fff_func, fscript);
+
+        /* wait for quickjs setup */
+        sem_wait(&fff->qjs_sem);
+    }
+
     fff_func(fff);
+
+    if ( fscript != NULL )
+    {
+        /* send poison pill */
+        AVFrame iframe;
+        iframe.pkt_pos = -1;
+        iframe.jctx = NULL;
+        add_frame_to_ffedit_json_queue(fscript->jq_in, &iframe);
+
+        /* wait for threads */
+        pthread_join(quickjs_thread, NULL);
+        pthread_join(script_in_thread, NULL);
+
+        /* destroy queues */
+        pthread_mutex_destroy(&fscript->jq_in->mutex);
+        pthread_cond_destroy(&fscript->jq_in->cond_empty);
+        pthread_cond_destroy(&fscript->jq_in->cond_full);
+        av_freep(&fscript->jq_in);
+        pthread_mutex_destroy(&fscript->jq_out->mutex);
+        pthread_cond_destroy(&fscript->jq_out->cond_empty);
+        pthread_cond_destroy(&fscript->jq_out->cond_full);
+        av_freep(&fscript->jq_out);
+    }
 
 the_end:
     if ( fff != NULL )
