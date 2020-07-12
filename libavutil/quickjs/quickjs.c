@@ -4883,6 +4883,8 @@ JSValue JS_NewFastArray(JSContext *ctx, JSValue **parray, uint32_t len)
         JS_FreeValue(ctx, val);
         return JS_EXCEPTION;
     }
+    for ( size_t i = 0; i < len; i++ )
+        new_array_prop[i] = JS_NULL;
 
     p->prop[0].u.value = JS_NewInt32(ctx, len);
     p->u.array.u.values = new_array_prop;
