@@ -6730,6 +6730,10 @@ fi
 
 check_cpp_condition winrt windows.h "!WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP)"
 
+# ffglitch
+disable w32threads
+enable pthreads
+
 if ! disabled w32threads && ! enabled pthreads; then
     check_func_headers "windows.h process.h" _beginthreadex &&
         check_type "windows.h" CONDITION_VARIABLE &&
