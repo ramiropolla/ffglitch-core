@@ -1,4 +1,3 @@
-
 static JSValue ffedit_to_quickjs(JSContext *ctx, json_t *jso)
 {
     JSValue val = JS_NULL;
@@ -219,7 +218,10 @@ static void *quickjs_func(void *arg)
         exit(1);
     }
 
-    sem_post(&fff->qjs_sem);
+    pthread_mutex_lock(&fff->qjs_mutex);
+    fff->qjs_init = 1;
+    pthread_cond_signal(&fff->qjs_cond);
+    pthread_mutex_unlock(&fff->qjs_mutex);
 
     while ( 42 )
     {

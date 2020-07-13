@@ -1,6 +1,4 @@
 
-#include <semaphore.h>
-
 #include "libavutil/json.h"
 
 #include "config.h"
@@ -87,7 +85,9 @@ typedef struct {
     /* for scripting */
     JSONQueue *jq_in;
     JSONQueue *jq_out;
-    sem_t qjs_sem;
+    pthread_cond_t qjs_cond;
+    pthread_mutex_t qjs_mutex;
+    int qjs_init;
     JSRuntime *qjs_rt;
     JSContext *qjs_ctx;
     const char *s_fname;
@@ -1023,13 +1023,18 @@ int main(int argc, char *argv[])
         pthread_cond_init(&fscript->jq_out->cond_full, NULL);
         fff->jq_out = fscript->jq_out;
 
-        sem_init(&fff->qjs_sem, 0, 1);
+        fff->qjs_init = 0;
+        pthread_mutex_init(&fff->qjs_mutex, NULL);
+        pthread_cond_init(&fff->qjs_cond, NULL);
 
         pthread_create(&quickjs_thread, NULL, quickjs_func, fff);
         pthread_create(&script_in_thread, NULL, fff_func, fscript);
 
         /* wait for quickjs setup */
-        sem_wait(&fff->qjs_sem);
+        pthread_mutex_lock(&fff->qjs_mutex);
+        while ( !fff->qjs_init )
+            pthread_cond_wait(&fff->qjs_cond, &fff->qjs_mutex);
+        pthread_mutex_unlock(&fff->qjs_mutex);
     }
 
     fff_func(fff);
@@ -1055,6 +1060,9 @@ int main(int argc, char *argv[])
         pthread_cond_destroy(&fscript->jq_out->cond_empty);
         pthread_cond_destroy(&fscript->jq_out->cond_full);
         av_freep(&fscript->jq_out);
+
+        pthread_mutex_destroy(&fff->qjs_mutex);
+        pthread_cond_destroy(&fff->qjs_cond);
     }
 
 the_end:
