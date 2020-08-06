@@ -887,6 +887,12 @@ static void fff_transplicate(FFFile *fff)
             av_log(NULL, AV_LOG_FATAL, "ffedit_decode() failed\n");
             goto the_end;
         }
+
+        if ( fff->is_applying_script )
+        {
+            json_ctx_free(ipkt->jctx);
+            av_freep(&ipkt->jctx);
+        }
     }
 
     for ( size_t i = 0 ; i < fff->fctx->nb_streams; i++ )
@@ -1068,6 +1074,8 @@ int main(int argc, char *argv[])
 the_end:
     if ( fff != NULL )
         fret = fff_terminate(fff);
+    if ( fscript != NULL )
+        fret = fff_terminate(fscript);
 
     av_freep(&input_fname);
     av_freep(&output_fname);
