@@ -462,7 +462,7 @@ static void ffe_mpeg12_use_block(
             s->dct_unquantize_intra(s, s->block[i], i, s->qscale >> 1);
         else
             s->dct_unquantize_inter(s, s->block[i], i, s->qscale >> 1);
-        if ( s->codec_id == AV_CODEC_ID_MPEG2VIDEO)
+        if ( s->codec_id == AV_CODEC_ID_MPEG2VIDEO )
         {
             int mismatch = 1;
             for ( j = 0; j < 64; j++ )
