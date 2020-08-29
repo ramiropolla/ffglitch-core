@@ -826,10 +826,20 @@ static int ffedit_decode(
             return ret;
         }
 
-        if ( fff->ectx != NULL && dctx->ffedit_out != NULL )
+        if ( fff->ectx != NULL && dctx->ffe_xp_packets )
         {
-            ffe_output_packet(fff->ectx, dctx->ffedit_in_pos, dctx->ffedit_in_size, dctx->ffedit_out, dctx->ffedit_out_size);
-            av_freep(&dctx->ffedit_out);
+            for ( size_t i = 0; i < dctx->nb_ffe_xp_packets; i++ )
+            {
+                FFEditTransplicatePacket *opkt = &dctx->ffe_xp_packets[i];
+                ffe_output_packet(fff->ectx,
+                                  opkt->i_pos,
+                                  opkt->i_size,
+                                  opkt->data,
+                                  opkt->o_size);
+                av_freep(&opkt->data);
+            }
+            av_freep(&dctx->ffe_xp_packets);
+            dctx->nb_ffe_xp_packets = 0;
         }
 
         if ( fff->is_exporting )

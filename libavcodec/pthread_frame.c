@@ -296,11 +296,6 @@ static int update_context_from_thread(AVCodecContext *dst, AVCodecContext *src, 
         }
 
         dst->hwaccel_flags = src->hwaccel_flags;
-
-        dst->ffedit_in_pos = src->ffedit_in_pos;
-        dst->ffedit_in_size = src->ffedit_in_size;
-        dst->ffedit_out = src->ffedit_out;
-        dst->ffedit_out_size = src->ffedit_out_size;
     }
 
     if (for_user) {

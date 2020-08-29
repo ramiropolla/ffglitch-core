@@ -81,23 +81,42 @@ void ffe_transplicate_flush(
         FFEditTransplicateContext *xp,
         AVPacket *pkt)
 {
+    FFEditTransplicatePacket *packet;
+    size_t nb_ffe_xp_packets;
+    size_t idx;
     int bitcount;
+    int ret;
+
     if ( xp->pb == NULL )
         return;
+
     bitcount = put_bits_count(xp->pb);
     flush_put_bits(xp->pb);
-    avctx->ffedit_in_pos = pkt->pos;
-    avctx->ffedit_in_size = pkt->size;
-    avctx->ffedit_out_size = (bitcount + 7) >> 3;
-    avctx->ffedit_out = av_malloc(avctx->ffedit_out_size);
-    memcpy(avctx->ffedit_out, xp->data, avctx->ffedit_out_size);
+
+    nb_ffe_xp_packets = avctx->nb_ffe_xp_packets;
+    idx = nb_ffe_xp_packets++;
+
+    ret = av_reallocp_array(&avctx->ffe_xp_packets, nb_ffe_xp_packets, sizeof(FFEditTransplicatePacket));
+    if ( ret < 0 )
+        return;
+
+    avctx->nb_ffe_xp_packets = nb_ffe_xp_packets;
+
+    packet = &avctx->ffe_xp_packets[idx];
+    packet->i_pos = pkt->pos;
+    packet->i_size = pkt->size;
+    packet->o_size = (bitcount + 7) >> 3;
+    packet->data = av_malloc(packet->o_size);
+    memcpy(packet->data, xp->data, packet->o_size);
+
     ffe_transplicate_free(xp);
+
 #if CONFIG_FFEDIT_XP_DEBUG
     /* Check only when replicating */
     if ( avctx->ffedit_apply == (1 << FFEDIT_FEAT_LAST) )
     {
-        const uint8_t *inptr = avctx->ffedit_out;
-        size_t out_size = avctx->ffedit_out_size;
+        const uint8_t *inptr = packet->data;
+        size_t out_size = packet->o_size;
         for ( int i = 0; i < out_size; i++ )
         {
             if ( inptr[i] != pkt->data[i] )

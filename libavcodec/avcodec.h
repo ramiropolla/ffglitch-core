@@ -1594,6 +1594,13 @@ typedef struct AVPacket {
 #define AV_PKT_FLAG_DISPOSABLE 0x0010
 
 
+typedef struct FFEditTransplicatePacket {
+    int64_t i_pos;
+    size_t i_size;
+    uint8_t *data;
+    size_t o_size;
+} FFEditTransplicatePacket;
+
 enum AVSideDataParamChangeFlags {
     AV_SIDE_DATA_PARAM_CHANGE_CHANNEL_COUNT  = 0x0001,
     AV_SIDE_DATA_PARAM_CHANGE_CHANNEL_LAYOUT = 0x0002,
@@ -1655,10 +1662,8 @@ typedef struct AVCodecContext {
      */
     unsigned int codec_tag;
 
-    int64_t ffedit_in_pos;
-    size_t ffedit_in_size;
-    void *ffedit_out;
-    size_t ffedit_out_size;
+    FFEditTransplicatePacket *ffe_xp_packets;
+    size_t                 nb_ffe_xp_packets;
 
     void *priv_data;
 
