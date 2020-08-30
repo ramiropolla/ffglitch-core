@@ -44,8 +44,15 @@ struct json_t {
 //---------------------------------------------------------------------
 // json context
 
-#define DATA_CHUNK (32*1024*1024) // 32Mb
-#define STR_CHUNK (1024*1024) // 1Mb
+#ifdef _WIN32
+// it seems windows is not as smart as linux/macos to manage unused
+// memory, so we use smaller chunks.
+#  define DATA_CHUNK (128*1024) // 128kB
+#  define STR_CHUNK (4*1024) // 4kB
+#else
+#  define DATA_CHUNK (32*1024*1024) // 32MB
+#  define STR_CHUNK (1024*1024) // 1MB
+#endif
 #define OBJECT_CHUNK 16
 #define ARRAY_CHUNK 64
 
