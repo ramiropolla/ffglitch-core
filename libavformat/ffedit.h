@@ -100,6 +100,9 @@ typedef struct FFEditOutputContext {
 
     FFEditFixup *fixups;
     size_t    nb_fixups;
+
+    size_t last_file_size;
+    size_t file_size_delta;
 } FFEditOutputContext;
 
 int ffe_output_open(

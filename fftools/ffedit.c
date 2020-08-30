@@ -6,6 +6,7 @@
 #include "libavutil/opt.h"
 #include "libavutil/avassert.h"
 #include "libavutil/avstring.h"
+#include "libavutil/bprint.h"
 #include "libavutil/ffversion.h"
 #include "libavutil/sha.h"
 #include "libavutil/time.h"
@@ -81,6 +82,8 @@ typedef struct {
     JSONFile *jf;
 
     int fret;
+
+    int frame_number;
 
     /* for scripting */
     JSONQueue *jq_in;
@@ -854,20 +857,115 @@ static int ffedit_decode(
         {
             add_frame_to_ffedit_json_queue(fff->jq_in, iframe);
         }
+
+        fff->frame_number++;
     }
 
     return 0;
+}
+
+static void print_report(
+        FFFile *fff,
+        int64_t timer_start,
+        int64_t pts,
+        int is_last_report)
+{
+    static int64_t last_time = -1;
+    float t;
+    float fps = 0;
+    int64_t total_size = -1;
+    double speed = -1;
+
+    int64_t cur_time = av_gettime_relative();
+
+    AVBPrint buf;
+    const char end_char = is_last_report ? '\n' : '\r';
+
+    /* print every 500ms and at the end */
+    if ( !is_last_report )
+    {
+        if ( last_time == -1 )
+        {
+            last_time = cur_time;
+            return;
+        }
+        if ( (cur_time - last_time) < 500000 )
+            return;
+        last_time = cur_time;
+    }
+
+    /* init buffer */
+    av_bprint_init(&buf, 0, AV_BPRINT_SIZE_AUTOMATIC);
+
+    t = (cur_time-timer_start) / 1000000.0;
+
+    /* frame fps */
+    if ( t > 1 )
+        fps = fff->frame_number / t;
+    av_bprintf(&buf, "frame=%5d fps=%3.*f ", fff->frame_number, fps < 9.95, fps);
+    if ( is_last_report )
+        av_bprintf(&buf, "L");
+
+    /* output size */
+    if ( fff->ectx != NULL )
+        total_size = fff->ectx->last_file_size + fff->ectx->file_size_delta;
+    if ( total_size < 0 )
+        av_bprintf(&buf, "size=N/A ");
+    else
+        av_bprintf(&buf, "size=%8.0fkB ", total_size / 1024.0);
+
+    /* pts */
+    if ( pts == AV_NOPTS_VALUE )
+    {
+        av_bprintf(&buf, "time=N/A ");
+    }
+    else
+    {
+        const char *hours_sign = (pts < 0) ? "-" : "";
+        int secs = FFABS(pts) / AV_TIME_BASE;
+        int us = FFABS(pts) % AV_TIME_BASE;
+        int mins = secs / 60;
+        int hours = mins / 60;
+        secs %= 60;
+        mins %= 60;
+        av_bprintf(&buf, "time=%s%02d:%02d:%02d.%02d ",
+                   hours_sign, hours, mins, secs, (100 * us) / AV_TIME_BASE);
+    }
+
+    /* speed */
+    if ( t != 0.0 && pts != AV_NOPTS_VALUE )
+        speed = (double) pts / AV_TIME_BASE / t;
+    if ( speed < 0 )
+        av_bprintf(&buf, " speed=N/A");
+    else
+        av_bprintf(&buf, " speed=%4.3gx", speed);
+
+    /* print string */
+    if ( AV_LOG_INFO > av_log_get_level() )
+        fprintf(stderr, "%s    %c", buf.str, end_char);
+    else
+        av_log(NULL, AV_LOG_INFO, "%s    %c", buf.str, end_char);
+    fflush(stderr);
+
+    /* finalize buffer */
+    av_bprint_finalize(&buf, NULL);
 }
 
 static void fff_transplicate(FFFile *fff)
 {
     AVPacket *ipkt = av_packet_alloc();
     AVFrame *iframe = av_frame_alloc();
+    int64_t last_pts = AV_NOPTS_VALUE;
+    int64_t timer_start;
+    int print_stats = !fff->is_exporting_script;
 
     fff->fret = -1;
 
     if ( fff->is_applying )
         reset_frames_idx_ffedit_json_file(fff->jf);
+
+    if ( print_stats )
+        timer_start = av_gettime_relative();
 
     while ( 42 )
     {
@@ -903,10 +1001,25 @@ static void fff_transplicate(FFFile *fff)
             json_ctx_free(ipkt->jctx);
             av_freep(&ipkt->jctx);
         }
+
+        if ( print_stats )
+        {
+            int64_t pts = ipkt->pts;
+            if ( pts == AV_NOPTS_VALUE )
+                pts = ipkt->dts;
+            if ( pts != AV_NOPTS_VALUE )
+                pts = av_rescale_q(pts, fff->fctx->streams[stream_index]->time_base, AV_TIME_BASE_Q);
+            if ( last_pts == AV_NOPTS_VALUE || last_pts < pts )
+                last_pts = pts;
+            print_report(fff, timer_start, last_pts, 0);
+        }
     }
 
     for ( size_t i = 0 ; i < fff->fctx->nb_streams; i++ )
         ffedit_decode(fff, fff->dctxs[i], iframe, NULL, i);
+
+    if ( print_stats )
+        print_report(fff, timer_start, last_pts, 1);
 
     fff->fret = 0;
 

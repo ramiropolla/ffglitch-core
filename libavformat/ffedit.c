@@ -87,6 +87,8 @@ int ffe_output_packet(
 {
     if ( ectx == NULL )
         return 0;
+    ectx->last_file_size = i_pos + i_size;
+    ectx->file_size_delta += o_size - i_size;
     return output_packet_internal(ectx, i_pos, i_size, data, o_size, 0);
 }
 
