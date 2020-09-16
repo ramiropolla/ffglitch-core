@@ -1016,7 +1016,8 @@ static void fff_transplicate(FFFile *fff)
     }
 
     for ( size_t i = 0 ; i < fff->fctx->nb_streams; i++ )
-        ffedit_decode(fff, fff->dctxs[i], iframe, NULL, i);
+        if ( fff->dctxs[i] != NULL )
+            ffedit_decode(fff, fff->dctxs[i], iframe, NULL, i);
 
     if ( print_stats )
         print_report(fff, timer_start, last_pts, 1);
