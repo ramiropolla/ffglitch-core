@@ -373,16 +373,15 @@ static void close_ffedit_json_file(JSONFile *jf, FFFile *fff)
     if ( jf->export_fp != NULL && jf->jstframes != NULL )
     {
         /* close json_ctx_t dynamic objects */
-        for ( size_t i = 0; i < fff->fctx->nb_streams; i++ )
-        {
-            for ( size_t j = 0; j < jf->nb_jstreams; j++ )
-                json_object_done(&jf->jctxs[0], jf->jstreams[i]);
-            json_dynamic_array_done(&jf->jctxs[0], jf->jstframes[i]);
-        }
+        for ( size_t i = 0; i < jf->nb_jstreams; i++ )
+            json_object_done(&jf->jctxs[0], jf->jstreams[i]);
         json_object_done(&jf->jctxs[0], jf->jroot);
 
         for ( size_t i = 0; i < fff->fctx->nb_streams; i++ )
+        {
+            json_dynamic_array_done(&jf->jctxs[0], jf->jstframes[i]);
             json_array_sort(jf->jstframes[i], sort_by_pkt_pos);
+        }
 
         json_fputs(jf->export_fp, jf->jroot);
         fclose(jf->export_fp);
