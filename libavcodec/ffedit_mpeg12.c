@@ -609,7 +609,8 @@ ffe_mb_export_flush(MpegEncContext *s, ffe_mb_mb_ctx *mbctx)
     AVFrame *f = s->current_picture_ptr->f;
     json_t *jframe = f->ffedit_sd[FFEDIT_FEAT_MB];
     ffe_mb_ctx *ctx = json_userdata_get(jframe);
-    size_t idx = s->mb_y * s->mb_width + s->mb_x;
+    json_t *jsize_y = json_array_get(ctx->jsizes, s->mb_y);
+    json_t *jdata_y = json_array_get(ctx->jdatas, s->mb_y);
     int size = put_bits_count(&mbctx->pb); // in bits
     int i;
 
@@ -630,8 +631,8 @@ ffe_mb_export_flush(MpegEncContext *s, ffe_mb_mb_ctx *mbctx)
 
     jdata = json_string_new(s->jctx, str);
 
-    json_array_set(ctx->jsizes, idx, jsize);
-    json_array_set(ctx->jdatas, idx, jdata);
+    json_array_set(jsize_y, s->mb_x, jsize);
+    json_array_set(jdata_y, s->mb_x, jdata);
 
     av_free(mbctx->data);
     s->gb.pb = NULL;
@@ -651,9 +652,8 @@ ffe_mb_import_init(MpegEncContext *s, ffe_mb_mb_ctx *mbctx)
     AVFrame *f = s->current_picture_ptr->f;
     json_t *jframe = f->ffedit_sd[FFEDIT_FEAT_MB];
     ffe_mb_ctx *ctx = json_userdata_get(jframe);
-    size_t idx = s->mb_y * s->mb_width + s->mb_x;
-
-    json_t *jdata = json_array_get(ctx->jdatas, idx);
+    json_t *jdata_y = json_array_get(ctx->jdatas, s->mb_y);
+    json_t *jdata = json_array_get(jdata_y, s->mb_x);
     const char *str = json_string_get(jdata);
     int size = strlen(str) / 2;
     int i;
@@ -680,9 +680,8 @@ ffe_mb_import_flush(MpegEncContext *s, ffe_mb_mb_ctx *mbctx)
     AVFrame *f = s->current_picture_ptr->f;
     json_t *jframe = f->ffedit_sd[FFEDIT_FEAT_MB];
     ffe_mb_ctx *ctx = json_userdata_get(jframe);
-    size_t idx = s->mb_y * s->mb_width + s->mb_x;
-
-    int size = json_array_get_int(ctx->jsizes, idx); // in bits
+    json_t *jsize_y = json_array_get(ctx->jsizes, s->mb_y);
+    int size = json_array_get_int(jsize_y, s->mb_x); // in bits
 
     av_free(mbctx->data);
     s->gb = mbctx->saved;
@@ -712,11 +711,13 @@ ffe_mpeg12_export_mb_cleanup(MpegEncContext *s, AVFrame *f)
 static void
 ffe_mpeg12_export_mb_init(MpegEncContext *s, AVFrame *f)
 {
-    int mb_count = s->mb_width * s->mb_height;
-
     // {
-    //  "sizes": [ ] # MUST NOT CHANGE!
-    //  "data": [ ]
+    //  "sizes": [ ] # line
+    //           [ ] # column
+    //           val # MUST NOT CHANGE!!!
+    //  "data":  [ ] # line
+    //           [ ] # column
+    //           hex sequence for macroblock
     //  ]
     // }
 
@@ -724,11 +725,10 @@ ffe_mpeg12_export_mb_init(MpegEncContext *s, AVFrame *f)
     ffe_mb_ctx *ctx = json_allocator_get0(s->jctx, sizeof(ffe_mb_ctx));
     json_userdata_set(jframe, ctx);
 
-    ctx->jdatas = json_array_new(s->jctx, mb_count);
-    ctx->jsizes = json_array_new(s->jctx, mb_count);
+    ctx->jdatas = ffe_jblock_new(s->jctx, s->mb_width, s->mb_height, JSON_PFLAGS_NO_LF);
+    ctx->jsizes = ffe_jblock_new(s->jctx, s->mb_width, s->mb_height, JSON_PFLAGS_NO_LF);
     json_object_add(jframe, "data", ctx->jdatas);
     json_object_add(jframe, "sizes", ctx->jsizes);
-    json_set_pflags(ctx->jsizes, JSON_PFLAGS_NO_LF);
 
     f->ffedit_sd[FFEDIT_FEAT_MB] = jframe;
 }
