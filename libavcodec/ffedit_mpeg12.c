@@ -630,6 +630,7 @@ ffe_mb_export_flush(MpegEncContext *s, ffe_mb_mb_ctx *mbctx)
     }
 
     jdata = json_string_new(s->jctx, str);
+    free(str);
 
     json_array_set(jsize_y, s->mb_x, jsize);
     json_array_set(jdata_y, s->mb_x, jdata);
