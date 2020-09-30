@@ -22,8 +22,8 @@ int ffe_transplicate_init(
     xp->av_class = &ffe_transplicate_class;
 
     // allocate buffer at least 50% bigger than original packet size
-    // and at least 1.5 MB.
-    pkt_size = FFMAX(pkt_size, 0x100000);
+    // and at least 3 MB.
+    pkt_size = FFMAX(pkt_size, 0x200000);
     pkt_size += pkt_size >> 1;
 
     xp->data = av_malloc(pkt_size);
