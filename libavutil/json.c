@@ -44,6 +44,8 @@ void json_ctx_start(json_ctx_t *jctx)
     jctx->str.bytes_left = 0;
 
     jctx->error = NULL;
+
+    jctx->next = NULL;
 }
 
 //---------------------------------------------------------------------
