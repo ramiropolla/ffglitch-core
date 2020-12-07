@@ -36,8 +36,10 @@
 #include <stdint.h>
 
 #include "libavutil/emms.h"
+#include "libavutil/file_open.h"
 #include "libavutil/internal.h"
 #include "libavutil/intmath.h"
+#include "libavutil/json.h"
 #include "libavutil/mathematics.h"
 #include "libavutil/mem_internal.h"
 #include "libavutil/opt.h"
@@ -2928,7 +2930,15 @@ static int encode_thread(AVCodecContext *c, void *arg){
     for(i=0; i<3; i++){
         /* init last dc values */
         /* note: quant matrix value (8) is implied here */
-        s->last_dc[i] = 128 << s->intra_dc_precision;
+        if ( s->codec_id == AV_CODEC_ID_MJPEG )
+        {
+            const uint8_t *dc_scale_table = (i == 0) ? s->y_dc_scale_table : s->c_dc_scale_table;
+            s->last_dc[i] = ((128*8)/dc_scale_table[s->qscale]) << s->intra_dc_precision;
+        }
+        else
+        {
+            s->last_dc[i] = 128 << s->intra_dc_precision;
+        }
 
         s->encoding_error[i] = 0;
     }
@@ -3612,6 +3622,32 @@ static int estimate_qp(MpegEncContext *s, int dry_run){
     return 0;
 }
 
+// copied from ffedit.c
+static char *read_file(const char *fname, size_t *psize)
+{
+    size_t size;
+    char *buf;
+    FILE *fp;
+
+    fp = avpriv_fopen_utf8(fname, "rb");
+    if ( fp == NULL )
+        return NULL;
+
+    fseek(fp, 0, SEEK_END);
+    size = ftell(fp);
+    fseek(fp, 0, SEEK_SET);
+
+    buf = av_malloc(size+1);
+    buf[size] = '\0';
+
+    fread(buf, size, 1, fp);
+    fclose(fp);
+
+    *psize = size;
+
+    return buf;
+}
+
 /* must be called before writing the header */
 static void set_frame_distances(MpegEncContext * s){
     av_assert1(s->current_picture_ptr->f->pts != AV_NOPTS_VALUE);
@@ -3807,6 +3843,72 @@ static int encode_picture(MpegEncContext *s)
         s->c_dc_scale_table = ff_mpeg12_dc_scale_table[s->intra_dc_precision];
         s->chroma_intra_matrix[0] =
         s->intra_matrix[0]  = ff_mpeg12_dc_scale_table[s->intra_dc_precision][8];
+
+        if ( s->json_dqt != NULL )
+        {
+            json_ctx_t jctx;
+            json_t *jroot;
+            json_t *luma;
+            json_t *chroma;
+            size_t size;
+            char *buf;
+
+            buf = read_file(s->json_dqt, &size);
+            if ( buf == NULL )
+            {
+                av_log(s->avctx, AV_LOG_FATAL,
+                       "Could not open DQT json file %s\n", s->json_dqt);
+                av_assert0(0);
+            }
+
+            json_ctx_start(&jctx, 0);
+            jroot = json_parse(&jctx, buf);
+            if ( jroot == NULL )
+            {
+                json_error_ctx_t jectx;
+                json_error_parse(&jectx, buf);
+                av_log(s->avctx, AV_LOG_FATAL, "%s:%d:%d: %s\n",
+                       s->json_dqt, (int) jectx.line, (int) jectx.offset, jectx.str);
+                av_log(s->avctx, AV_LOG_FATAL, "%s:%d:%s\n", s->json_dqt, (int) jectx.line, jectx.buf);
+                av_log(s->avctx, AV_LOG_FATAL, "%s:%d:%s\n", s->json_dqt, (int) jectx.line, jectx.column);
+                json_error_free(&jectx);
+                av_assert0(0);
+            }
+
+            luma = json_object_get(jroot, "luma");
+            if ( luma != NULL )
+            {
+                uint8_t *y = av_malloc(128); // TODO memleak
+                int y0 = luma->array_of_ints[0];
+                for ( i = 0; i < 128; i++ )
+                    y[i] = y0;
+                s->y_dc_scale_table = y;
+                s->intra_matrix[0] = y0;
+                for ( i = 1; i < 64; i++ )
+                {
+                    int j = s->idsp.idct_permutation[i];
+                    s->intra_matrix[j] = luma->array_of_ints[i];
+                }
+            }
+            chroma = json_object_get(jroot, "chroma");
+            if ( chroma != NULL )
+            {
+                uint8_t *c = av_malloc(128); // TODO memleak
+                int c0 = chroma->array_of_ints[0];
+                for ( i = 0; i < 128; i++ )
+                    c[i] = c0;
+                s->c_dc_scale_table = c;
+                s->chroma_intra_matrix[0] = c0;
+                for ( i = 1; i < 64; i++ )
+                {
+                    int j = s->idsp.idct_permutation[i];
+                    s->chroma_intra_matrix[j] = chroma->array_of_ints[i];
+                }
+            }
+
+            json_ctx_free(&jctx);
+        }
+
         ff_convert_matrix(s, s->q_intra_matrix, s->q_intra_matrix16,
                        s->intra_matrix, s->intra_quant_bias, 8, 8, 1);
         ff_convert_matrix(s, s->q_chroma_intra_matrix, s->q_chroma_intra_matrix16,

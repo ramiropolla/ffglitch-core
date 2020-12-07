@@ -631,6 +631,7 @@ FF_MPV_COMMON_OPTS
     { "default", NULL, 0, AV_OPT_TYPE_CONST, { .i64 = HUFFMAN_TABLE_DEFAULT }, INT_MIN, INT_MAX, VE, .unit = "huffman" },
     { "optimal", NULL, 0, AV_OPT_TYPE_CONST, { .i64 = HUFFMAN_TABLE_OPTIMAL }, INT_MIN, INT_MAX, VE, .unit = "huffman" },
 { "force_duplicated_matrix", "Always write luma and chroma matrix for mjpeg, useful for rtp streaming.", OFFSET(force_duplicated_matrix), AV_OPT_TYPE_BOOL, {.i64 = 0 }, 0, 1, VE },
+{ "dqt", "JSON file with Quantization Tables", offsetof(MJPEGEncContext, mpeg.json_dqt), AV_OPT_TYPE_STRING, { .str = NULL }, 0, 0, VE },
 { NULL},
 };
 
