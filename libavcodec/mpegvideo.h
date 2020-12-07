@@ -427,6 +427,7 @@ typedef struct MpegEncContext {
     int esc_pos;
     int pred;
     int huffman;
+    char *json_dqt;
 
     /* MSMPEG4 specific */
     int mv_table_index;

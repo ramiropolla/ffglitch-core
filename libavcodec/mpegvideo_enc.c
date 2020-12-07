@@ -35,6 +35,7 @@
 
 #include "libavutil/internal.h"
 #include "libavutil/intmath.h"
+#include "libavutil/json.h"
 #include "libavutil/mathematics.h"
 #include "libavutil/pixdesc.h"
 #include "libavutil/opt.h"
@@ -2967,7 +2968,8 @@ static int encode_thread(AVCodecContext *c, void *arg){
     for(i=0; i<3; i++){
         /* init last dc values */
         /* note: quant matrix value (8) is implied here */
-        s->last_dc[i] = 128 << s->intra_dc_precision;
+        const uint8_t *dc_scale_table = (i == 0) ? s->y_dc_scale_table : s->c_dc_scale_table;
+        s->last_dc[i] = ((128*8)/dc_scale_table[s->qscale]) << s->intra_dc_precision;
 
         s->current_picture.encoding_error[i] = 0;
     }
@@ -3666,6 +3668,32 @@ static int estimate_qp(MpegEncContext *s, int dry_run){
     return 0;
 }
 
+// copied from ffedit.c
+static char *read_file(const char *fname, size_t *psize)
+{
+    size_t size;
+    char *buf;
+    FILE *fp;
+
+    fp = fopen(fname, "rb");
+    if ( fp == NULL )
+        return NULL;
+
+    fseek(fp, 0, SEEK_END);
+    size = ftell(fp);
+    fseek(fp, 0, SEEK_SET);
+
+    buf = av_malloc(size+1);
+    buf[size] = '\0';
+
+    fread(buf, size, 1, fp);
+    fclose(fp);
+
+    *psize = size;
+
+    return buf;
+}
+
 /* must be called before writing the header */
 static void set_frame_distances(MpegEncContext * s){
     av_assert1(s->current_picture_ptr->f->pts != AV_NOPTS_VALUE);
@@ -3865,6 +3893,61 @@ static int encode_picture(MpegEncContext *s, int picture_number)
         s->c_dc_scale_table= ff_mpeg2_dc_scale_table[s->intra_dc_precision];
         s->chroma_intra_matrix[0] =
         s->intra_matrix[0] = ff_mpeg2_dc_scale_table[s->intra_dc_precision][8];
+
+        if ( s->json_dqt != NULL )
+        {
+            json_ctx_t jctx;
+            json_t *jroot;
+            json_t *luma;
+            json_t *chroma;
+            size_t size;
+            char *buf;
+
+            buf = read_file(s->json_dqt, &size);
+            if ( buf == NULL )
+            {
+                av_log(s->avctx, AV_LOG_FATAL,
+                       "Could not open DQT json file %s\n", s->json_dqt);
+                av_assert0(0);
+            }
+
+            json_ctx_start(&jctx);
+            jroot = json_parse(&jctx, buf);
+            if ( jroot == NULL )
+            {
+                av_log(s->avctx, AV_LOG_FATAL, "json_parse error: %s\n",
+                       json_parse_error(&jctx));
+                av_assert0(0);
+            }
+
+            luma = json_object_get(jroot, "luma");
+            if ( luma != NULL )
+            {
+                uint8_t *y = av_malloc(32); // TODO memleak
+                int y0 = json_array_get_int(luma, 0);
+                for ( i = 0; i < 32; i++ )
+                    y[i] = y0;
+                s->y_dc_scale_table = y;
+                s->intra_matrix[0] = y0;
+                for ( i = 1; i < 64; i++ )
+                    s->intra_matrix[i] = json_array_get_int(luma, i);
+            }
+            chroma = json_object_get(jroot, "chroma");
+            if ( chroma != NULL )
+            {
+                uint8_t *c = av_malloc(32); // TODO memleak
+                int c0 = json_array_get_int(chroma, 0);
+                for ( i = 0; i < 32; i++ )
+                    c[i] = c0;
+                s->c_dc_scale_table = c;
+                s->chroma_intra_matrix[0] = c0;
+                for ( i = 1; i < 64; i++ )
+                    s->chroma_intra_matrix[i] = json_array_get_int(chroma, i);
+            }
+
+            json_ctx_free(&jctx);
+        }
+
         ff_convert_matrix(s, s->q_intra_matrix, s->q_intra_matrix16,
                        s->intra_matrix, s->intra_quant_bias, 8, 8, 1);
         ff_convert_matrix(s, s->q_chroma_intra_matrix, s->q_chroma_intra_matrix16,
