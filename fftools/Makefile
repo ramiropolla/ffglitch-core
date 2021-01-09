@@ -1,9 +1,11 @@
 AVPROGS-$(CONFIG_FFMPEG)   += ffmpeg
 AVPROGS-$(CONFIG_FFPLAY)   += ffplay
 AVPROGS-$(CONFIG_FFPROBE)  += ffprobe
+FFGLITCH-$(CONFIG_FFMPEG)  += ffgac$(PROGSSUF)$(EXESUF)
 
 AVPROGS     := $(AVPROGS-yes:%=%$(PROGSSUF)$(EXESUF))
 PROGS       += $(AVPROGS)
+PROGS       += $(FFGLITCH-yes)
 
 AVBASENAMES  = ffmpeg ffplay ffprobe
 ALLAVPROGS   = $(AVBASENAMES:%=%$(PROGSSUF)$(EXESUF))
@@ -40,7 +42,10 @@ endef
 
 $(foreach P,$(AVPROGS-yes),$(eval $(call DOFFTOOL,$(P))))
 
-all: $(AVPROGS)
+ffgac$(PROGSSUF)_g$(EXESUF): ffmpeg$(PROGSSUF)_g$(EXESUF)
+	$(CP) $< $@
+
+all: $(AVPROGS) $(FFGLITCH-yes)
 
 fftools/ffprobe.o fftools/cmdutils.o: libavutil/ffversion.h | fftools
 OUTDIRS += fftools
@@ -62,4 +67,4 @@ uninstall-progs:
 	$(RM) $(addprefix "$(BINDIR)/", $(ALLAVPROGS))
 
 clean::
-	$(RM) $(ALLAVPROGS) $(ALLAVPROGS_G) $(CLEANSUFFIXES:%=fftools/%)
+	$(RM) $(ALLAVPROGS) ffgac$(PROGSSUF)$(EXESUF) $(ALLAVPROGS_G) ffgac$(PROGSSUF)_g$(EXESUF) $(CLEANSUFFIXES:%=fftools/%)
