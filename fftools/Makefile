@@ -2,11 +2,12 @@ AVPROGS-$(CONFIG_FFMPEG)   += ffmpeg
 AVPROGS-$(CONFIG_FFPLAY)   += ffplay
 AVPROGS-$(CONFIG_FFPROBE)  += ffprobe
 AVPROGS-$(CONFIG_FFEDIT)   += ffedit
+AVPROGS-$(CONFIG_FFMPEG)   += ffgac
 
 AVPROGS     := $(AVPROGS-yes:%=%$(PROGSSUF)$(EXESUF))
 PROGS       += $(AVPROGS)
 
-AVBASENAMES  = ffmpeg ffplay ffprobe ffedit
+AVBASENAMES  = ffmpeg ffplay ffprobe ffedit ffgac
 ALLAVPROGS   = $(AVBASENAMES:%=%$(PROGSSUF)$(EXESUF))
 ALLAVPROGS_G = $(AVBASENAMES:%=%$(PROGSSUF)_g$(EXESUF))
 
@@ -28,6 +29,9 @@ $(1)$(PROGSSUF)_g$(EXESUF): FF_EXTRALIBS += $(EXTRALIBS-$(1))
 endef
 
 $(foreach P,$(AVPROGS-yes),$(eval $(call DOFFTOOL,$(P))))
+
+ffgac$(PROGSSUF)_g$(EXESUF): ffmpeg$(PROGSSUF)_g$(EXESUF)
+	cp $< $@
 
 all: $(AVPROGS)
 
