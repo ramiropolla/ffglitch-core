@@ -960,7 +960,7 @@ int main(int argc, char **argv)
 
     if (nb_output_files <= 0 && nb_input_files == 0) {
         show_usage();
-        av_log(NULL, AV_LOG_WARNING, "Use -h to get full help or, even better, run 'man %s'\n", program_name);
+        av_log(NULL, AV_LOG_WARNING, "Use -h to get full help\n");
         ret = 1;
         goto finish;
     }
