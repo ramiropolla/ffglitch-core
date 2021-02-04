@@ -12,18 +12,11 @@ static JSValue ffedit_to_quickjs(JSContext *ctx, json_t *jso)
             JS_SetPropertyStr(ctx, val, jso->obj->names[i], ffedit_to_quickjs(ctx, jso->obj->values[i]));
         break;
     case JSON_TYPE_ARRAY:
-#if 1
         val = JS_NewFastArray(ctx, &parray, JSON_LEN(jso->flags));
         for ( size_t i = 0; i < JSON_LEN(jso->flags); i++ )
             parray[i] = ffedit_to_quickjs(ctx, jso->array[i]);
-#else
-        val = JS_NewArray(ctx);
-        for ( size_t i = 0; i < JSON_LEN(jso->flags); i++ )
-            JS_DefinePropertyValueUint32(ctx, val, i, ffedit_to_quickjs(ctx, jso->array[i]), JS_PROP_C_W_E);
-#endif
         break;
     case JSON_TYPE_ARRAY_OF_INTS:
-#if 1
         val = JS_NewFastArray(ctx, &parray, JSON_LEN(jso->flags));
         for ( size_t i = 0; i < JSON_LEN(jso->flags); i++ )
         {
@@ -32,16 +25,6 @@ static JSValue ffedit_to_quickjs(JSContext *ctx, json_t *jso)
             else
                 parray[i] = JS_NewInt32(ctx, jso->array_of_ints[i]);
         }
-#else
-        val = JS_NewArray(ctx);
-        for ( size_t i = 0; i < JSON_LEN(jso->flags); i++ )
-        {
-            if ( jso->array_of_ints[i] == JSON_NULL )
-                JS_DefinePropertyValueUint32(ctx, val, i, JS_NULL, JS_PROP_C_W_E);
-            else
-                JS_DefinePropertyValueUint32(ctx, val, i, JS_NewInt32(ctx, jso->array_of_ints[i]), JS_PROP_C_W_E);
-        }
-#endif
         break;
     case JSON_TYPE_STRING:
         val = JS_NewString(ctx, jso->str);
