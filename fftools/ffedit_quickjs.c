@@ -1,3 +1,24 @@
+//---------------------------------------------------------------------
+static int64_t __JS_ToInt64(JSContext *ctx, JSValue val)
+{
+    int64_t i64;
+    JS_ToInt64(ctx, &i64, val);
+    return i64;
+}
+
+static inline JS_BOOL JS_IsInt32(JSValueConst v)
+{
+    int tag = JS_VALUE_GET_TAG(v);
+    return tag == JS_TAG_INT;
+}
+
+static inline JS_BOOL JS_IsFloat64(JSValueConst v)
+{
+    int tag = JS_VALUE_GET_TAG(v);
+    return JS_TAG_IS_FLOAT64(tag);
+}
+
+//---------------------------------------------------------------------
 static JSValue ffedit_to_quickjs(JSContext *ctx, json_t *jso)
 {
     JSValue val = JS_NULL;
@@ -42,25 +63,19 @@ static JSValue ffedit_to_quickjs(JSContext *ctx, json_t *jso)
     return val;
 }
 
-static int64_t __JS_ToInt64(JSContext *ctx, JSValue val)
-{
-    int64_t i64;
-    JS_ToInt64(ctx, &i64, val);
-    return i64;
-}
-
 static json_t *quickjs_to_ffedit(json_ctx_t *jctx, JSContext *ctx, JSValue val)
 {
+    if ( JS_IsInt32(val) )
+        return json_int_new(jctx, JS_VALUE_GET_INT(val));
+    if ( JS_IsFloat64(val) )
+        return json_int_new(jctx, JS_VALUE_GET_FLOAT64(val));
     if ( JS_IsString(val) )
         return json_string_new(jctx, JS_ToCString(ctx, val));
     if ( JS_IsBool(val) )
         return json_bool_new(jctx, JS_ToBool(ctx, val));
-    if ( JS_IsNumber(val) )
-        return json_int_new(jctx, __JS_ToInt64(ctx, val));
     if ( JS_IsArray(ctx, val) )
     {
         int is_array_of_ints = 0;
-        JSValue length_val;
         uint32_t length;
         json_t *array;
 
@@ -70,7 +85,7 @@ static json_t *quickjs_to_ffedit(json_ctx_t *jctx, JSContext *ctx, JSValue val)
 
         if ( parray == NULL )
         {
-            length_val = JS_GetPropertyStr(ctx, val, "length");
+            JSValue length_val = JS_GetPropertyStr(ctx, val, "length");
             JS_ToUint32(ctx, &length, length_val);
             JS_FreeValue(ctx, length_val);
 
