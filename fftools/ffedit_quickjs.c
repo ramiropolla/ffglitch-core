@@ -19,6 +19,94 @@ static inline JS_BOOL JS_IsFloat64(JSValueConst v)
 }
 
 //---------------------------------------------------------------------
+static JSValue deep_copy(JSContext *ctx, JSValueConst val)
+{
+    if ( JS_IsInt32(val) )
+        return JS_NewInt32(ctx, JS_VALUE_GET_INT(val));
+    if ( JS_IsFloat64(val) )
+        return __JS_NewFloat64(ctx, JS_VALUE_GET_FLOAT64(val));
+    if ( JS_IsString(val) )
+        return JS_NewString(ctx, JS_ToCString(ctx, val));
+    if ( JS_IsBool(val) )
+        return JS_NewBool(ctx, JS_ToBool(ctx, val));
+    if ( JS_IsArray(ctx, val) )
+    {
+        uint32_t length;
+        JSValue array;
+
+        JSValue *parray = NULL;
+        JSValue *new_parray = NULL;
+
+        JS_GetFastArray(val, &parray, &length);
+
+        if ( parray == NULL )
+        {
+            JSValue length_val = JS_GetPropertyStr(ctx, val, "length");
+            JS_ToUint32(ctx, &length, length_val);
+            JS_FreeValue(ctx, length_val);
+        }
+
+        array = JS_NewFastArray(ctx, &new_parray, length);
+
+        if ( parray == NULL )
+        {
+            for ( size_t i = 0; i < length; i++ )
+            {
+                JSValue val_i = JS_GetPropertyUint32(ctx, val, i);
+                new_parray[i] = deep_copy(ctx, val_i);
+                JS_FreeValue(ctx, val_i);
+            }
+        }
+        else
+        {
+            for ( size_t i = 0; i < length; i++ )
+                new_parray[i] = deep_copy(ctx, parray[i]);
+        }
+
+        return array;
+    }
+    if ( JS_IsObject(val) )
+    {
+        JSValue object = JS_NewObject(ctx);
+        JSPropertyEnum *tab;
+        uint32_t length;
+        JS_GetOwnPropertyNames(ctx, &tab, &length, val, JS_GPN_STRING_MASK | JS_GPN_ENUM_ONLY);
+        for ( size_t i = 0; i < length; i++ )
+        {
+            const char *str = JS_AtomToCString(ctx, tab[i].atom);
+            JSValue val_i = JS_GetProperty(ctx, val, tab[i].atom);
+            JS_SetPropertyStr(ctx, object, str, deep_copy(ctx, val_i));
+            JS_FreeValue(ctx, val_i);
+            JS_FreeAtom(ctx, tab[i].atom);
+        }
+        js_free(ctx, tab);
+        return object;
+    }
+    JS_ThrowTypeError(ctx, "bad_deep_copy_type");
+    return JS_EXCEPTION;
+}
+
+static JSValue js_ffedit_deep_copy(JSContext *ctx, JSValueConst this_val,
+                                   int argc, JSValueConst *argv)
+{
+    // deep_copy(val)
+    return deep_copy(ctx, argv[0]);
+}
+
+static const JSCFunctionListEntry js_ffedit_funcs[] = {
+    JS_CFUNC_DEF("deep_copy", 1, js_ffedit_deep_copy ),
+    JS_PROP_STRING_DEF("[Symbol.toStringTag]", "ffedit", JS_PROP_CONFIGURABLE ),
+};
+
+#ifndef countof
+#define countof(x) (sizeof(x) / sizeof((x)[0]))
+#endif
+
+static const JSCFunctionListEntry js_ffedit_obj[] = {
+    JS_OBJECT_DEF("ffedit", js_ffedit_funcs, countof(js_ffedit_funcs), JS_PROP_WRITABLE | JS_PROP_CONFIGURABLE ),
+};
+
+//---------------------------------------------------------------------
 static JSValue ffedit_to_quickjs(JSContext *ctx, json_t *jso)
 {
     JSValue val = JS_NULL;
@@ -185,6 +273,9 @@ static void *quickjs_func(void *arg)
     JS_SetModuleLoaderFunc(fff->qjs_rt, NULL, js_module_loader, NULL);
     js_std_add_helpers(fff->qjs_ctx, 0, NULL);
 
+    global_object = JS_GetGlobalObject(fff->qjs_ctx);
+    JS_SetPropertyFunctionList(fff->qjs_ctx, global_object, js_ffedit_obj, countof(js_ffedit_obj));
+
     /* system modules */
     js_init_module_std(fff->qjs_ctx, "std");
     js_init_module_os(fff->qjs_ctx, "os");
@@ -197,7 +288,6 @@ static void *quickjs_func(void *arg)
     }
     JS_FreeValue(fff->qjs_ctx, val);
 
-    global_object = JS_GetGlobalObject(fff->qjs_ctx);
     glitch_frame = JS_GetPropertyStr(fff->qjs_ctx, global_object, "glitch_frame");
     if ( JS_IsUndefined(glitch_frame) )
     {
