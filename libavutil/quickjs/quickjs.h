@@ -1,8 +1,8 @@
 /*
  * QuickJS Javascript Engine
  *
- * Copyright (c) 2017-2020 Fabrice Bellard
- * Copyright (c) 2017-2020 Charlie Gordon
+ * Copyright (c) 2017-2021 Fabrice Bellard
+ * Copyright (c) 2017-2021 Charlie Gordon
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -333,7 +333,11 @@ JSRuntime *JS_NewRuntime(void);
 void JS_SetRuntimeInfo(JSRuntime *rt, const char *info);
 void JS_SetMemoryLimit(JSRuntime *rt, size_t limit);
 void JS_SetGCThreshold(JSRuntime *rt, size_t gc_threshold);
+/* use 0 to disable maximum stack size check */
 void JS_SetMaxStackSize(JSRuntime *rt, size_t stack_size);
+/* should be called when changing thread to update the stack top value
+   used to check stack overflow. */
+void JS_UpdateStackTop(JSRuntime *rt);
 JSRuntime *JS_NewRuntime2(const JSMallocFunctions *mf, void *opaque);
 void JS_FreeRuntime(JSRuntime *rt);
 void *JS_GetRuntimeOpaque(JSRuntime *rt);
@@ -412,6 +416,8 @@ void JS_ComputeMemoryUsage(JSRuntime *rt, JSMemoryUsage *s);
 void JS_DumpMemoryUsage(FILE *fp, const JSMemoryUsage *s, JSRuntime *rt);
 
 /* atom support */
+#define JS_ATOM_NULL 0
+
 JSAtom JS_NewAtomLen(JSContext *ctx, const char *str, size_t len);
 JSAtom JS_NewAtom(JSContext *ctx, const char *str);
 JSAtom JS_NewAtomUInt32(JSContext *ctx, uint32_t n);
@@ -712,8 +718,6 @@ JS_BOOL JS_IsConstructor(JSContext* ctx, JSValueConst val);
 JS_BOOL JS_SetConstructorBit(JSContext *ctx, JSValueConst func_obj, JS_BOOL val);
 
 JSValue JS_NewArray(JSContext *ctx);
-JSValue JS_NewFastArray(JSContext *ctx, JSValue **parray, uint32_t len);
-int JS_GetFastArray(JSValueConst val, JSValue **parray, uint32_t *plen);
 int JS_IsArray(JSContext *ctx, JSValueConst val);
 
 JSValue JS_GetPropertyInternal(JSContext *ctx, JSValueConst obj,
@@ -776,7 +780,10 @@ JS_BOOL JS_DetectModule(const char *input, size_t input_len);
 /* 'input' must be zero terminated i.e. input[input_len] = '\0'. */
 JSValue JS_Eval(JSContext *ctx, const char *input, size_t input_len,
                 const char *filename, int eval_flags);
-JSValue JS_EvalFunction(JSContext *ctx, JSValue fun_obj);
+/* same as JS_Eval() but with an explicit 'this_obj' parameter */
+JSValue JS_EvalThis(JSContext *ctx, JSValueConst this_obj,
+                    const char *input, size_t input_len,
+                    const char *filename, int eval_flags);
 JSValue JS_GetGlobalObject(JSContext *ctx);
 int JS_IsInstanceOf(JSContext *ctx, JSValueConst val, JSValueConst obj);
 int JS_DefineProperty(JSContext *ctx, JSValueConst this_obj,
@@ -837,6 +844,8 @@ typedef int JSInterruptHandler(JSRuntime *rt, void *opaque);
 void JS_SetInterruptHandler(JSRuntime *rt, JSInterruptHandler *cb, void *opaque);
 /* if can_block is TRUE, Atomics.wait() can be used */
 void JS_SetCanBlock(JSRuntime *rt, JS_BOOL can_block);
+/* set the [IsHTMLDDA] internal slot */
+void JS_SetIsHTMLDDA(JSContext *ctx, JSValueConst obj);
 
 typedef struct JSModuleDef JSModuleDef;
 
@@ -883,10 +892,18 @@ uint8_t *JS_WriteObject2(JSContext *ctx, size_t *psize, JSValueConst obj,
 #define JS_READ_OBJ_REFERENCE (1 << 3) /* allow object references */
 JSValue JS_ReadObject(JSContext *ctx, const uint8_t *buf, size_t buf_len,
                       int flags);
-
+/* instantiate and evaluate a bytecode function. Only used when
+   reading a script or module with JS_ReadObject() */
+JSValue JS_EvalFunction(JSContext *ctx, JSValue fun_obj);
 /* load the dependencies of the module 'obj'. Useful when JS_ReadObject()
    returns a module. */
 int JS_ResolveModule(JSContext *ctx, JSValueConst obj);
+
+/* only exported for os.Worker() */
+JSAtom JS_GetScriptOrModuleName(JSContext *ctx, int n_stack_levels);
+/* only exported for os.Worker() */
+JSModuleDef *JS_RunModule(JSContext *ctx, const char *basename,
+                          const char *filename);
 
 /* C function definition */
 typedef enum JSCFunctionEnum {  /* XXX: should rename for namespace isolation */

@@ -120,7 +120,7 @@ Load as ES6 script (default=autodetect).
 
 @item --bignum
 Enable the bignum extensions: BigDecimal object, BigFloat object and
-the @code{"use bigint"} and @code{"use math"} directives.
+the @code{"use math"} directive.
 
 @item -I file
 @item --include file
@@ -167,6 +167,12 @@ Set the C name of the generated data.
 @item -m
 Compile as Javascript module (default=autodetect).
 
+@item -D module_name
+Compile a dynamically loaded module and its dependencies. This option
+is needed when your code uses the @code{import} keyword or the
+@code{os.Worker} constructor because the compiler cannot statically
+find the name of the dynamically loaded modules.
+
 @item -M module_name[,cname]
 Add initialization code for an external C module. See the
 @code{c_module} example.
@@ -184,7 +190,7 @@ Disable selected language features to produce a smaller executable file.
 
 @item -fbignum
 Enable the bignum extensions: BigDecimal object, BigFloat object and
-the @code{"use bigint"} and @code{"use math"} directives.
+the @code{"use math"} directive.
 
 @end table
 
@@ -446,6 +452,16 @@ useful in case of specific memory constraints or for testing.
 Return the value of the environment variable @code{name} or
 @code{undefined} if it is not defined.
 
+@item setenv(name, value)
+Set the value of the environment variable @code{name} to the string
+@code{value}.
+
+@item unsetenv(name)
+Delete the environment variable @code{name}.
+
+@item getenviron()
+Return an object containing the environment variables as key-value pairs.
+
 @item urlGet(url, options = undefined)
 
 Download @code{url} using the @file{curl} command line
@@ -526,7 +542,7 @@ position @code{position} (wrapper to the libc @code{fread}).
 
 @item write(buffer, position, length)
 Write @code{length} bytes to the file from the ArrayBuffer @code{buffer} at byte
-position @code{position} (wrapper to the libc @code{fread}).
+position @code{position} (wrapper to the libc @code{fwrite}).
 
 @item getline()
 Return the next line from the file, assuming UTF-8 encoding, excluding
@@ -764,13 +780,14 @@ Cancel a timer.
 Return a string representing the platform: @code{"linux"}, @code{"darwin"},
 @code{"win32"} or @code{"js"}.
 
-@item Worker(source)
+@item Worker(module_filename)
 Constructor to create a new thread (worker) with an API close to the
-@code{WebWorkers}. @code{source} is a string containing the module
-source which is executed in the newly created thread. Threads normally
-don't share any data and communicate between each other with
-messages. Nested workers are not supported. An example is available in
-@file{tests/test_worker.js}.
+@code{WebWorkers}. @code{module_filename} is a string specifying the
+module filename which is executed in the newly created thread. As for
+dynamically imported module, it is relative to the current script or
+module path. Threads normally don't share any data and communicate
+between each other with messages. Nested workers are not supported. An
+example is available in @file{tests/test_worker.js}.
 
 The worker class has the following static properties:
 
@@ -879,10 +896,11 @@ set the C opaque point with
 @code{JS_GetOpaque()}/@code{JS_SetOpaque()}.
 
 When defining a new JS class, it is possible to declare a finalizer
-which is called when the object is destroyed. A @code{gc_mark} method
-can be provided so that the cycle removal algorithm can find the other
-objects referenced by this object. Other methods are available to
-define exotic object behaviors.
+which is called when the object is destroyed. The finalizer should be
+used to release C resources. It is invalid to execute JS code from
+it. A @code{gc_mark} method can be provided so that the cycle removal
+algorithm can find the other objects referenced by this object. Other
+methods are available to define exotic object behaviors.
 
 The Class ID are globally allocated (i.e. for all runtimes). The
 JSClass are allocated per @code{JSRuntime}. @code{JS_SetClassProto()}
