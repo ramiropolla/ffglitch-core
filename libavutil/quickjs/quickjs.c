@@ -1040,7 +1040,6 @@ static __exception int JS_ToArrayLengthFree(JSContext *ctx, uint32_t *plen,
                                             JSValue val, BOOL is_array_ctor);
 static JSValue JS_EvalObject(JSContext *ctx, JSValueConst this_obj,
                              JSValueConst val, int flags, int scope_idx);
-JSValue __attribute__((format(printf, 2, 3))) JS_ThrowInternalError(JSContext *ctx, const char *fmt, ...);
 static __maybe_unused void JS_DumpAtoms(JSRuntime *rt);
 static __maybe_unused void JS_DumpString(JSRuntime *rt,
                                                   const JSString *p);
@@ -1167,7 +1166,6 @@ static JSValue JS_ToBigDecimalFree(JSContext *ctx, JSValue val,
                                    BOOL allow_null_or_undefined);
 static bfdec_t *JS_ToBigDecimal(JSContext *ctx, JSValueConst val);
 #endif
-JSValue JS_ThrowOutOfMemory(JSContext *ctx);
 static JSValue JS_ThrowTypeErrorRevokedProxy(JSContext *ctx);
 static JSValue js_proxy_getPrototypeOf(JSContext *ctx, JSValueConst obj);
 static int js_proxy_setPrototypeOf(JSContext *ctx, JSValueConst obj,
@@ -3977,9 +3975,10 @@ JSValue JS_NewString(JSContext *ctx, const char *str)
 JSValue JS_NewAtomString(JSContext *ctx, const char *str)
 {
     JSAtom atom = JS_NewAtom(ctx, str);
+    JSValue val;
     if (atom == JS_ATOM_NULL)
         return JS_EXCEPTION;
-    JSValue val = JS_AtomToString(ctx, atom);
+    val = JS_AtomToString(ctx, atom);
     JS_FreeAtom(ctx, atom);
     return val;
 }
@@ -9344,6 +9343,7 @@ int JS_DefinePropertyValue(JSContext *ctx, JSValueConst this_obj,
     return ret;
 }
 
+static
 int JS_DefinePropertyValueValue(JSContext *ctx, JSValueConst this_obj,
                                 JSValue prop, JSValue val, int flags)
 {
@@ -9367,6 +9367,7 @@ int JS_DefinePropertyValueUint32(JSContext *ctx, JSValueConst this_obj,
                                        val, flags);
 }
 
+static
 int JS_DefinePropertyValueInt64(JSContext *ctx, JSValueConst this_obj,
                                 int64_t idx, JSValue val, int flags)
 {
@@ -9705,6 +9706,7 @@ int JS_DeleteProperty(JSContext *ctx, JSValueConst obj, JSAtom prop, int flags)
     return FALSE;
 }
 
+static
 int JS_DeletePropertyInt64(JSContext *ctx, JSValueConst obj, int64_t idx, int flags)
 {
     JSAtom prop;
@@ -9738,6 +9740,7 @@ BOOL JS_IsFunction(JSContext *ctx, JSValueConst val)
     }
 }
 
+static
 BOOL JS_IsCFunction(JSContext *ctx, JSValueConst val, JSCFunction *func, int magic)
 {
     JSObject *p;
@@ -9779,6 +9782,7 @@ BOOL JS_IsError(JSContext *ctx, JSValueConst val)
 }
 
 /* used to avoid catching interrupt exceptions */
+static
 BOOL JS_IsUncatchableError(JSContext *ctx, JSValueConst val)
 {
     JSObject *p;
@@ -10725,11 +10729,13 @@ static int JS_ToInt32SatFree(JSContext *ctx, int *pres, JSValue val)
     return 0;
 }
 
+static
 int JS_ToInt32Sat(JSContext *ctx, int *pres, JSValueConst val)
 {
     return JS_ToInt32SatFree(ctx, pres, JS_DupValue(ctx, val));
 }
 
+static
 int JS_ToInt32Clamp(JSContext *ctx, int *pres, JSValueConst val,
                     int min, int max, int min_offset)
 {
@@ -10797,11 +10803,13 @@ static int JS_ToInt64SatFree(JSContext *ctx, int64_t *pres, JSValue val)
     }
 }
 
+static
 int JS_ToInt64Sat(JSContext *ctx, int64_t *pres, JSValueConst val)
 {
     return JS_ToInt64SatFree(ctx, pres, JS_DupValue(ctx, val));
 }
 
+static
 int JS_ToInt64Clamp(JSContext *ctx, int64_t *pres, JSValueConst val,
                     int64_t min, int64_t max, int64_t neg_offset)
 {
@@ -11578,6 +11586,7 @@ static JSValue js_dtoa(JSContext *ctx,
     return JS_NewString(ctx, buf);
 }
 
+static
 JSValue JS_ToStringInternal(JSContext *ctx, JSValueConst val, BOOL is_ToPropertyKey)
 {
     uint32_t tag;
@@ -12027,6 +12036,7 @@ static double js_pow(double a, double b)
     }
 }
 
+static
 JSValue JS_NewBigInt64_1(JSContext *ctx, int64_t v)
 {
     JSValue val;
@@ -20098,6 +20108,7 @@ static void __attribute((unused)) dump_token(JSParseState *s,
     }
 }
 
+static
 int __attribute__((format(printf, 2, 3))) js_parse_error(JSParseState *s, const char *fmt, ...)
 {
     JSContext *ctx = s->ctx;
@@ -32683,9 +32694,9 @@ static __exception int resolve_labels(JSContext *ctx, JSFunctionDef *s)
             if (OPTIMIZE) {
                 /* simplify typeof tests */
                 if (code_match(&cc, pos_next, OP_push_atom_value, M4(OP_strict_eq, OP_strict_neq, OP_eq, OP_neq), -1)) {
-                    if (cc.line_num >= 0) line_num = cc.line_num;
                     int op1 = (cc.op == OP_strict_eq || cc.op == OP_eq) ? OP_strict_eq : OP_strict_neq;
                     int op2 = -1;
+                    if (cc.line_num >= 0) line_num = cc.line_num;
                     switch (cc.atom) {
                     case JS_ATOM_undefined:
                         op2 = OP_typeof_is_undefined;
@@ -55451,6 +55462,7 @@ static const JSCFunctionListEntry js_atomics_obj[] = {
     JS_OBJECT_DEF("Atomics", js_atomics_funcs, countof(js_atomics_funcs), JS_PROP_WRITABLE | JS_PROP_CONFIGURABLE ),
 };
 
+static
 void JS_AddIntrinsicAtomics(JSContext *ctx)
 {
     /* add Atomics as autoinit object */
@@ -55463,6 +55475,7 @@ void JS_AddIntrinsicTypedArrays(JSContext *ctx)
 {
     JSValue typed_array_base_proto, typed_array_base_func;
     JSValueConst array_buffer_func, shared_array_buffer_func;
+    JSValue obj;
     int i;
 
     ctx->class_proto[JS_CLASS_ARRAY_BUFFER] = JS_NewObject(ctx);
@@ -55495,7 +55508,7 @@ void JS_AddIntrinsicTypedArrays(JSContext *ctx)
                                countof(js_typed_array_base_proto_funcs));
 
     /* TypedArray.prototype.toString must be the same object as Array.prototype.toString */
-    JSValue obj = JS_GetProperty(ctx, ctx->class_proto[JS_CLASS_ARRAY], JS_ATOM_toString);
+    obj = JS_GetProperty(ctx, ctx->class_proto[JS_CLASS_ARRAY], JS_ATOM_toString);
     /* XXX: should use alias method in JSCFunctionListEntry */ //@@@
     JS_DefinePropertyValue(ctx, typed_array_base_proto, JS_ATOM_toString, obj,
                            JS_PROP_WRITABLE | JS_PROP_CONFIGURABLE);

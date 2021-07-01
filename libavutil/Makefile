@@ -210,6 +210,34 @@ OBJS-$(!CONFIG_VULKAN)                  += hwcontext_stub.o
 
 OBJS += $(COMPAT_OBJS:%=../compat/%)
 
+# quickjs
+QUICKJS_OBJS += quickjs/cutils.o
+QUICKJS_OBJS += quickjs/libbf.o
+QUICKJS_OBJS += quickjs/libregexp.o
+QUICKJS_OBJS += quickjs/libunicode.o
+QUICKJS_OBJS += quickjs/quickjs-libc.o
+QUICKJS_OBJS += quickjs/quickjs.o
+
+QUICKJS_CONFIG_VERSION := $(shell cat $(SRC_PATH)/libavutil/quickjs/VERSION)
+
+$(SUBDIR)quickjs/cutils.o:       CFLAGS += -D_GNU_SOURCE -DCONFIG_VERSION=\"$(QUICKJS_CONFIG_VERSION)\" -DCONFIG_BIGNUM
+$(SUBDIR)quickjs/libbf.o:        CFLAGS += -D_GNU_SOURCE -DCONFIG_VERSION=\"$(QUICKJS_CONFIG_VERSION)\" -DCONFIG_BIGNUM
+$(SUBDIR)quickjs/libregexp.o:    CFLAGS += -D_GNU_SOURCE -DCONFIG_VERSION=\"$(QUICKJS_CONFIG_VERSION)\" -DCONFIG_BIGNUM
+$(SUBDIR)quickjs/libunicode.o:   CFLAGS += -D_GNU_SOURCE -DCONFIG_VERSION=\"$(QUICKJS_CONFIG_VERSION)\" -DCONFIG_BIGNUM
+$(SUBDIR)quickjs/quickjs-libc.o: CFLAGS += -D_GNU_SOURCE -DCONFIG_VERSION=\"$(QUICKJS_CONFIG_VERSION)\" -DCONFIG_BIGNUM
+$(SUBDIR)quickjs/quickjs.o:      CFLAGS += -D_GNU_SOURCE -DCONFIG_VERSION=\"$(QUICKJS_CONFIG_VERSION)\" -DCONFIG_BIGNUM
+
+$(SUBDIR)quickjs/qjs.o:          CFLAGS += -D_GNU_SOURCE -DCONFIG_VERSION=\"$(QUICKJS_CONFIG_VERSION)\" -DCONFIG_BIGNUM
+$(SUBDIR)quickjs/qjscalc.o:      CFLAGS += -D_GNU_SOURCE -DCONFIG_VERSION=\"$(QUICKJS_CONFIG_VERSION)\" -DCONFIG_BIGNUM
+$(SUBDIR)quickjs/repl.o:         CFLAGS += -D_GNU_SOURCE -DCONFIG_VERSION=\"$(QUICKJS_CONFIG_VERSION)\" -DCONFIG_BIGNUM
+
+QUICKJS_LIBS=-lm -lpthread
+ifneq ($(EXESUF),.exe)
+QUICKJS_LIBS+=-ldl
+endif
+
+OBJS += $(QUICKJS_OBJS)
+
 # Windows resource file
 SHLIBOBJS-$(HAVE_GNU_WINDRES)           += avutilres.o
 
