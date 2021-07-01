@@ -4920,6 +4920,48 @@ JSValue JS_NewArray(JSContext *ctx)
                                  JS_CLASS_ARRAY);
 }
 
+JSValue JS_NewFastArray(JSContext *ctx, JSValue **parray, uint32_t len)
+{
+    JSValue *new_array_prop;
+    JSObject *p;
+    size_t slack;
+
+    /* create new array */
+    JSValue val = JS_NewArray(ctx);
+    if ( JS_IsException(val) )
+        return val;
+    p = JS_VALUE_GET_OBJ(val);
+
+    /* allocate array values */
+    new_array_prop = js_realloc2(ctx, p->u.array.u.values, sizeof(JSValue) * len, &slack);
+    if ( !new_array_prop )
+    {
+        JS_FreeValue(ctx, val);
+        return JS_EXCEPTION;
+    }
+    for ( size_t i = 0; i < len; i++ )
+        new_array_prop[i] = JS_NULL;
+
+    p->prop[0].u.value = JS_NewInt32(ctx, len);
+    p->u.array.u.values = new_array_prop;
+    p->u.array.u1.size = len + (slack / sizeof(*new_array_prop));
+    p->u.array.count = len;
+
+    *parray = p->u.array.u.values;
+
+    return val;
+}
+
+int JS_GetFastArray(JSValueConst val, JSValue **parray, uint32_t *plen)
+{
+    JSObject *p = JS_VALUE_GET_OBJ(val);
+    if ( !p->fast_array )
+        return 0;
+    *parray = p->u.array.u.values;
+    *plen = p->u.array.count;
+    return 1;
+}
+
 JSValue JS_NewObject(JSContext *ctx)
 {
     /* inline JS_NewObjectClass(ctx, JS_CLASS_OBJECT); */
@@ -53864,7 +53906,10 @@ static JSValue js_atomics_wait(JSContext *ctx,
         ret = 0;
     } else {
         /* XXX: use clock monotonic */
-        clock_gettime(CLOCK_REALTIME, &ts);
+        struct timeval tv;
+        gettimeofday(&tv, NULL);
+        ts.tv_sec = tv.tv_sec;
+        ts.tv_nsec = tv.tv_usec * 1000;
         ts.tv_sec += timeout / 1000;
         ts.tv_nsec += (timeout % 1000) * 1000000;
         if (ts.tv_nsec >= 1000000000) {

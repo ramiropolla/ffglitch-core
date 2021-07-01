@@ -718,6 +718,8 @@ JS_BOOL JS_IsConstructor(JSContext* ctx, JSValueConst val);
 JS_BOOL JS_SetConstructorBit(JSContext *ctx, JSValueConst func_obj, JS_BOOL val);
 
 JSValue JS_NewArray(JSContext *ctx);
+JSValue JS_NewFastArray(JSContext *ctx, JSValue **parray, uint32_t len);
+int JS_GetFastArray(JSValueConst val, JSValue **parray, uint32_t *plen);
 int JS_IsArray(JSContext *ctx, JSValueConst val);
 
 JSValue JS_GetPropertyInternal(JSContext *ctx, JSValueConst obj,
