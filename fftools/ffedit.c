@@ -520,7 +520,7 @@ static int opt_feature(void *optctx, const char *opt, const char *arg)
     char str_feature[0x100];
     ssize_t idx;
 
-    strncpy(str_feature, arg, sizeof(str_feature));
+    strncpy(str_feature, arg, sizeof(str_feature) - 1);
     idx = parse_idx(str_feature);
     if ( idx == -2 )
         return AVERROR(EINVAL);
