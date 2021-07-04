@@ -151,8 +151,13 @@ static JSONFile *read_ffedit_json_file(const char *_apply_fname)
 
     if ( jf->jroot == NULL )
     {
-        av_log(NULL, AV_LOG_FATAL, "json_parse error: %s\n",
-               json_parse_error(&jf->jctxs[0]));
+        json_error_ctx_t jectx;
+        json_error_parse(&jectx, buf);
+        av_log(NULL, AV_LOG_FATAL, "%s:%d:%d: %s\n",
+               _apply_fname, (int) jectx.line, (int) jectx.offset, jectx.str);
+        av_log(NULL, AV_LOG_FATAL, "%s:%d:%s\n", _apply_fname, (int) jectx.line, jectx.buf);
+        av_log(NULL, AV_LOG_FATAL, "%s:%d:%s\n", _apply_fname, (int) jectx.line, jectx.column);
+        json_error_free(&jectx);
         exit(1);
     }
     jf->jstreams0 = json_object_get(jf->jroot, "streams");

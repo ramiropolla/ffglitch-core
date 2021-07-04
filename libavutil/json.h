@@ -53,8 +53,6 @@ struct json_t {
 #  define DATA_CHUNK (32*1024*1024) // 32MB
 #  define STR_CHUNK (1024*1024) // 1MB
 #endif
-#define OBJECT_CHUNK 16
-#define ARRAY_CHUNK 64
 
 typedef struct {
     void **chunks;
@@ -68,8 +66,6 @@ typedef struct json_ctx_t json_ctx_t;
 struct json_ctx_t {
     json_allocator_t data;
     json_allocator_t str;
-
-    const char *error;
 
     /* for multi-threading */
     json_ctx_t *next;
@@ -85,10 +81,22 @@ void *json_allocator_strdup(json_ctx_t *jctx, const void *src, size_t len);
 void json_ctx_free(json_ctx_t *jctx);
 json_t *alloc_json_t(json_ctx_t *jctx);
 
+typedef struct json_error_ctx_t json_error_ctx_t;
+
+struct json_error_ctx_t {
+    char *str;
+    char *buf;
+    char *column;
+
+    size_t line;
+    size_t offset;
+};
+
 //---------------------------------------------------------------------
 // parser
-json_t *json_parse(json_ctx_t *jctx, char *buf);
-const char *json_parse_error(json_ctx_t *jctx);
+json_t *json_parse(json_ctx_t *jctx, const char *buf);
+void json_error_parse(json_error_ctx_t *jectx, const char *buf);
+void json_error_free(json_error_ctx_t *jectx);
 
 //---------------------------------------------------------------------
 // dynamic

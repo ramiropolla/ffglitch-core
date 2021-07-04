@@ -3915,8 +3915,13 @@ static int encode_picture(MpegEncContext *s, int picture_number)
             jroot = json_parse(&jctx, buf);
             if ( jroot == NULL )
             {
-                av_log(s->avctx, AV_LOG_FATAL, "json_parse error: %s\n",
-                       json_parse_error(&jctx));
+                json_error_ctx_t jectx;
+                json_error_parse(&jectx, buf);
+                av_log(NULL, AV_LOG_FATAL, "%s:%d:%d: %s\n",
+                      s->json_dqt, (int) jectx.line, (int) jectx.offset, jectx.str);
+                av_log(NULL, AV_LOG_FATAL, "%s:%d:%s\n", s->json_dqt, (int) jectx.line, jectx.buf);
+                av_log(NULL, AV_LOG_FATAL, "%s:%d:%s\n", s->json_dqt, (int) jectx.line, jectx.column);
+                json_error_free(&jectx);
                 av_assert0(0);
             }
 
