@@ -20,6 +20,9 @@
 const char program_name[] = "ffedit";
 const int program_birth_year = 2000; // FFmpeg, that is
 
+#define TIME_JSON_PARSE 0
+#define TIME_JSON_FPUTS 0
+
 /* command-line options */
 static const char *input_fname;
 static const char *output_fname;
@@ -111,6 +114,12 @@ static void get_from_ffedit_json_queue(JSONQueue *jq, AVPacket *ipkt);
 
 static JSONFile *read_ffedit_json_file(const char *_apply_fname)
 {
+#if TIME_JSON_PARSE
+    int64_t diff;
+    int64_t t0;
+    int64_t t1;
+#endif
+
     JSONFile *jf = NULL;
     size_t size;
     char *buf;
@@ -127,7 +136,19 @@ static JSONFile *read_ffedit_json_file(const char *_apply_fname)
 
     GROW_ARRAY(jf->jctxs, jf->nb_jctxs);
     json_ctx_start(&jf->jctxs[0]);
+
+#if TIME_JSON_PARSE
+    t0 = av_gettime_relative();
+#endif
+
     jf->jroot = json_parse(&jf->jctxs[0], buf);
+
+#if TIME_JSON_PARSE
+    t1 = av_gettime_relative();
+    diff = (t1 - t0);
+    printf("time taken in json_parse() %" PRId64 "\n", diff);
+#endif
+
     if ( jf->jroot == NULL )
     {
         av_log(NULL, AV_LOG_FATAL, "json_parse error: %s\n",
@@ -372,6 +393,12 @@ static void close_ffedit_json_file(JSONFile *jf, FFFile *fff)
     /* write output json file if needed */
     if ( jf->export_fp != NULL && jf->jstframes != NULL )
     {
+#if TIME_JSON_FPUTS
+        int64_t diff;
+        int64_t t0;
+        int64_t t1;
+#endif
+
         /* close json_ctx_t dynamic objects */
         for ( size_t i = 0; i < jf->nb_jstreams; i++ )
             json_object_done(&jf->jctxs[0], jf->jstreams[i]);
@@ -383,7 +410,18 @@ static void close_ffedit_json_file(JSONFile *jf, FFFile *fff)
             json_array_sort(jf->jstframes[i], sort_by_pkt_pos);
         }
 
+#if TIME_JSON_FPUTS
+        t0 = av_gettime_relative();
+#endif
+
         json_fputs(jf->export_fp, jf->jroot);
+
+#if TIME_JSON_FPUTS
+        t1 = av_gettime_relative();
+        diff = (t1 - t0);
+        printf("time taken in json_fputs() %" PRId64 "\n", diff);
+#endif
+
         fclose(jf->export_fp);
     }
 
