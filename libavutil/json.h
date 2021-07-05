@@ -14,6 +14,7 @@ typedef struct json_t json_t;
 typedef struct {
     char **names;
     json_t **values;
+    void *userdata;
 } json_obj_t;
 
 #define JSON_NULL 0x8000000000000000ULL
@@ -31,7 +32,6 @@ struct json_t {
 #define JSON_TYPE(x)   (x & 0x00FF0000)
 #define JSON_PFLAGS(x) (x & 0xFF000000)
     uint64_t flags;
-    void *userdata;
     union {
         char *str;
         int64_t val;

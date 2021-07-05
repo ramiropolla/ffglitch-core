@@ -415,12 +415,12 @@ const char *json_string_get(json_t *jso)
 //---------------------------------------------------------------------
 void json_userdata_set(json_t *jso, void *userdata)
 {
-    jso->userdata = userdata;
+    jso->obj->userdata = userdata;
 }
 
 void *json_userdata_get(json_t *jso)
 {
-    return jso->userdata;
+    return jso->obj->userdata;
 }
 
 //---------------------------------------------------------------------
