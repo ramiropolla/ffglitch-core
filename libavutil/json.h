@@ -31,7 +31,6 @@ struct json_t {
 #define JSON_LEN(x)    (x & 0x0000FFFF)
 #define JSON_TYPE(x)   (x & 0x00FF0000)
 #define JSON_PFLAGS(x) (x & 0xFF000000)
-    uint64_t flags;
     union {
         char *str;
         int64_t val;
@@ -39,6 +38,7 @@ struct json_t {
         int64_t *array_of_ints;
         json_obj_t *obj;
     };
+    uint32_t flags;
 };
 
 //---------------------------------------------------------------------
