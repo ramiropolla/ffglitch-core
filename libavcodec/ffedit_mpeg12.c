@@ -113,7 +113,10 @@ ffe_mpeg12_export_info_cleanup(MpegEncContext *s, AVFrame *f)
 //     [ mv, mv, ..., mv ],
 //     ...                ,
 //     [ mv, mv, ..., mv ]
-//   ]
+//   ],
+//   "fcode": [ ],
+//   "bcode": [ ],
+//   "overflow": "assert", "truncate", or "ignore"
 // }
 //
 // - mv:
@@ -125,20 +128,48 @@ ffe_mpeg12_export_info_cleanup(MpegEncContext *s, AVFrame *f)
 
 /* forward declarations */
 
-static int mpeg_decode_motion(MpegEncContext *s, int fcode, int pred);
+static int mpeg_decode_motion_delta(MpegEncContext *s, int fcode);
 
 /* init */
 
 static void
 ffe_mpeg12_export_mv_init(MpegEncContext *s, AVFrame *f)
 {
-    ffe_mv_export_init(s->jctx, f, s->mb_height, s->mb_width);
+    int nb_fcodes = (s->codec_id == AV_CODEC_ID_MPEG2VIDEO) ? 2 : 1;
+    ffe_mv_export_init(s->jctx, f, s->mb_height, s->mb_width, nb_fcodes);
+    ffe_mv_export_fcode(s->jctx, f, 0, 0, s->mpeg_f_code[0][0]);
+    ffe_mv_export_fcode(s->jctx, f, 1, 0, s->mpeg_f_code[1][0]);
+    if ( s->codec_id == AV_CODEC_ID_MPEG2VIDEO )
+    {
+        ffe_mv_export_fcode(s->jctx, f, 0, 1, s->mpeg_f_code[0][1]);
+        ffe_mv_export_fcode(s->jctx, f, 1, 1, s->mpeg_f_code[1][1]);
+    }
+}
+
+static void
+ffe_mpeg12_export_mv_delta_init(MpegEncContext *s, AVFrame *f)
+{
+    int nb_fcodes = (s->codec_id == AV_CODEC_ID_MPEG2VIDEO) ? 2 : 1;
+    ffe_mv_delta_export_init(s->jctx, f, s->mb_height, s->mb_width, nb_fcodes);
+    ffe_mv_delta_export_fcode(s->jctx, f, 0, 0, s->mpeg_f_code[0][0]);
+    ffe_mv_delta_export_fcode(s->jctx, f, 1, 0, s->mpeg_f_code[1][0]);
+    if ( s->codec_id == AV_CODEC_ID_MPEG2VIDEO )
+    {
+        ffe_mv_delta_export_fcode(s->jctx, f, 0, 1, s->mpeg_f_code[0][1]);
+        ffe_mv_delta_export_fcode(s->jctx, f, 1, 1, s->mpeg_f_code[1][1]);
+    }
 }
 
 static void
 ffe_mpeg12_import_mv_init(MpegEncContext *s, AVFrame *f)
 {
     ffe_mv_import_init(s->jctx, f);
+}
+
+static void
+ffe_mpeg12_import_mv_delta_init(MpegEncContext *s, AVFrame *f)
+{
+    ffe_mv_delta_import_init(s->jctx, f);
 }
 
 /* export */
@@ -156,35 +187,79 @@ static void ffe_mpeg12_mv_init_mb(
         ffe_mv_import_init_mb(mbctx, s->jctx, f, s->mb_y, s->mb_x, nb_directions, nb_blocks);
 }
 
+static void ffe_mpeg12_mv_delta_init_mb(
+        ffe_mv_mb_ctx *mbctx,
+        MpegEncContext *s,
+        int nb_directions,
+        int nb_blocks)
+{
+    AVFrame *f = s->current_picture_ptr->f;
+    if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_MV_DELTA)) != 0 )
+        ffe_mv_delta_export_init_mb(mbctx, s->jctx, f, s->mb_y, s->mb_x, nb_directions, nb_blocks);
+    if ( (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_MV_DELTA)) != 0 )
+        ffe_mv_delta_import_init_mb(mbctx, s->jctx, f, s->mb_y, s->mb_x, nb_directions, nb_blocks);
+}
+
 //---------------------------------------------------------------------
+static inline int modulo_decoding(int val, int fcode)
+{
+    int shift = fcode - 1;
+    /* modulo decoding */
+    val = sign_extend(val, 5 + shift);
+    return val;
+}
+
 static int ffe_decode_mpegmv(
         ffe_mv_mb_ctx *mbctx,
+        ffe_mv_mb_ctx *mbctx_delta,
         MpegEncContext *s,
         int fcode,
         int pred,
         int x_or_y)     // 0 = x, 1 = y
 {
     AVFrame *f = s->current_picture_ptr->f;
-    int code;
+    int delta;
+    int val;
 
-    if ( (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_MV)) != 0 )
+    if ( (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_MV)) != 0
+      || (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_MV_DELTA)) != 0 )
+    {
         s->pb = *ffe_transplicate_save(&s->ffe_xp);
+    }
 
-    code = mpeg_decode_motion(s, fcode, pred);
-    if ( code == 0xffff )
-        return code;
+    delta = mpeg_decode_motion_delta(s, fcode);
+    if ( delta == 0xffff )
+        return delta;
+
+    if ( (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_MV_DELTA)) != 0 )
+        delta = ffe_mv_delta_get(mbctx_delta, f, x_or_y);
+
+    /* NOTE maintaining FFmpeg behaviour that does not sign-extend when
+     *      delta is zero. I don't know whether this is correct or not.
+     */
+    val = delta + pred;
+    if ( delta != 0 )
+        val = modulo_decoding(val, fcode);
 
     if ( (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_MV)) != 0 )
-        code = ffe_mv_get(mbctx, f, x_or_y);
-    if ( (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_MV)) != 0 )
+        val = ffe_mv_get(mbctx, f, x_or_y);
+    if ( (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_MV)) != 0
+      || (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_MV_DELTA)) != 0 )
     {
-        ff_mpeg1_encode_motion(s, code - pred, fcode);
+        if ( (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_MV)) != 0 )
+            delta = ffe_mv_overflow(mbctx, pred, val, fcode, 5);
+        else
+            delta = ffe_mv_delta_overflow(mbctx_delta, delta, fcode, 5);
+        ff_mpeg1_encode_motion(s, delta, fcode);
         ffe_transplicate_restore(&s->ffe_xp, &s->pb);
+        val = modulo_decoding(delta + pred, fcode);
     }
     if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_MV)) != 0 )
-        ffe_mv_set(mbctx, s->jctx, x_or_y, code);
+        ffe_mv_set(mbctx, s->jctx, x_or_y, val);
+    if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_MV_DELTA)) != 0 )
+        ffe_mv_delta_set(mbctx_delta, s->jctx, x_or_y, delta);
 
-    return code;
+    return val;
 }
 
 /*-------------------------------------------------------------------*/
@@ -798,6 +873,11 @@ ffe_mpeg12_init(MpegEncContext *s)
     else if ( (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_MV)) != 0 )
         ffe_mpeg12_import_mv_init(s, f);
 
+    if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_MV_DELTA)) != 0 )
+        ffe_mpeg12_export_mv_delta_init(s, f);
+    else if ( (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_MV_DELTA)) != 0 )
+        ffe_mpeg12_import_mv_delta_init(s, f);
+
     if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_QSCALE)) != 0 )
         ffe_mpeg12_export_qscale_init(s, f);
     else if ( (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_QSCALE)) != 0 )
@@ -822,6 +902,9 @@ ffe_mpeg12_export_cleanup(MpegEncContext *s, AVFrame *f)
 
     if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_MV)) != 0 )
         ffe_mv_export_cleanup(s->jctx, f);
+
+    if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_MV_DELTA)) != 0 )
+        ffe_mv_delta_export_cleanup(s->jctx, f);
 
     if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_QSCALE)) != 0 )
         ffe_mpeg12_export_qscale_cleanup(s, f);

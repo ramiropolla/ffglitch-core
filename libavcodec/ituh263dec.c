@@ -311,6 +311,30 @@ int ff_h263_decode_motion(MpegEncContext * s, int pred, int f_code)
     return val;
 }
 
+int ff_h263_decode_motion_delta(MpegEncContext *s, int f_code)
+{
+    int code, val, sign, shift;
+    code = get_vlc2(&s->gb, mv_vlc.table, MV_VLC_BITS, 2);
+
+    if (code == 0)
+        return 0;
+    if (code < 0)
+        return 0xffff;
+
+    sign = get_bits1(&s->gb);
+    shift = f_code - 1;
+    val = code;
+    if (shift) {
+        val = (val - 1) << shift;
+        val |= get_bits(&s->gb, shift);
+        val++;
+    }
+    if (sign)
+        val = -val;
+
+    return val;
+}
+
 
 /* Decode RVLC of H.263+ UMV */
 static int h263p_decode_umotion(MpegEncContext * s, int pred)
