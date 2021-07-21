@@ -1157,6 +1157,7 @@ int main(int argc, char *argv[])
     }
 
     /* TODO review this */
+    /* TODO cannot import/apply both mv and mv_delta at the same time */
     if ( features_selected == 0 )
     {
         /* select all features by default */

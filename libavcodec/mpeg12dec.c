@@ -102,13 +102,13 @@ static const uint32_t btype2mb_type[11] = {
 };
 
 /* as H.263, but only 17 codes */
-static int mpeg_decode_motion(MpegEncContext *s, int fcode, int pred)
+static int mpeg_decode_motion_delta(MpegEncContext *s, int fcode)
 {
     int code, sign, val, shift;
 
     code = get_vlc2(&s->gb, ff_mv_vlc.table, MV_VLC_BITS, 2);
     if (code == 0)
-        return pred;
+        return 0;
     if (code < 0)
         return 0xffff;
 
@@ -122,10 +122,8 @@ static int mpeg_decode_motion(MpegEncContext *s, int fcode, int pred)
     }
     if (sign)
         val = -val;
-    val += pred;
 
-    /* modulo decoding */
-    return sign_extend(val, 5 + shift);
+    return val;
 }
 
 #define MAX_INDEX (64 - 1)
@@ -425,6 +423,7 @@ static int mpeg_decode_mb(MpegEncContext *s, int16_t block[12][64])
     const int mb_block_count = 4 + (1 << s->chroma_format);
     AVFrame *f = s->current_picture_ptr->f;
     ffe_mv_mb_ctx mbctx;
+    ffe_mv_mb_ctx mbctx_delta;
     int ret;
 
     ff_tlog(s->avctx, "decode_mb: x=%d y=%d\n", s->mb_x, s->mb_y);
@@ -518,13 +517,18 @@ static int mpeg_decode_mb(MpegEncContext *s, int16_t block[12][64])
             ffe_mpeg12_mv_init_mb(&mbctx, s, 1, 1);
             ffe_mv_select(&mbctx, f, 0, 0);
 
+            ffe_mpeg12_mv_delta_init_mb(&mbctx_delta, s, 1, 1);
+            ffe_mv_delta_select(&mbctx_delta, f, 0, 0);
+
             s->mv[0][0][0]      =
             s->last_mv[0][0][0] =
-            s->last_mv[0][1][0] = ffe_decode_mpegmv(&mbctx, s, s->mpeg_f_code[0][0],
+            s->last_mv[0][1][0] = ffe_decode_mpegmv(&mbctx, &mbctx_delta,
+                                                    s, s->mpeg_f_code[0][0],
                                                     s->last_mv[0][0][0], 0);
             s->mv[0][0][1]      =
             s->last_mv[0][0][1] =
-            s->last_mv[0][1][1] = ffe_decode_mpegmv(&mbctx, s, s->mpeg_f_code[0][1],
+            s->last_mv[0][1][1] = ffe_decode_mpegmv(&mbctx, &mbctx_delta,
+                                                    s, s->mpeg_f_code[0][1],
                                                     s->last_mv[0][0][1], 1);
 
             check_marker(s->avctx, &s->gb, "after concealment_motion_vectors");
@@ -602,20 +606,24 @@ static int mpeg_decode_mb(MpegEncContext *s, int16_t block[12][64])
                     mb_type   |= MB_TYPE_16x16;
                     s->mv_type = MV_TYPE_16X16;
                     ffe_mpeg12_mv_init_mb(&mbctx, s, 2, 1);
+                    ffe_mpeg12_mv_delta_init_mb(&mbctx_delta, s, 2, 1);
                     for (i = 0; i < 2; i++) {
                         if (USES_LIST(mb_type, i)) {
                             ffe_mv_select(&mbctx, f, i, 0);
+                            ffe_mv_delta_select(&mbctx_delta, f, i, 0);
 
                             /* MT_FRAME */
                             s->mv[i][0][0]      =
                             s->last_mv[i][0][0] =
                             s->last_mv[i][1][0] =
-                                ffe_decode_mpegmv(&mbctx, s, s->mpeg_f_code[i][0],
+                                ffe_decode_mpegmv(&mbctx, &mbctx_delta,
+                                                  s, s->mpeg_f_code[i][0],
                                                   s->last_mv[i][0][0], 0);
                             s->mv[i][0][1]      =
                             s->last_mv[i][0][1] =
                             s->last_mv[i][1][1] =
-                                ffe_decode_mpegmv(&mbctx, s, s->mpeg_f_code[i][1],
+                                ffe_decode_mpegmv(&mbctx, &mbctx_delta,
+                                                  s, s->mpeg_f_code[i][1],
                                                   s->last_mv[i][0][1], 1);
                             /* full_pel: only for MPEG-1 */
                             if (s->full_pel[i]) {
@@ -628,14 +636,17 @@ static int mpeg_decode_mb(MpegEncContext *s, int16_t block[12][64])
                     mb_type   |= MB_TYPE_16x8 | MB_TYPE_INTERLACED;
                     s->mv_type = MV_TYPE_16X8;
                     ffe_mpeg12_mv_init_mb(&mbctx, s, 2, 2);
+                    ffe_mpeg12_mv_delta_init_mb(&mbctx_delta, s, 2, 2);
                     for (i = 0; i < 2; i++) {
                         if (USES_LIST(mb_type, i)) {
                             /* MT_16X8 */
                             for (j = 0; j < 2; j++) {
                                 s->field_select[i][j] = get_bits1(&s->gb);
                                 ffe_mv_select(&mbctx, f, i, j);
+                                ffe_mv_delta_select(&mbctx_delta, f, i, j);
                                 for (k = 0; k < 2; k++) {
-                                    val = ffe_decode_mpegmv(&mbctx, s, s->mpeg_f_code[i][k],
+                                    val = ffe_decode_mpegmv(&mbctx, &mbctx_delta,
+                                                            s, s->mpeg_f_code[i][k],
                                                             s->last_mv[i][j][k], k);
                                     s->last_mv[i][j][k] = val;
                                     s->mv[i][j][k]      = val;
@@ -650,17 +661,21 @@ static int mpeg_decode_mb(MpegEncContext *s, int16_t block[12][64])
                 if (s->picture_structure == PICT_FRAME) {
                     mb_type |= MB_TYPE_16x8 | MB_TYPE_INTERLACED;
                     ffe_mpeg12_mv_init_mb(&mbctx, s, 2, 2);
+                    ffe_mpeg12_mv_delta_init_mb(&mbctx_delta, s, 2, 2);
                     for (i = 0; i < 2; i++) {
                         if (USES_LIST(mb_type, i)) {
                             for (j = 0; j < 2; j++) {
                                 s->field_select[i][j] = get_bits1(&s->gb);
                                 ffe_mv_select(&mbctx, f, i, j);
-                                val = ffe_decode_mpegmv(&mbctx, s, s->mpeg_f_code[i][0],
+                                ffe_mv_delta_select(&mbctx_delta, f, i, j);
+                                val = ffe_decode_mpegmv(&mbctx, &mbctx_delta,
+                                                        s, s->mpeg_f_code[i][0],
                                                         s->last_mv[i][j][0], 0);
                                 s->last_mv[i][j][0] = val;
                                 s->mv[i][j][0]      = val;
                                 ff_tlog(s->avctx, "fmx=%d\n", val);
-                                val = ffe_decode_mpegmv(&mbctx, s, s->mpeg_f_code[i][1],
+                                val = ffe_decode_mpegmv(&mbctx, &mbctx_delta,
+                                                        s, s->mpeg_f_code[i][1],
                                                         s->last_mv[i][j][1] >> 1, 1);
                                 s->last_mv[i][j][1] = 2 * val;
                                 s->mv[i][j][1]      = val;
@@ -672,12 +687,15 @@ static int mpeg_decode_mb(MpegEncContext *s, int16_t block[12][64])
                     av_assert0(!s->progressive_sequence);
                     mb_type |= MB_TYPE_16x16 | MB_TYPE_INTERLACED;
                     ffe_mpeg12_mv_init_mb(&mbctx, s, 2, 2);
+                    ffe_mpeg12_mv_delta_init_mb(&mbctx_delta, s, 2, 2);
                     for (i = 0; i < 2; i++) {
                         if (USES_LIST(mb_type, i)) {
                             s->field_select[i][0] = get_bits1(&s->gb);
                             ffe_mv_select(&mbctx, f, i, 0);
+                            ffe_mv_delta_select(&mbctx_delta, f, i, 0);
                             for (k = 0; k < 2; k++) {
-                                val = ffe_decode_mpegmv(&mbctx, s, s->mpeg_f_code[i][k],
+                                val = ffe_decode_mpegmv(&mbctx, &mbctx_delta,
+                                                        s, s->mpeg_f_code[i][k],
                                                         s->last_mv[i][0][k], k);
                                 s->last_mv[i][0][k] = val;
                                 s->last_mv[i][1][k] = val;
@@ -694,18 +712,22 @@ static int mpeg_decode_mb(MpegEncContext *s, int16_t block[12][64])
                 }
                 s->mv_type = MV_TYPE_DMV;
                 ffe_mpeg12_mv_init_mb(&mbctx, s, 2, 1);
+                ffe_mpeg12_mv_delta_init_mb(&mbctx_delta, s, 2, 1);
                 for (i = 0; i < 2; i++) {
                     if (USES_LIST(mb_type, i)) {
                         int dmx, dmy, mx, my, m;
                         const int my_shift = s->picture_structure == PICT_FRAME;
                         ffe_mv_select(&mbctx, f, i, 0);
+                        ffe_mv_delta_select(&mbctx_delta, f, i, 0);
 
-                        mx = ffe_decode_mpegmv(&mbctx, s, s->mpeg_f_code[i][0],
+                        mx = ffe_decode_mpegmv(&mbctx, &mbctx_delta,
+                                               s, s->mpeg_f_code[i][0],
                                                s->last_mv[i][0][0], 0);
                         s->last_mv[i][0][0] = mx;
                         s->last_mv[i][1][0] = mx;
                         dmx = get_dmv(s);
-                        my  = ffe_decode_mpegmv(&mbctx, s, s->mpeg_f_code[i][1],
+                        my  = ffe_decode_mpegmv(&mbctx, &mbctx_delta,
+                                                s, s->mpeg_f_code[i][1],
                                                 s->last_mv[i][0][1] >> my_shift, 0);
                         dmy = get_dmv(s);
 
@@ -2785,6 +2807,7 @@ AVCodec ff_mpeg1video_decoder = {
                            },
     .ffedit_features = (1 << FFEDIT_FEAT_INFO)
                      | (1 << FFEDIT_FEAT_MV)
+                     | (1 << FFEDIT_FEAT_MV_DELTA)
                      | (1 << FFEDIT_FEAT_QSCALE)
                      | (1 << FFEDIT_FEAT_Q_DCT)
                      | (1 << FFEDIT_FEAT_MB)
@@ -2837,6 +2860,7 @@ AVCodec ff_mpeg2video_decoder = {
                     },
     .ffedit_features = (1 << FFEDIT_FEAT_INFO)
                      | (1 << FFEDIT_FEAT_MV)
+                     | (1 << FFEDIT_FEAT_MV_DELTA)
                      | (1 << FFEDIT_FEAT_QSCALE)
                      | (1 << FFEDIT_FEAT_Q_DCT)
                      | (1 << FFEDIT_FEAT_MB)
@@ -2862,6 +2886,7 @@ AVCodec ff_mpegvideo_decoder = {
     .max_lowres     = 3,
     .ffedit_features = (1 << FFEDIT_FEAT_INFO)
                      | (1 << FFEDIT_FEAT_MV)
+                     | (1 << FFEDIT_FEAT_MV_DELTA)
                      | (1 << FFEDIT_FEAT_QSCALE)
                      | (1 << FFEDIT_FEAT_Q_DCT)
                      | (1 << FFEDIT_FEAT_MB)

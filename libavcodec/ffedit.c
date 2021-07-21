@@ -7,6 +7,7 @@ static const char *const feat_keys[] = {
     "q_dct",
     "q_dc",
     "mv",
+    "mv_delta",
     "qscale",
     "dqt",
     "dht",
@@ -31,6 +32,7 @@ static const char *const feat_desc[] = {
     "quantized DCT coefficients",
     "quantized DCT coefficients (DC only)",
     "motion vectors",
+    "motion vectors (delta only)",
     "quantization scale",
     "quantization table",
     "huffman table",
@@ -47,6 +49,7 @@ int ffe_default_feat(enum FFEditFeature feat)
     switch ( feat )
     {
         case FFEDIT_FEAT_Q_DCT:
+        case FFEDIT_FEAT_MV_DELTA:
         case FFEDIT_FEAT_MB:
             return 0;
         default:
