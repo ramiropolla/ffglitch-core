@@ -146,6 +146,8 @@ libavutil/json.h
 libavutil/json_dump.c
 libavutil/json_parse.c
 libavutil/quickjs/libunicode-table.h
+libavutil/quickjs/qjscalc.c
+libavutil/quickjs/repl.c
 libavutil/quickjs/unicode_gen_def.h
 libswresample/log2_tab.c
 libswscale/log2_tab.c

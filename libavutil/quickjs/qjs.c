@@ -280,7 +280,7 @@ static const JSMallocFunctions trace_mf = {
 
 #define PROG_NAME "qjs"
 
-void help(void)
+static void help(void)
 {
     printf("QuickJS version " CONFIG_VERSION "\n"
            "usage: " PROG_NAME " [options] [file [args]]\n"
