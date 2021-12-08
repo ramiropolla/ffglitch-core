@@ -1598,8 +1598,15 @@ void ff_estimate_b_frame_motion(MpegEncContext * s,
 /* find best f_code for ME which do unlimited searches */
 int ff_get_best_fcode(MpegEncContext * s, int16_t (*mv_table)[2], int type)
 {
-    if ( s->fixed_f_code != 0 )
-        return s->fixed_f_code;
+    if ( s->f_code_expr_str != NULL )
+    {
+        int ret;
+        s->f_code_var_values[0] = s->avctx->frame_number;
+        ret = av_expr_eval(s->f_code_expr, s->f_code_var_values, NULL);
+        if ( ret > 6 )
+            ret = 6;
+        return ret;
+    }
     if (s->motion_est != FF_ME_ZERO) {
         int score[8];
         int i, y, range= s->avctx->me_range ? s->avctx->me_range : (INT_MAX/2);
