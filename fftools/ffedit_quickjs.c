@@ -179,21 +179,10 @@ static void *quickjs_func(void *arg)
     /* TODO check for errors */
     fff->qjs_rt = JS_NewRuntime();
     js_std_init_handlers(fff->qjs_rt);
-    fff->qjs_ctx = JS_NewContextRaw(fff->qjs_rt);
+    fff->qjs_ctx = JS_NewContext(fff->qjs_rt);
 
     /* loader for ES6 modules */
     JS_SetModuleLoaderFunc(fff->qjs_rt, NULL, js_module_loader, NULL);
-    JS_AddIntrinsicBaseObjects(fff->qjs_ctx);
-    JS_AddIntrinsicDate(fff->qjs_ctx);
-    JS_AddIntrinsicEval(fff->qjs_ctx);
-    JS_AddIntrinsicStringNormalize(fff->qjs_ctx);
-    JS_AddIntrinsicRegExp(fff->qjs_ctx);
-    JS_AddIntrinsicJSON(fff->qjs_ctx);
-    JS_AddIntrinsicProxy(fff->qjs_ctx);
-    JS_AddIntrinsicMapSet(fff->qjs_ctx);
-    JS_AddIntrinsicTypedArrays(fff->qjs_ctx);
-    JS_AddIntrinsicPromise(fff->qjs_ctx);
-    JS_AddIntrinsicBigInt(fff->qjs_ctx);
     js_std_add_helpers(fff->qjs_ctx, 0, NULL);
 
     /* system modules */
