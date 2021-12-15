@@ -995,6 +995,11 @@ end:
     if (get_bits_left(&s->gb) < 0)
         return AVERROR_INVALIDDATA;
 
+    return SLICE_CHECK;
+}
+
+int ff_h263_decode_mb_slice_check(MpegEncContext *s)
+{
         /* per-MB end of slice check */
     {
         int v= show_bits(&s->gb, 16);

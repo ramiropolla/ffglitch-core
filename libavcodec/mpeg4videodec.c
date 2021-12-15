@@ -1369,6 +1369,13 @@ static int mpeg4_decode_partitioned_mb(MpegEncContext *s, int16_t block[6][64])
         }
     }
 
+    return SLICE_CHECK;
+}
+
+static int mpeg4_decode_partitioned_mb_slice_check(MpegEncContext *s)
+{
+    Mpeg4DecContext *ctx = s->avctx->priv_data;
+    const int xy = s->mb_x + s->mb_y * s->mb_stride;
     /* per-MB end of slice check */
     if (--s->mb_num_left <= 0) {
         if (mpeg4_is_resync(ctx))
@@ -1764,6 +1771,13 @@ intra:
 end:
     ffe_mpeg4_export_info(s, s->current_picture.mb_type[xy]);
 
+    return SLICE_CHECK;
+}
+
+static int mpeg4_decode_mb_slice_check(MpegEncContext *s)
+{
+    Mpeg4DecContext *ctx = s->avctx->priv_data;
+    const int xy = s->mb_x + s->mb_y * s->mb_stride;
     /* per-MB end of slice check */
     if (s->codec_id == AV_CODEC_ID_MPEG4) {
         int next = mpeg4_is_resync(ctx);
@@ -2059,6 +2073,11 @@ static int mpeg4_decode_studio_mb(MpegEncContext *s, int16_t block_[12][64])
         }
     }
 
+    return SLICE_CHECK;
+}
+
+static int mpeg4_decode_studio_mb_slice_check(MpegEncContext *s)
+{
     if (get_bits_left(&s->gb) >= 24 && show_bits(&s->gb, 23) == 0) {
         next_start_code_studio(&s->gb);
         return SLICE_END;
@@ -2726,9 +2745,15 @@ static int decode_vop_header(Mpeg4DecContext *ctx, GetBitContext *gb)
 
     s->partitioned_frame = s->data_partitioning && s->pict_type != AV_PICTURE_TYPE_B;
     if (s->partitioned_frame)
+    {
         s->decode_mb = mpeg4_decode_partitioned_mb;
+        s->slice_check = mpeg4_decode_partitioned_mb_slice_check;
+    }
     else
-        s->decode_mb = mpeg4_decode_mb;
+    {
+        s->decode_mb = ffe_mpeg4_decode_mb;
+        s->slice_check = mpeg4_decode_mb_slice_check;
+    }
 
     time_incr = 0;
     while (get_bits1(gb) != 0)
@@ -3079,6 +3104,7 @@ static int decode_studio_vop_header(Mpeg4DecContext *ctx, GetBitContext *gb)
     s->partitioned_frame = 0;
     s->interlaced_dct = 0;
     s->decode_mb = mpeg4_decode_studio_mb;
+    s->slice_check = mpeg4_decode_studio_mb_slice_check;
 
     decode_smpte_tc(ctx, gb);
 
@@ -3533,7 +3559,8 @@ static av_cold int decode_init(AVCodecContext *avctx)
 
     s->h263_pred = 1;
     s->low_delay = 0; /* default, might be overridden in the vol header during header parsing */
-    s->decode_mb = mpeg4_decode_mb;
+    s->decode_mb = ffe_mpeg4_decode_mb;
+    s->slice_check = mpeg4_decode_mb_slice_check;
     ctx->time_increment_bits = 4; /* default value for broken headers */
 
     avctx->chroma_sample_location = AVCHROMA_LOC_LEFT;
@@ -3610,4 +3637,5 @@ AVCodec ff_mpeg4_decoder = {
     .ffedit_features = (1 << FFEDIT_FEAT_INFO)
                      | (1 << FFEDIT_FEAT_MV)
                      | (1 << FFEDIT_FEAT_MV_DELTA)
+                     | (1 << FFEDIT_FEAT_MB)
 };

@@ -2,6 +2,7 @@
 /* This file is included by mpeg4videodec.c */
 
 #include "ffedit_json.h"
+#include "ffedit_mb.h"
 #include "ffedit_mv.h"
 
 //---------------------------------------------------------------------
@@ -180,4 +181,34 @@ ffe_mpeg4_mv_not_supported(MpegEncContext *s)
                "FFedit doesn't support the motion vectors in this file.\n");
         av_assert0(0);
     }
+}
+
+//---------------------------------------------------------------------
+
+static int mpeg4_decode_mb(MpegEncContext *s, int16_t block[6][64]);
+
+static int
+ffe_mpeg4_decode_mb(MpegEncContext *s, int16_t block[12][64])
+{
+    AVFrame *f = s->current_picture_ptr->f;
+    FFEditTransplicateContext *xp = NULL;
+    ffe_mb_mb_ctx mbctx;
+    int ret;
+
+    if ( (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_MB)) != 0 )
+        xp = &s->ffe_xp;
+
+    if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_MB)) != 0 )
+        ffe_mb_export_init_mb(&mbctx, &s->gb);
+    else if ( (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_MB)) != 0 )
+        ffe_mb_import_init_mb(&mbctx, f, &s->gb, xp, s->mb_y, s->mb_x);
+
+    ret = mpeg4_decode_mb(s, s->block);
+
+    if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_MB)) != 0 )
+        ffe_mb_export_flush_mb(&mbctx, s->jctx, f, &s->gb, s->mb_y, s->mb_x);
+    else if ( (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_MB)) != 0 )
+        ffe_mb_import_flush_mb(&mbctx, f, &s->gb, xp, s->mb_y, s->mb_x);
+
+    return ret;
 }

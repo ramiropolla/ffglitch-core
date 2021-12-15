@@ -84,6 +84,7 @@ void ff_h263_show_pict_info(MpegEncContext *s);
 int ff_intel_h263_decode_picture_header(MpegEncContext *s);
 int ff_h263_decode_mb(MpegEncContext *s,
                       int16_t block[6][64]);
+int ff_h263_decode_mb_slice_check(MpegEncContext *s);
 
 /**
  * Return the value of the 3-bit "source format" syntax element.

@@ -511,6 +511,7 @@ typedef struct MpegEncContext {
     int16_t (*block)[64]; ///< points to one of the following blocks
     int16_t (*blocks)[12][64]; // for HQ mode we need to keep the best block
     int (*decode_mb)(struct MpegEncContext *s, int16_t block[12][64]); // used by some codecs to avoid a switch()
+    int (*slice_check)(struct MpegEncContext *s);
 
     int32_t (*block32)[12][64];
     int dpcm_direction;          // 0 = DCT, 1 = DPCM top to bottom scan, -1 = DPCM bottom to top scan
@@ -520,6 +521,7 @@ typedef struct MpegEncContext {
 #define SLICE_ERROR     -1
 #define SLICE_END       -2 ///<end marker found
 #define SLICE_NOEND     -3 ///<no end marker or error found but mb count exceeded
+#define SLICE_CHECK     -4 ///<decode_mb ok, call per-MB slice_check function
 
     void (*dct_unquantize_mpeg1_intra)(struct MpegEncContext *s,
                            int16_t *block/*align 16*/, int n, int qscale);
