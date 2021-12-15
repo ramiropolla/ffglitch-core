@@ -467,6 +467,7 @@ OBJS-$(CONFIG_SCALE2REF_FILTER)              += vf_scale.o scale_eval.o
 OBJS-$(CONFIG_SCALE2REF_NPP_FILTER)          += vf_scale_npp.o scale_eval.o
 OBJS-$(CONFIG_SCDET_FILTER)                  += vf_scdet.o
 OBJS-$(CONFIG_SCHARR_FILTER)                 += vf_convolution.o
+OBJS-$(CONFIG_SCRIPT_FILTER)                 += vf_script.o pixelsort.o rgb_to_hsv.o
 OBJS-$(CONFIG_SCROLL_FILTER)                 += vf_scroll.o
 OBJS-$(CONFIG_SEGMENT_FILTER)                += f_segment.o
 OBJS-$(CONFIG_SELECT_FILTER)                 += f_select.o

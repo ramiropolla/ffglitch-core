@@ -440,6 +440,7 @@ extern const AVFilter ff_vf_scale2ref;
 extern const AVFilter ff_vf_scale2ref_npp;
 extern const AVFilter ff_vf_scdet;
 extern const AVFilter ff_vf_scharr;
+extern const AVFilter ff_vf_script;
 extern const AVFilter ff_vf_scroll;
 extern const AVFilter ff_vf_segment;
 extern const AVFilter ff_vf_select;

@@ -647,6 +647,20 @@ FATE_FILTER_PIXFMTS := $(if $(call VIDEO_FILTER, FORMAT SCALE),$(FATE_FILTER_PIX
 $(FATE_FILTER_PIXFMTS): libavfilter/tests/filtfmts$(EXESUF)
 FATE_FILTER_VSYNTH-yes += $(FATE_FILTER_PIXFMTS)
 
+FATE_FILTER_FFGAC += fate-filter-script
+FATE_FILTER_VSYNTH-$(CONFIG_SCRIPT_FILTER) += fate-filter-script
+fate-filter-script: CMD = framecrc -c:v pgmyuv -i $(SRC) -vf script=$(SRC_PATH)/tests/ffgac/scripts/vf_script/uv.js
+
+FATE_FILTER_FFGAC += fate-filter-script-pixelsort-yuv444p
+FATE_FILTER_VSYNTH-$(CONFIG_SCRIPT_FILTER) += fate-filter-script-pixelsort-yuv444p
+fate-filter-script-pixelsort-yuv444p: CMD = framecrc -c:v pgmyuv -i $(SRC) -vf scale,format=yuv444p,script=$(SRC_PATH)/tests/ffgac/scripts/vf_script/pixelsort-yuv444p.js,scale,format=yuv420p
+
+FATE_FILTER_FFGAC += fate-filter-script-pixelsort-gbrp
+FATE_FILTER_VSYNTH-$(CONFIG_SCRIPT_FILTER) += fate-filter-script-pixelsort-gbrp
+fate-filter-script-pixelsort-gbrp: CMD = framecrc -c:v pgmyuv -i $(SRC) -vf scale,format=gbrp,script=$(SRC_PATH)/tests/ffgac/scripts/vf_script/pixelsort-gbrp.js,scale,format=yuv420p
+
+fate-filter-ffgac: $(FATE_FILTER_FFGAC)
+
 fate-filter-pixfmts: $(FATE_FILTER_PIXFMTS)
 
 FATE_FILTER_VSYNTH-$(call VIDEO_FILTER) += $(FATE_FILTER_VSYNTH_VIDEO_FILTER-yes)
