@@ -293,6 +293,11 @@ static int msmpeg4v34_decode_mb(MpegEncContext *s, int16_t block[6][64])
     return 0;
 }
 
+static int slice_check_ok(MpegEncContext *s)
+{
+    return SLICE_OK;
+}
+
 /* init all vlc decoding tables */
 static av_cold void msmpeg4_decode_init_static(void)
 {
@@ -377,6 +382,7 @@ av_cold int ff_msmpeg4_decode_init(AVCodecContext *avctx)
     case 5:
         break;
     }
+    s->slice_check = slice_check_ok;
 
     s->slice_height= s->mb_height; //to avoid 1/0 if the first frame is not a keyframe
 

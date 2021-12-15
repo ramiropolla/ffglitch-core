@@ -104,6 +104,7 @@ av_cold int ff_h263_decode_init(AVCodecContext *avctx)
 
     s->quant_precision = 5;
     s->decode_mb       = ff_h263_decode_mb;
+    s->slice_check     = ff_h263_decode_mb_slice_check;
     s->low_delay       = 1;
 
     /* select sub codec */
@@ -275,6 +276,8 @@ static int decode_slice(MpegEncContext *s)
 
             ff_tlog(NULL, "Decoding MB at %dx%d\n", s->mb_x, s->mb_y);
             ret = s->decode_mb(s, s->block);
+            if ( ret == SLICE_CHECK )
+                ret = s->slice_check(s);
 
             if (s->pict_type != AV_PICTURE_TYPE_B)
                 ff_h263_update_motion_val(s);
