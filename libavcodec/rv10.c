@@ -646,6 +646,8 @@ static int rv10_decode_packet(AVCodecContext *avctx, const uint8_t *buf,
         s->mv_dir  = MV_DIR_FORWARD;
         s->mv_type = MV_TYPE_16X16;
         ret = ff_h263_decode_mb(s, s->block);
+        if ( ret == SLICE_CHECK )
+            ret = ff_h263_decode_mb_slice_check(s);
 
         // Repeat the slice end check from ff_h263_decode_mb with our active
         // bitstream size
