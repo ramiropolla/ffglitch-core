@@ -8,6 +8,8 @@ libavcodec/ffedit.h
 libavcodec/ffedit_h263.c
 libavcodec/ffedit_json.c
 libavcodec/ffedit_json.h
+libavcodec/ffedit_mb.c
+libavcodec/ffedit_mb.h
 libavcodec/ffedit_mjpeg.c
 libavcodec/ffedit_mpeg12.c
 libavcodec/ffedit_mpeg4.c
