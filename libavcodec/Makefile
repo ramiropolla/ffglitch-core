@@ -57,6 +57,7 @@ OBJS = ac3_parser.o                                                     \
        ffedit.o                                                         \
        ffedit_json.o                                                    \
        ffedit_xp.o                                                      \
+       ffedit_mb.o                                                      \
        ffedit_mv.o                                                      \
 
 # subsystems
