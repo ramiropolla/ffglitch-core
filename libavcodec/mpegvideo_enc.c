@@ -2968,8 +2968,15 @@ static int encode_thread(AVCodecContext *c, void *arg){
     for(i=0; i<3; i++){
         /* init last dc values */
         /* note: quant matrix value (8) is implied here */
-        const uint8_t *dc_scale_table = (i == 0) ? s->y_dc_scale_table : s->c_dc_scale_table;
-        s->last_dc[i] = ((128*8)/dc_scale_table[s->qscale]) << s->intra_dc_precision;
+        if ( s->codec_id == AV_CODEC_ID_MJPEG )
+        {
+            const uint8_t *dc_scale_table = (i == 0) ? s->y_dc_scale_table : s->c_dc_scale_table;
+            s->last_dc[i] = ((128*8)/dc_scale_table[s->qscale]) << s->intra_dc_precision;
+        }
+        else
+        {
+            s->last_dc[i] = 128 << s->intra_dc_precision;
+        }
 
         s->current_picture.encoding_error[i] = 0;
     }
