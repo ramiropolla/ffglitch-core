@@ -138,6 +138,7 @@ enum {
     JS_CLASS_ARRAY_BUFFER,      /* u.array_buffer */
     JS_CLASS_SHARED_ARRAY_BUFFER, /* u.array_buffer */
     JS_CLASS_UINT8C_ARRAY,      /* u.array (typed_array) */
+    JS_CLASS_UINTC8_ARRAY,      /* u.array (typed_array) */
     JS_CLASS_INT8_ARRAY,        /* u.array (typed_array) */
     JS_CLASS_UINT8_ARRAY,       /* u.array (typed_array) */
     JS_CLASS_INT16_ARRAY,       /* u.array (typed_array) */
@@ -932,7 +933,7 @@ struct JSObject {
                 JSValue *values;        /* JS_CLASS_ARRAY, JS_CLASS_ARGUMENTS */ 
                 void *ptr;              /* JS_CLASS_UINT8C_ARRAY..JS_CLASS_FLOAT64_ARRAY */
                 int8_t *int8_ptr;       /* JS_CLASS_INT8_ARRAY */
-                uint8_t *uint8_ptr;     /* JS_CLASS_UINT8_ARRAY, JS_CLASS_UINT8C_ARRAY */
+                uint8_t *uint8_ptr;     /* JS_CLASS_UINT8_ARRAY, JS_CLASS_UINT8C_ARRAY, JS_CLASS_UINTC8_ARRAY */
                 int16_t *int16_ptr;     /* JS_CLASS_INT16_ARRAY */
                 uint16_t *uint16_ptr;   /* JS_CLASS_UINT16_ARRAY */
                 int32_t *int32_ptr;     /* JS_CLASS_INT32_ARRAY */
@@ -1461,6 +1462,7 @@ static JSClassShortDef const js_std_class_def[] = {
     { JS_ATOM_ArrayBuffer, js_array_buffer_finalizer, NULL },                   /* JS_CLASS_ARRAY_BUFFER */
     { JS_ATOM_SharedArrayBuffer, js_array_buffer_finalizer, NULL },             /* JS_CLASS_SHARED_ARRAY_BUFFER */
     { JS_ATOM_Uint8ClampedArray, js_typed_array_finalizer, js_typed_array_mark }, /* JS_CLASS_UINT8C_ARRAY */
+    { JS_ATOM_UintC8Array, js_typed_array_finalizer, js_typed_array_mark },     /* JS_CLASS_UINTC8_ARRAY */
     { JS_ATOM_Int8Array, js_typed_array_finalizer, js_typed_array_mark },       /* JS_CLASS_INT8_ARRAY */
     { JS_ATOM_Uint8Array, js_typed_array_finalizer, js_typed_array_mark },      /* JS_CLASS_UINT8_ARRAY */
     { JS_ATOM_Int16Array, js_typed_array_finalizer, js_typed_array_mark },      /* JS_CLASS_INT16_ARRAY */
@@ -4775,6 +4777,7 @@ static JSValue JS_NewObjectFromShape(JSContext *ctx, JSShape *sh, JSClassID clas
         break;
     case JS_CLASS_ARGUMENTS:
     case JS_CLASS_UINT8C_ARRAY:
+    case JS_CLASS_UINTC8_ARRAY:
     case JS_CLASS_INT8_ARRAY:
     case JS_CLASS_UINT8_ARRAY:
     case JS_CLASS_INT16_ARRAY:
@@ -6146,6 +6149,7 @@ void JS_ComputeMemoryUsage(JSRuntime *rt, JSMemoryUsage *s)
             break;
         case JS_CLASS_GENERATOR:         /* u.generator_data */
         case JS_CLASS_UINT8C_ARRAY:      /* u.typed_array / u.array */
+        case JS_CLASS_UINTC8_ARRAY:      /* u.typed_array / u.array */
         case JS_CLASS_INT8_ARRAY:        /* u.typed_array / u.array */
         case JS_CLASS_UINT8_ARRAY:       /* u.typed_array / u.array */
         case JS_CLASS_INT16_ARRAY:       /* u.typed_array / u.array */
@@ -7907,6 +7911,7 @@ static JSValue JS_GetPropertyValue(JSContext *ctx, JSValueConst this_obj,
         case JS_CLASS_INT8_ARRAY:
             return JS_NewInt32(ctx, p->u.array.u.int8_ptr[idx]);
         case JS_CLASS_UINT8C_ARRAY:
+        case JS_CLASS_UINTC8_ARRAY:
         case JS_CLASS_UINT8_ARRAY:
             return JS_NewInt32(ctx, p->u.array.u.uint8_ptr[idx]);
         case JS_CLASS_INT16_ARRAY:
@@ -8740,6 +8745,7 @@ static int JS_SetPropertyValue(JSContext *ctx, JSValueConst this_obj,
                 goto ta_out_of_bound;
             p->u.array.u.uint8_ptr[idx] = v;
             break;
+        case JS_CLASS_UINTC8_ARRAY:
         case JS_CLASS_INT8_ARRAY:
         case JS_CLASS_UINT8_ARRAY:
             if (JS_ToInt32Free(ctx, &v, val))
@@ -11793,6 +11799,7 @@ static __maybe_unused void JS_DumpObject(JSRuntime *rt, JSObject *p)
                 JS_DumpValueShort(rt, p->u.array.u.values[i]);
                 break;
             case JS_CLASS_UINT8C_ARRAY:
+            case JS_CLASS_UINTC8_ARRAY:
             case JS_CLASS_INT8_ARRAY:
             case JS_CLASS_UINT8_ARRAY:
             case JS_CLASS_INT16_ARRAY:
@@ -51143,7 +51150,7 @@ void JS_AddIntrinsicBaseObjects(JSContext *ctx)
 /* Typed Arrays */
 
 static uint8_t const typed_array_size_log2[JS_TYPED_ARRAY_COUNT] = {
-    0, 0, 0, 1, 1, 2, 2,
+    0, 0, 0, 0, 1, 1, 2, 2,
 #ifdef CONFIG_BIGNUM
     3, 3, /* BigInt64Array, BigUint64Array */
 #endif
@@ -52218,6 +52225,7 @@ static JSValue js_typed_array_indexOf(JSContext *ctx, JSValueConst this_val,
             goto scan8;
         break;
     case JS_CLASS_UINT8C_ARRAY:
+    case JS_CLASS_UINTC8_ARRAY:
     case JS_CLASS_UINT8_ARRAY:
         if (is_int && (uint8_t)v64 == v64) {
             const uint8_t *pv, *pp;
@@ -52780,6 +52788,7 @@ static JSValue js_typed_array_sort(JSContext *ctx, JSValueConst this_val,
             cmpfun = js_TA_cmp_int8;
             break;
         case JS_CLASS_UINT8C_ARRAY:
+        case JS_CLASS_UINTC8_ARRAY:
         case JS_CLASS_UINT8_ARRAY:
             tsc.getfun = js_TA_get_uint8;
             cmpfun = js_TA_cmp_uint8;
@@ -53141,8 +53150,16 @@ static JSValue js_typed_array_constructor(JSContext *ctx,
     if (JS_VALUE_GET_TAG(argv[0]) != JS_TAG_OBJECT) {
         if (JS_ToIndex(ctx, &len, argv[0]))
             return JS_EXCEPTION;
-        buffer = js_array_buffer_constructor1(ctx, JS_UNDEFINED,
-                                              len << size_log2);
+        if ( argc == 2 )
+        {
+            /* HUGE HACK but it works */
+            buffer = js_array_buffer_constructor3(ctx, JS_UNDEFINED,
+                                                  len << size_log2, JS_CLASS_ARRAY_BUFFER,
+                                                  JS_VALUE_GET_PTR(argv[1]), NULL, NULL, FALSE);
+        } else {
+            buffer = js_array_buffer_constructor1(ctx, JS_UNDEFINED,
+                                                  len << size_log2);
+        }
         if (JS_IsException(buffer))
             return JS_EXCEPTION;
         offset = 0;
@@ -53312,6 +53329,7 @@ static JSValue js_dataview_getValue(JSContext *ctx,
     switch(class_id) {
     case JS_CLASS_INT8_ARRAY:
         return JS_NewInt32(ctx, *(int8_t *)ptr);
+    case JS_CLASS_UINT8C_ARRAY:
     case JS_CLASS_UINT8_ARRAY:
         return JS_NewInt32(ctx, *(uint8_t *)ptr);
     case JS_CLASS_INT16_ARRAY:
@@ -53445,6 +53463,7 @@ static JSValue js_dataview_setValue(JSContext *ctx,
     ptr = abuf->data + ta->offset + pos;
 
     switch(class_id) {
+    case JS_CLASS_UINT8C_ARRAY:
     case JS_CLASS_INT8_ARRAY:
     case JS_CLASS_UINT8_ARRAY:
         *ptr = v;
@@ -53729,6 +53748,7 @@ static JSValue js_atomics_op(JSContext *ctx,
     case JS_CLASS_INT8_ARRAY:
         a = (int8_t)a;
         goto done;
+    case JS_CLASS_UINT8C_ARRAY:
     case JS_CLASS_UINT8_ARRAY:
         a = (uint8_t)a;
         goto done;
