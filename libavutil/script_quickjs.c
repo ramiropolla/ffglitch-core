@@ -27,6 +27,9 @@
 #if CONFIG_RTMIDI
 #include "libavutil/quickjs-rtmidi.h"
 #endif
+#if CONFIG_SDL2
+#include "libavutil/quickjs-sdl.h"
+#endif
 
 /*********************************************************************/
 static const AVClass quickjs_class = {
@@ -367,6 +370,9 @@ FFQuickJSContext *ff_quickjs_init(const char *script_fname, int flags)
     /* extra features */
 #if CONFIG_RTMIDI
     ff_quickjs_rtmidi_init(qjs_ctx, js_ctx->global_object);
+#endif
+#if CONFIG_SDL2
+    ff_quickjs_sdl_init(qjs_ctx, js_ctx->global_object);
 #endif
 
     /* system modules */
