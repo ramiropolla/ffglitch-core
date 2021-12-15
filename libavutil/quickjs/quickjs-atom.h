@@ -203,6 +203,7 @@ DEF(ArrayBuffer, "ArrayBuffer")
 DEF(SharedArrayBuffer, "SharedArrayBuffer")
 /* must keep same order as class IDs for typed arrays */
 DEF(Uint8ClampedArray, "Uint8ClampedArray") 
+DEF(UintC8Array, "UintC8Array")
 DEF(Int8Array, "Int8Array")
 DEF(Uint8Array, "Uint8Array")
 DEF(Int16Array, "Int16Array")
