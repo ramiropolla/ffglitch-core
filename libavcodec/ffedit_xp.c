@@ -140,9 +140,9 @@ void ffe_transplicate_flush(
                     *ptr2++ = ' ';
                     ptr2 = dump_byte(ptr2, inptr[k]);
                 }
-                av_log(NULL, AV_LOG_FATAL, "orig   %d: %s\n", start * 8, buf1);
-                av_log(NULL, AV_LOG_FATAL, "ffedit %d: %s\n", start * 8, buf2);
-                av_log(NULL, AV_LOG_FATAL, "ffedit replication mismatch at bit %d + %d (bitcount %d)\n", i * 8, j, bitcount);
+                av_log(ffe_class, AV_LOG_FATAL, "orig   %d: %s\n", start * 8, buf1);
+                av_log(ffe_class, AV_LOG_FATAL, "ffedit %d: %s\n", start * 8, buf2);
+                av_log(ffe_class, AV_LOG_FATAL, "ffedit replication mismatch at bit %d + %d (bitcount %d)\n", i * 8, j, bitcount);
                 av_assert0(0);
             }
         }

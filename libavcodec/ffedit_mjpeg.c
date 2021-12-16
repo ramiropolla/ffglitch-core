@@ -683,7 +683,7 @@ ffe_mjpeg_scan_init(
        || (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_Q_DCT)) != 0
        || (s->avctx->ffedit_apply  & (1 << FFEDIT_FEAT_Q_DCT)) != 0) )
     {
-        av_log(NULL, AV_LOG_ERROR,
+        av_log(ffe_class, AV_LOG_ERROR,
                "FFedit doesn't support progressive JPEGs.\n");
         av_assert0(0);
     }
