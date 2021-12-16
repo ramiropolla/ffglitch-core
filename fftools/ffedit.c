@@ -130,7 +130,7 @@ static JSONFile *read_ffedit_json_file(const char *_apply_fname)
     buf = read_file(_apply_fname, &size);
     if ( buf == NULL )
     {
-        av_log(NULL, AV_LOG_FATAL,
+        av_log(ffe_class, AV_LOG_FATAL,
                 "Could not open json file %s\n", _apply_fname);
         exit(1);
     }
@@ -154,10 +154,10 @@ static JSONFile *read_ffedit_json_file(const char *_apply_fname)
     {
         json_error_ctx_t jectx;
         json_error_parse(&jectx, buf);
-        av_log(NULL, AV_LOG_FATAL, "%s:%d:%d: %s\n",
+        av_log(ffe_class, AV_LOG_FATAL, "%s:%d:%d: %s\n",
                _apply_fname, (int) jectx.line, (int) jectx.offset, jectx.str);
-        av_log(NULL, AV_LOG_FATAL, "%s:%d:%s\n", _apply_fname, (int) jectx.line, jectx.buf);
-        av_log(NULL, AV_LOG_FATAL, "%s:%d:%s\n", _apply_fname, (int) jectx.line, jectx.column);
+        av_log(ffe_class, AV_LOG_FATAL, "%s:%d:%s\n", _apply_fname, (int) jectx.line, jectx.buf);
+        av_log(ffe_class, AV_LOG_FATAL, "%s:%d:%s\n", _apply_fname, (int) jectx.line, jectx.column);
         json_error_free(&jectx);
         exit(1);
     }
@@ -201,7 +201,7 @@ static JSONFile *prepare_ffedit_json_file(
     jf->export_fp = fopen(_export_fname, "w");
     if ( jf->export_fp == NULL )
     {
-        av_log(NULL, AV_LOG_FATAL,
+        av_log(ffe_class, AV_LOG_FATAL,
                 "Could not open json file %s\n", _export_fname);
         av_free(jf);
         return NULL;
@@ -509,15 +509,15 @@ static const OptionDef options[] = {
 
 static void show_usage(void)
 {
-    av_log(NULL, AV_LOG_INFO, "Simple media glitcher\n");
-    av_log(NULL, AV_LOG_INFO, "usage: %s [options] input_file [output_file]\n", program_name);
-    av_log(NULL, AV_LOG_INFO, "\n");
+    av_log(ffe_class, AV_LOG_INFO, "Simple media glitcher\n");
+    av_log(ffe_class, AV_LOG_INFO, "usage: %s [options] input_file [output_file]\n", program_name);
+    av_log(ffe_class, AV_LOG_INFO, "\n");
 }
 
 static void print_example(const char *desc, const char *str)
 {
-    av_log(NULL, AV_LOG_INFO, "\t%s:\n", desc);
-    av_log(NULL, AV_LOG_INFO, "\t\tffedit %s\n", str);
+    av_log(ffe_class, AV_LOG_INFO, "\t%s:\n", desc);
+    av_log(ffe_class, AV_LOG_INFO, "\t\tffedit %s\n", str);
 }
 
 void show_help_default(const char *opt, const char *arg)
@@ -525,7 +525,7 @@ void show_help_default(const char *opt, const char *arg)
     av_log_set_callback(log_callback_help);
     show_usage();
     show_help_options(options, "Main options:", 0, OPT_EXPERT, 0);
-    av_log(NULL, AV_LOG_INFO, "Examples:\n");
+    av_log(ffe_class, AV_LOG_INFO, "Examples:\n");
     print_example("check for supported glitches",
                   "input.avi");
     print_example("replicate file (for testing)",
@@ -593,7 +593,7 @@ static void opt_filenames(void *optctx, const char *filename)
     }
     else
     {
-        av_log(NULL, AV_LOG_FATAL,
+        av_log(ffe_class, AV_LOG_FATAL,
                "Too many filenames (at most one input and one output)\n");
         exit(1);
     }
@@ -687,7 +687,7 @@ static FFFile *fff_open_files(
             fff->s_buf = read_file(s_fname, &fff->s_size);
             if ( fff->s_buf == NULL )
             {
-                av_log(NULL, AV_LOG_FATAL,
+                av_log(ffe_class, AV_LOG_FATAL,
                        "Could not open script file %s\n", s_fname);
                 exit(1);
             }
@@ -708,14 +708,14 @@ static FFFile *fff_open_files(
     ret = avformat_open_input(&fff->fctx, i_fname, NULL, NULL);
     if ( ret < 0 )
     {
-        av_log(NULL, AV_LOG_FATAL, "Could not open input file '%s'\n", i_fname);
+        av_log(ffe_class, AV_LOG_FATAL, "Could not open input file '%s'\n", i_fname);
         goto the_end;
     }
 
     ret = avformat_find_stream_info(fff->fctx, 0);
     if ( ret < 0 )
     {
-        av_log(NULL, AV_LOG_FATAL,
+        av_log(ffe_class, AV_LOG_FATAL,
                "Failed to retrieve input stream information\n");
         goto the_end;
     }
@@ -724,7 +724,7 @@ static FFFile *fff_open_files(
 
     if ( (fff->fctx->iformat->flags & AVFMT_FFEDIT_BITSTREAM) == 0 )
     {
-        av_log(NULL, AV_LOG_FATAL, "Format '%s' not supported by ffedit.\n",
+        av_log(ffe_class, AV_LOG_FATAL, "Format '%s' not supported by ffedit.\n",
                fff->fctx->iformat->long_name);
         goto the_end;
     }
@@ -735,7 +735,7 @@ static FFFile *fff_open_files(
 
         fff->decs[i] = avcodec_find_decoder(fff->fctx->streams[i]->codecpar->codec_id);
         if ( fff->decs[i] == NULL )
-            av_log(NULL, AV_LOG_ERROR,
+            av_log(ffe_class, AV_LOG_ERROR,
                    "Failed to find decoder for stream %zu. Skipping\n", i);
     }
 
@@ -791,7 +791,7 @@ static void fff_open_decoders(FFFile *fff)
 
         if ( (decoder->capabilities & AV_CODEC_CAP_FFEDIT_BITSTREAM) == 0 )
         {
-            av_log(NULL, AV_LOG_ERROR,
+            av_log(ffe_class, AV_LOG_ERROR,
                    "Codec '%s' not supported by ffedit. Skipping\n",
                    decoder->long_name);
             continue;
@@ -835,7 +835,7 @@ static void fff_open_decoders(FFFile *fff)
         av_dict_free(&opts);
         if ( ret < 0 )
         {
-            av_log(NULL, AV_LOG_ERROR,
+            av_log(ffe_class, AV_LOG_ERROR,
                    "Failed to open decoder for '%s'. Skipping\n",
                    decoder->long_name);
             continue;
@@ -857,7 +857,7 @@ static int ffedit_decode(
     ret = avcodec_send_packet(dctx, ipkt);
     if ( ret < 0 )
     {
-        av_log(NULL, AV_LOG_FATAL, "send_packet() failed\n");
+        av_log(ffe_class, AV_LOG_FATAL, "send_packet() failed\n");
         return ret;
     }
 
@@ -868,7 +868,7 @@ static int ffedit_decode(
             return 0;
         if ( ret < 0 )
         {
-            av_log(NULL, AV_LOG_FATAL, "receive_frame() failed\n");
+            av_log(ffe_class, AV_LOG_FATAL, "receive_frame() failed\n");
             return ret;
         }
 
@@ -1035,7 +1035,7 @@ static void fff_transplicate(FFFile *fff)
         ret = ffedit_decode(fff, dctx, iframe, ipkt, stream_index);
         if ( ret < 0 )
         {
-            av_log(NULL, AV_LOG_FATAL, "ffedit_decode() failed\n");
+            av_log(ffe_class, AV_LOG_FATAL, "ffedit_decode() failed\n");
             goto the_end;
         }
 
@@ -1103,7 +1103,7 @@ static void *fff_func(void *arg)
         fff_open_decoders(fff);
         if ( fff->fret < 0 )
         {
-            av_log(NULL, AV_LOG_FATAL, "Error opening decoders.\n");
+            av_log(ffe_class, AV_LOG_FATAL, "Error opening decoders.\n");
             return NULL;
         }
 
@@ -1136,26 +1136,26 @@ int main(int argc, char *argv[])
     /* check options consistency */
     if ( (export_fname != NULL) && (apply_fname != NULL) )
     {
-        av_log(NULL, AV_LOG_FATAL, "Only one of -e or -a may be used!\n");
+        av_log(ffe_class, AV_LOG_FATAL, "Only one of -e or -a may be used!\n");
         goto the_end;
     }
     if ( (script_fname != NULL) )
     {
         if ( (export_fname != NULL) || (apply_fname != NULL) )
         {
-            av_log(NULL, AV_LOG_FATAL, "Only one of -s or -e and -a may be used!\n");
+            av_log(ffe_class, AV_LOG_FATAL, "Only one of -s or -e and -a may be used!\n");
             goto the_end;
         }
         if ( (output_fname == NULL) )
         {
-            av_log(NULL, AV_LOG_FATAL, "Output file required when using scripts!\n");
+            av_log(ffe_class, AV_LOG_FATAL, "Output file required when using scripts!\n");
             goto the_end;
         }
         script_is_js = av_match_ext(script_fname, "js");
         script_is_py = av_match_ext(script_fname, "py");
         if ( !script_is_js && !script_is_py )
         {
-            av_log(NULL, AV_LOG_FATAL, "Only JavaScript (\".js\") or Python (\".py\") scripts supported!\n");
+            av_log(ffe_class, AV_LOG_FATAL, "Only JavaScript (\".js\") or Python (\".py\") scripts supported!\n");
             goto the_end;
         }
     }
@@ -1163,7 +1163,7 @@ int main(int argc, char *argv[])
     /* there must be one input */
     if ( !input_fname )
     {
-        av_log(NULL, AV_LOG_FATAL, "No input file specified!\n");
+        av_log(ffe_class, AV_LOG_FATAL, "No input file specified!\n");
         goto the_end;
     }
 
@@ -1196,7 +1196,7 @@ int main(int argc, char *argv[])
                     {
                         if ( ffe_feat_excludes(i, j) )
                         {
-                            av_log(NULL, AV_LOG_FATAL, "Mutually exclusive features \"%s\" and \"%s\" specified while applying!\n",
+                            av_log(ffe_class, AV_LOG_FATAL, "Mutually exclusive features \"%s\" and \"%s\" specified while applying!\n",
                                    ffe_feat_to_str(i), ffe_feat_to_str(j));
                             goto the_end;
                         }

@@ -167,15 +167,15 @@ static int python_init(PythonContext *pctx, FFFile *fff)
     pctx->libpython_so = dlopen_python();
     if ( pctx->libpython_so == NULL )
     {
-        av_log(NULL, AV_LOG_FATAL, "FFedit: Could not find libpython in the usual places.\n");
-        av_log(NULL, AV_LOG_FATAL, "FFedit: Try specifying the path to libpython using the FFGLITCH_LIBPYTHON_PATH environment variable.\n");
+        av_log(ffe_class, AV_LOG_FATAL, "Could not find libpython in the usual places.\n");
+        av_log(ffe_class, AV_LOG_FATAL, "Try specifying the path to libpython using the FFGLITCH_LIBPYTHON_PATH environment variable.\n");
         ret = AVERROR(EINVAL);
         goto end;
     }
 
     if ( !dlsyms_python(&pctx->pyfuncs, pctx->libpython_so) )
     {
-        av_log(NULL, AV_LOG_FATAL, "FFedit: Could not load all necessary functions from libpython.\n");
+        av_log(ffe_class, AV_LOG_FATAL, "Could not load all necessary functions from libpython.\n");
         ret = AVERROR(EINVAL);
         goto end;
     }
@@ -199,7 +199,7 @@ static int python_init(PythonContext *pctx, FFFile *fff)
     pysrc = pyfuncs->Py_CompileString(fff->s_buf, fff->s_fname, Py_file_input);
     if ( pysrc == NULL )
     {
-        av_log(NULL, AV_LOG_FATAL, "Could not compile script file %s\n", fff->s_fname);
+        av_log(ffe_class, AV_LOG_FATAL, "Could not compile script file %s\n", fff->s_fname);
         pyfuncs->PyErr_Print();
         ret = AVERROR(EINVAL);
         goto end;
@@ -208,7 +208,7 @@ static int python_init(PythonContext *pctx, FFFile *fff)
     pyret = pyfuncs->PyEval_EvalCode(pysrc, pctx->globals, pctx->locals);
     if ( pyret == NULL )
     {
-        av_log(NULL, AV_LOG_FATAL, "Could not eval script file %s\n", fff->s_fname);
+        av_log(ffe_class, AV_LOG_FATAL, "Could not eval script file %s\n", fff->s_fname);
         pyfuncs->PyErr_Print();
         ret = AVERROR(EINVAL);
         goto end;
@@ -220,7 +220,7 @@ static int python_init(PythonContext *pctx, FFFile *fff)
     if ( pctx->glitch_frame == NULL
       || !pyfuncs->PyCallable_Check(pctx->glitch_frame) )
     {
-        av_log(NULL, AV_LOG_FATAL, "Could not find function glitch_frame() in %s\n", fff->s_fname);
+        av_log(ffe_class, AV_LOG_FATAL, "Could not find function glitch_frame() in %s\n", fff->s_fname);
         pyfuncs->PyErr_Print();
         ret = AVERROR(EINVAL);
         goto end;
@@ -302,7 +302,7 @@ static void *python_func(void *arg)
         pyret = pyfuncs->PyObject_CallFunction(pctx.glitch_frame, "O", pyargs);
         if ( pyret == NULL )
         {
-            av_log(NULL, AV_LOG_FATAL, "Error calling glitch_frame() function in %s\n", fff->s_fname);
+            av_log(ffe_class, AV_LOG_FATAL, "Error calling glitch_frame() function in %s\n", fff->s_fname);
             pyfuncs->PyErr_Print();
             exit(1);
         }

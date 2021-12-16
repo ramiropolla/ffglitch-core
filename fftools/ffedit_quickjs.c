@@ -295,7 +295,7 @@ static void *quickjs_func(void *arg)
     glitch_frame = JS_GetPropertyStr(qjs_ctx, global_object, "glitch_frame");
     if ( JS_IsUndefined(glitch_frame) )
     {
-        av_log(NULL, AV_LOG_FATAL, "function glitch_frame() not found in %s\n", fff->s_fname);
+        av_log(ffe_class, AV_LOG_FATAL, "function glitch_frame() not found in %s\n", fff->s_fname);
         exit(1);
     }
 
