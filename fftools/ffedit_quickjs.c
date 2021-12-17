@@ -1,3 +1,5 @@
+#include "libavutil/quickjs/quickjs-libc.h"
+
 //---------------------------------------------------------------------
 static int64_t __JS_ToInt64(JSContext *ctx, JSValue val)
 {
@@ -260,45 +262,47 @@ static void *quickjs_func(void *arg)
     FFFile *fff = (FFFile *) arg;
     AVPacket ipkt;
     AVFrame iframe;
+    JSRuntime *qjs_rt;
+    JSContext *qjs_ctx;
     JSValue global_object;
     JSValue glitch_frame;
     JSValue val;
 
     /* TODO check for errors */
-    fff->qjs_rt = JS_NewRuntime();
-    js_std_init_handlers(fff->qjs_rt);
-    fff->qjs_ctx = JS_NewContext(fff->qjs_rt);
+    qjs_rt = JS_NewRuntime();
+    js_std_init_handlers(qjs_rt);
+    qjs_ctx = JS_NewContext(qjs_rt);
 
     /* loader for ES6 modules */
-    JS_SetModuleLoaderFunc(fff->qjs_rt, NULL, js_module_loader, NULL);
-    js_std_add_helpers(fff->qjs_ctx, 0, NULL);
+    JS_SetModuleLoaderFunc(qjs_rt, NULL, js_module_loader, NULL);
+    js_std_add_helpers(qjs_ctx, 0, NULL);
 
-    global_object = JS_GetGlobalObject(fff->qjs_ctx);
-    JS_SetPropertyFunctionList(fff->qjs_ctx, global_object, js_ffedit_obj, countof(js_ffedit_obj));
+    global_object = JS_GetGlobalObject(qjs_ctx);
+    JS_SetPropertyFunctionList(qjs_ctx, global_object, js_ffedit_obj, countof(js_ffedit_obj));
 
     /* system modules */
-    js_init_module_std(fff->qjs_ctx, "std");
-    js_init_module_os(fff->qjs_ctx, "os");
+    js_init_module_std(qjs_ctx, "std");
+    js_init_module_os(qjs_ctx, "os");
 
-    val = JS_Eval(fff->qjs_ctx, fff->qjs_buf, fff->qjs_size, fff->s_fname, JS_EVAL_TYPE_GLOBAL);
+    val = JS_Eval(qjs_ctx, fff->s_buf, fff->s_size, fff->s_fname, JS_EVAL_TYPE_GLOBAL);
     if ( JS_IsException(val) )
     {
-        js_std_dump_error(fff->qjs_ctx);
+        js_std_dump_error(qjs_ctx);
         exit(1);
     }
-    JS_FreeValue(fff->qjs_ctx, val);
+    JS_FreeValue(qjs_ctx, val);
 
-    glitch_frame = JS_GetPropertyStr(fff->qjs_ctx, global_object, "glitch_frame");
+    glitch_frame = JS_GetPropertyStr(qjs_ctx, global_object, "glitch_frame");
     if ( JS_IsUndefined(glitch_frame) )
     {
         av_log(NULL, AV_LOG_FATAL, "function glitch_frame() not found in %s\n", fff->s_fname);
         exit(1);
     }
 
-    pthread_mutex_lock(&fff->qjs_mutex);
-    fff->qjs_init = 1;
-    pthread_cond_signal(&fff->qjs_cond);
-    pthread_mutex_unlock(&fff->qjs_mutex);
+    pthread_mutex_lock(&fff->s_mutex);
+    fff->s_init = 1;
+    pthread_cond_signal(&fff->s_cond);
+    pthread_mutex_unlock(&fff->s_mutex);
 
     while ( 42 )
     {
@@ -324,7 +328,7 @@ static void *quickjs_func(void *arg)
             if ( ipkt.ffedit_sd[i] != NULL )
                 json_object_add(jargs, ffe_feat_to_str(i), ipkt.ffedit_sd[i]);
         json_object_done(ipkt.jctx, jargs);
-        args = ffedit_to_quickjs(fff->qjs_ctx, jargs);
+        args = ffedit_to_quickjs(qjs_ctx, jargs);
         /* free jctx from ipkt, we no longer need it */
         json_ctx_free(ipkt.jctx);
 
@@ -335,13 +339,13 @@ static void *quickjs_func(void *arg)
 #endif
 
         /* call glitch_frame() with data */
-        val = JS_Call(fff->qjs_ctx, glitch_frame, JS_UNDEFINED, 1, &args);
+        val = JS_Call(qjs_ctx, glitch_frame, JS_UNDEFINED, 1, &args);
         if ( JS_IsException(val) )
         {
-            js_std_dump_error(fff->qjs_ctx);
+            js_std_dump_error(qjs_ctx);
             exit(1);
         }
-        JS_FreeValue(fff->qjs_ctx, val);
+        JS_FreeValue(qjs_ctx, val);
 
 #if TIME_QUICKJS
         t1 = av_gettime_relative();
@@ -352,14 +356,14 @@ static void *quickjs_func(void *arg)
         /* convert json back to ffedit */
         iframe.jctx = av_mallocz(sizeof(json_ctx_t));
         json_ctx_start(iframe.jctx);
-        jframe = quickjs_to_ffedit(iframe.jctx, fff->qjs_ctx, args);
+        jframe = quickjs_to_ffedit(iframe.jctx, qjs_ctx, args);
         for ( size_t i = 0; i < FFEDIT_FEAT_LAST; i++ )
         {
             const char *key = ffe_feat_to_str(i);
             iframe.ffedit_sd[i] = json_object_get(jframe, key);
         }
         iframe.pkt_pos = ipkt.pos;
-        JS_FreeValue(fff->qjs_ctx, args);
+        JS_FreeValue(qjs_ctx, args);
 
 #if TIME_QUICKJS
         t1 = av_gettime_relative();
@@ -375,13 +379,13 @@ static void *quickjs_func(void *arg)
     printf("time taken convert1 %" PRId64 " call %" PRId64 " convert2 %" PRId64 "\n", convert1, call, convert2);
 #endif
 
-    JS_FreeValue(fff->qjs_ctx, glitch_frame);
-    JS_FreeValue(fff->qjs_ctx, global_object);
+    JS_FreeValue(qjs_ctx, glitch_frame);
+    JS_FreeValue(qjs_ctx, global_object);
 
     /* free quickjs */
-    js_std_free_handlers(fff->qjs_rt);
-    JS_FreeContext(fff->qjs_ctx);
-    JS_FreeRuntime(fff->qjs_rt);
+    js_std_free_handlers(qjs_rt);
+    JS_FreeContext(qjs_ctx);
+    JS_FreeRuntime(qjs_rt);
 
     return NULL;
 }
