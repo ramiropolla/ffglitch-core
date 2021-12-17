@@ -11,7 +11,6 @@
 #include "libavutil/sha.h"
 #include "libavutil/time.h"
 #include "libavutil/thread.h"
-#include "libavutil/quickjs/quickjs-libc.h"
 #include "libavformat/ffedit.h"
 #include "libavcodec/ffedit.h"
 
@@ -91,14 +90,13 @@ typedef struct {
     /* for scripting */
     JSONQueue *jq_in;
     JSONQueue *jq_out;
-    pthread_cond_t qjs_cond;
-    pthread_mutex_t qjs_mutex;
-    int qjs_init;
-    JSRuntime *qjs_rt;
-    JSContext *qjs_ctx;
+
     const char *s_fname;
-    char *qjs_buf;
-    size_t qjs_size;
+    char *s_buf;
+    size_t s_size;
+    pthread_cond_t s_cond;
+    pthread_mutex_t s_mutex;
+    int s_init;
 } FFFile;
 
 static int opt_feature(void *optctx, const char *opt, const char *arg);
@@ -622,8 +620,8 @@ static int sort_by_pkt_pos(const void *j1, const void *j2)
 
 static void fff_close_files(FFFile *fff)
 {
-    if ( fff->qjs_buf != NULL )
-        av_free(fff->qjs_buf);
+    if ( fff->s_buf != NULL )
+        av_free(fff->s_buf);
 
     if ( fff->jf != NULL )
         close_ffedit_json_file(fff->jf, fff);
@@ -683,8 +681,8 @@ static FFFile *fff_open_files(
         if ( fff->is_applying_script )
         {
             fff->s_fname = s_fname;
-            fff->qjs_buf = read_file(s_fname, &fff->qjs_size);
-            if ( fff->qjs_buf == NULL )
+            fff->s_buf = read_file(s_fname, &fff->s_size);
+            if ( fff->s_buf == NULL )
             {
                 av_log(NULL, AV_LOG_FATAL,
                        "Could not open script file %s\n", s_fname);
@@ -1116,8 +1114,8 @@ int main(int argc, char *argv[])
 {
     FFFile *fff = NULL;
     FFFile *fscript = NULL;
-    pthread_t script_in_thread;
-    pthread_t quickjs_thread;
+    pthread_t script_input_thread;
+    pthread_t script_thread;
     int fret = -1;
 
     hack_musl_pthread_stack_size();
@@ -1196,18 +1194,18 @@ int main(int argc, char *argv[])
         pthread_cond_init(&fscript->jq_out->cond_full, NULL);
         fff->jq_out = fscript->jq_out;
 
-        fff->qjs_init = 0;
-        pthread_mutex_init(&fff->qjs_mutex, NULL);
-        pthread_cond_init(&fff->qjs_cond, NULL);
+        fff->s_init = 0;
+        pthread_mutex_init(&fff->s_mutex, NULL);
+        pthread_cond_init(&fff->s_cond, NULL);
 
-        pthread_create(&quickjs_thread, NULL, quickjs_func, fff);
-        pthread_create(&script_in_thread, NULL, fff_func, fscript);
+        pthread_create(&script_thread, NULL, quickjs_func, fff);
+        pthread_create(&script_input_thread, NULL, fff_func, fscript);
 
-        /* wait for quickjs setup */
-        pthread_mutex_lock(&fff->qjs_mutex);
-        while ( !fff->qjs_init )
-            pthread_cond_wait(&fff->qjs_cond, &fff->qjs_mutex);
-        pthread_mutex_unlock(&fff->qjs_mutex);
+        /* wait for script setup */
+        pthread_mutex_lock(&fff->s_mutex);
+        while ( !fff->s_init )
+            pthread_cond_wait(&fff->s_cond, &fff->s_mutex);
+        pthread_mutex_unlock(&fff->s_mutex);
     }
 
     fff_func(fff);
@@ -1221,8 +1219,8 @@ int main(int argc, char *argv[])
         add_frame_to_ffedit_json_queue(fscript->jq_in, &iframe);
 
         /* wait for threads */
-        pthread_join(quickjs_thread, NULL);
-        pthread_join(script_in_thread, NULL);
+        pthread_join(script_thread, NULL);
+        pthread_join(script_input_thread, NULL);
 
         /* destroy queues */
         pthread_mutex_destroy(&fscript->jq_in->mutex);
@@ -1234,8 +1232,8 @@ int main(int argc, char *argv[])
         pthread_cond_destroy(&fscript->jq_out->cond_full);
         av_freep(&fscript->jq_out);
 
-        pthread_mutex_destroy(&fff->qjs_mutex);
-        pthread_cond_destroy(&fff->qjs_cond);
+        pthread_mutex_destroy(&fff->s_mutex);
+        pthread_cond_destroy(&fff->s_cond);
     }
 
 the_end:
