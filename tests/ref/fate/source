@@ -2,6 +2,7 @@ Files without standard license headers:
 compat/avisynth/windowsPorts/basicDataTypeConversions.h
 compat/avisynth/windowsPorts/windows2linux.h
 fftools/ffedit.c
+fftools/ffedit_python.c
 fftools/ffedit_quickjs.c
 libavcodec/ffedit.c
 libavcodec/ffedit.h

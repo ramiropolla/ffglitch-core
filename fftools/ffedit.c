@@ -28,6 +28,8 @@ static const char *output_fname;
 static const char *apply_fname;
 static const char *export_fname;
 static const char *script_fname;
+static int script_is_js;
+static int script_is_py;
 /* TODO use avformat_match_stream_specifier */
 static int selected_features[FFEDIT_FEAT_LAST];
 static int selected_features_idx[FFEDIT_FEAT_LAST];
@@ -109,6 +111,7 @@ static void add_frame_to_ffedit_json_queue(JSONQueue *jq, AVFrame *iframe);
 static void get_from_ffedit_json_queue(JSONQueue *jq, AVPacket *ipkt);
 
 #include "ffedit_quickjs.c"
+#include "ffedit_python.c"
 
 static JSONFile *read_ffedit_json_file(const char *_apply_fname)
 {
@@ -496,7 +499,7 @@ static const OptionDef options[] = {
     { "o", HAS_ARG | OPT_STRING, { &output_fname }, "output file (may be omitted)", "file" },
     { "a", HAS_ARG | OPT_STRING, { &apply_fname }, "apply data", "json file" },
     { "e", HAS_ARG | OPT_STRING, { &export_fname }, "export data", "json file" },
-    { "s", HAS_ARG | OPT_STRING, { &script_fname }, "run script", "javascript file" },
+    { "s", HAS_ARG | OPT_STRING, { &script_fname }, "run script", "javascript or python file" },
     { "f", HAS_ARG, { .func_arg = opt_feature }, "select feature (optionally specify stream with feat:#)", "feature" },
     { "t", OPT_BOOL, { &test_mode }, "test mode (bitexact output)" },
     { "y", OPT_BOOL, { &file_overwrite }, "overwrite output files" },
@@ -1136,15 +1139,25 @@ int main(int argc, char *argv[])
         av_log(NULL, AV_LOG_FATAL, "Only one of -e or -a may be used!\n");
         goto the_end;
     }
-    if ( (script_fname != NULL) && ((export_fname != NULL) || (apply_fname != NULL)) )
+    if ( (script_fname != NULL) )
     {
-        av_log(NULL, AV_LOG_FATAL, "Only one of -s or -e and -a may be used!\n");
-        goto the_end;
-    }
-    if ( (script_fname != NULL) && (output_fname == NULL) )
-    {
-        av_log(NULL, AV_LOG_FATAL, "Output file required when using scripts!\n");
-        goto the_end;
+        if ( (export_fname != NULL) || (apply_fname != NULL) )
+        {
+            av_log(NULL, AV_LOG_FATAL, "Only one of -s or -e and -a may be used!\n");
+            goto the_end;
+        }
+        if ( (output_fname == NULL) )
+        {
+            av_log(NULL, AV_LOG_FATAL, "Output file required when using scripts!\n");
+            goto the_end;
+        }
+        script_is_js = av_match_ext(script_fname, "js");
+        script_is_py = av_match_ext(script_fname, "py");
+        if ( !script_is_js && !script_is_py )
+        {
+            av_log(NULL, AV_LOG_FATAL, "Only JavaScript (\".js\") or Python (\".py\") scripts supported!\n");
+            goto the_end;
+        }
     }
 
     /* there must be one input */
@@ -1198,7 +1211,10 @@ int main(int argc, char *argv[])
         pthread_mutex_init(&fff->s_mutex, NULL);
         pthread_cond_init(&fff->s_cond, NULL);
 
-        pthread_create(&script_thread, NULL, quickjs_func, fff);
+        if ( script_is_js )
+            pthread_create(&script_thread, NULL, quickjs_func, fff);
+        else /* if ( script_is_py ) */
+            pthread_create(&script_thread, NULL, python_func, fff);
         pthread_create(&script_input_thread, NULL, fff_func, fscript);
 
         /* wait for script setup */
