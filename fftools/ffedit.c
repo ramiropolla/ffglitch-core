@@ -1168,7 +1168,6 @@ int main(int argc, char *argv[])
     }
 
     /* TODO review this */
-    /* TODO cannot import/apply both mv and mv_delta at the same time */
     if ( features_selected == 0 )
     {
         /* select all features by default */
@@ -1181,6 +1180,30 @@ int main(int argc, char *argv[])
             }
         }
         features_selected = 1;
+    }
+
+    /* check for mutually exclusive features if applying requested */
+    if ( (apply_fname != NULL)
+      || ((script_fname != NULL) && (output_fname != NULL)) )
+    {
+        for ( size_t i = 0; i < FFEDIT_FEAT_LAST; i++ )
+        {
+            if ( selected_features[i] )
+            {
+                for ( size_t j = 0; j < FFEDIT_FEAT_LAST; j++ )
+                {
+                    if ( (i != j) && selected_features[j] )
+                    {
+                        if ( ffe_feat_excludes(i, j) )
+                        {
+                            av_log(NULL, AV_LOG_FATAL, "Mutually exclusive features \"%s\" and \"%s\" specified while applying!\n",
+                                   ffe_feat_to_str(i), ffe_feat_to_str(j));
+                            goto the_end;
+                        }
+                    }
+                }
+            }
+        }
     }
 
     /* open files for main thread */
