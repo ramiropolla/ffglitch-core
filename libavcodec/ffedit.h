@@ -21,5 +21,6 @@ enum FFEditFeature ffe_str_to_feat(const char *str);
 const char *       ffe_feat_to_str(enum FFEditFeature feat);
 const char *       ffe_feat_desc(enum FFEditFeature feat);
 int                ffe_default_feat(enum FFEditFeature feat);
+int                ffe_feat_excludes(enum FFEditFeature feat1, enum FFEditFeature feat2);
 
 #endif /* AVUTIL_FFEDIT_H */
