@@ -82,7 +82,7 @@ void *av_malloc(size_t size)
     if (size > (max_alloc_size - 32))
         return NULL;
 
-#if HAVE_POSIX_MEMALIGN && !defined __APPLE__
+#if HAVE_POSIX_MEMALIGN
     if (size) //OS X on SDK 10.6 has a broken posix_memalign implementation
     if (posix_memalign(&ptr, ALIGN, size))
         ptr = NULL;
