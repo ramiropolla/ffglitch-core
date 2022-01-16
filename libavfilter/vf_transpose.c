@@ -38,19 +38,8 @@
 #include "formats.h"
 #include "internal.h"
 #include "video.h"
+
 #include "transpose.h"
-
-typedef struct TransContext {
-    const AVClass *class;
-    int hsub, vsub;
-    int planes;
-    int pixsteps[4];
-
-    int passthrough;    ///< PassthroughType, landscape passthrough mode enabled
-    int dir;            ///< TransposeDir
-
-    TransVtable vtables[4];
-} TransContext;
 
 static int query_formats(AVFilterContext *ctx)
 {
@@ -174,48 +163,19 @@ static void transpose_8x8_64_c(uint8_t *src, ptrdiff_t src_linesize,
     transpose_block_64_c(src, src_linesize, dst, dst_linesize, 8, 8);
 }
 
-static int config_props_output(AVFilterLink *outlink)
+void ff_vf_transpose_init(
+        TransContext *s,
+        const AVPixFmtDescriptor *desc_in,
+        const AVPixFmtDescriptor *desc_out,
+        int format_out)
 {
-    AVFilterContext *ctx = outlink->src;
-    TransContext *s = ctx->priv;
-    AVFilterLink *inlink = ctx->inputs[0];
-    const AVPixFmtDescriptor *desc_out = av_pix_fmt_desc_get(outlink->format);
-    const AVPixFmtDescriptor *desc_in  = av_pix_fmt_desc_get(inlink->format);
-
-    if (s->dir&4) {
-        av_log(ctx, AV_LOG_WARNING,
-               "dir values greater than 3 are deprecated, use the passthrough option instead\n");
-        s->dir &= 3;
-        s->passthrough = TRANSPOSE_PT_TYPE_LANDSCAPE;
-    }
-
-    if ((inlink->w >= inlink->h && s->passthrough == TRANSPOSE_PT_TYPE_LANDSCAPE) ||
-        (inlink->w <= inlink->h && s->passthrough == TRANSPOSE_PT_TYPE_PORTRAIT)) {
-        av_log(ctx, AV_LOG_VERBOSE,
-               "w:%d h:%d -> w:%d h:%d (passthrough mode)\n",
-               inlink->w, inlink->h, inlink->w, inlink->h);
-        return 0;
-    } else {
-        s->passthrough = TRANSPOSE_PT_TYPE_NONE;
-    }
-
     s->hsub = desc_in->log2_chroma_w;
     s->vsub = desc_in->log2_chroma_h;
-    s->planes = av_pix_fmt_count_planes(outlink->format);
+    s->planes = av_pix_fmt_count_planes(format_out);
 
     av_assert0(desc_in->nb_components == desc_out->nb_components);
 
-
     av_image_fill_max_pixsteps(s->pixsteps, NULL, desc_out);
-
-    outlink->w = inlink->h;
-    outlink->h = inlink->w;
-
-    if (inlink->sample_aspect_ratio.num)
-        outlink->sample_aspect_ratio = av_div_q((AVRational) { 1, 1 },
-                                                inlink->sample_aspect_ratio);
-    else
-        outlink->sample_aspect_ratio = inlink->sample_aspect_ratio;
 
     for (int i = 0; i < 4; i++) {
         TransVtable *v = &s->vtables[i];
@@ -242,6 +202,43 @@ static int config_props_output(AVFilterLink *outlink)
         ff_transpose_init_x86(v, s->pixsteps[i]);
     }
 #endif
+}
+
+static int config_props_output(AVFilterLink *outlink)
+{
+    AVFilterContext *ctx = outlink->src;
+    TransContext *s = ctx->priv;
+    AVFilterLink *inlink = ctx->inputs[0];
+    const AVPixFmtDescriptor *desc_out = av_pix_fmt_desc_get(outlink->format);
+    const AVPixFmtDescriptor *desc_in  = av_pix_fmt_desc_get(inlink->format);
+
+    if (s->dir&4) {
+        av_log(ctx, AV_LOG_WARNING,
+               "dir values greater than 3 are deprecated, use the passthrough option instead\n");
+        s->dir &= 3;
+        s->passthrough = TRANSPOSE_PT_TYPE_LANDSCAPE;
+    }
+
+    if ((inlink->w >= inlink->h && s->passthrough == TRANSPOSE_PT_TYPE_LANDSCAPE) ||
+        (inlink->w <= inlink->h && s->passthrough == TRANSPOSE_PT_TYPE_PORTRAIT)) {
+        av_log(ctx, AV_LOG_VERBOSE,
+               "w:%d h:%d -> w:%d h:%d (passthrough mode)\n",
+               inlink->w, inlink->h, inlink->w, inlink->h);
+        return 0;
+    } else {
+        s->passthrough = TRANSPOSE_PT_TYPE_NONE;
+    }
+
+    ff_vf_transpose_init(s, desc_in, desc_out, outlink->format);
+
+    outlink->w = inlink->h;
+    outlink->h = inlink->w;
+
+    if (inlink->sample_aspect_ratio.num)
+        outlink->sample_aspect_ratio = av_div_q((AVRational) { 1, 1 },
+                                                inlink->sample_aspect_ratio);
+    else
+        outlink->sample_aspect_ratio = inlink->sample_aspect_ratio;
 
     av_log(ctx, AV_LOG_VERBOSE,
            "w:%d h:%d dir:%d -> w:%d h:%d rotation:%s vflip:%d\n",
@@ -260,15 +257,14 @@ static AVFrame *get_video_buffer(AVFilterLink *inlink, int w, int h)
         ff_default_get_video_buffer(inlink, w, h);
 }
 
-typedef struct ThreadData {
-    AVFrame *in, *out;
-} ThreadData;
-
-static int filter_slice(AVFilterContext *ctx, void *arg, int jobnr,
-                        int nb_jobs)
+int ff_vf_transpose_filter_slice(
+        AVFilterContext *ctx,
+        void *arg,
+        int jobnr,
+        int nb_jobs)
 {
-    TransContext *s = ctx->priv;
-    ThreadData *td = arg;
+    VFTransposeThreadData *td = arg;
+    TransContext *s = td->s;
     AVFrame *out = td->out;
     AVFrame *in = td->in;
     int plane;
@@ -332,7 +328,7 @@ static int filter_frame(AVFilterLink *inlink, AVFrame *in)
     AVFilterContext *ctx = inlink->dst;
     TransContext *s = ctx->priv;
     AVFilterLink *outlink = ctx->outputs[0];
-    ThreadData td;
+    VFTransposeThreadData td;
     AVFrame *out;
 
     if (s->passthrough)
@@ -356,7 +352,8 @@ static int filter_frame(AVFilterLink *inlink, AVFrame *in)
     }
 
     td.in = in, td.out = out;
-    ff_filter_execute(ctx, filter_slice, &td, NULL,
+    td.s = s;
+    ff_filter_execute(ctx, ff_vf_transpose_filter_slice, &td, NULL,
                       FFMIN(outlink->h, ff_filter_get_nb_threads(ctx)));
     av_frame_free(&in);
     return ff_filter_frame(outlink, out);

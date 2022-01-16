@@ -21,6 +21,9 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "libavutil/pixdesc.h"
+#include "avfilter.h"
+
 enum PassthroughType {
     TRANSPOSE_PT_TYPE_NONE,
     TRANSPOSE_PT_TYPE_LANDSCAPE,
@@ -46,5 +49,34 @@ typedef struct TransVtable {
 } TransVtable;
 
 void ff_transpose_init_x86(TransVtable *v, int pixstep);
+
+typedef struct TransContext {
+    const AVClass *class;
+    int hsub, vsub;
+    int planes;
+    int pixsteps[4];
+
+    int passthrough;    ///< PassthroughType, landscape passthrough mode enabled
+    int dir;            ///< TransposeDir
+
+    TransVtable vtables[4];
+} TransContext;
+
+void ff_vf_transpose_init(
+        TransContext *s,
+        const AVPixFmtDescriptor *desc_in,
+        const AVPixFmtDescriptor *desc_out,
+        int format_out);
+
+int ff_vf_transpose_filter_slice(
+        AVFilterContext *ctx,
+        void *arg,
+        int jobnr,
+        int nb_jobs);
+
+typedef struct VFTransposeThreadData {
+    AVFrame *in, *out;
+    TransContext *s;
+} VFTransposeThreadData;
 
 #endif
