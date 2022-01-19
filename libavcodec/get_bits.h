@@ -36,6 +36,8 @@
 #include "mathops.h"
 #include "vlc.h"
 
+#include "put_bits.h"
+
 /*
  * Safe bitstream reading:
  * optionally, the get_bits API can check to ensure that we
@@ -58,6 +60,7 @@ typedef struct GetBitContext {
     int index;
     int size_in_bits;
     int size_in_bits_plus8;
+    PutBitContext *pb;
 } GetBitContext;
 
 static inline unsigned int get_bits(GetBitContext *s, int n);
@@ -243,6 +246,11 @@ static inline int get_xbits(GetBitContext *s, int n)
     UPDATE_CACHE(re, s);
     cache = GET_CACHE(re, s);
     sign  = ~cache >> 31;
+    if ( s->pb != NULL )
+    {
+        int tmp = SHOW_UBITS(re, s, n);
+        put_bits(s->pb, n, tmp);
+    }
     LAST_SKIP_BITS(re, s, n);
     CLOSE_READER(re, s);
     return (NEG_USR32(sign ^ cache, n) ^ sign) - sign;
@@ -257,6 +265,11 @@ static inline int get_xbits_le(GetBitContext *s, int n)
     UPDATE_CACHE_LE(re, s);
     cache = GET_CACHE(re, s);
     sign  = sign_extend(~cache, n) >> 31;
+    if ( s->pb != NULL )
+    {
+        int tmp = SHOW_UBITS_LE(re, s, n);
+        put_bits_le(s->pb, n, tmp);
+    }
     LAST_SKIP_BITS(re, s, n);
     CLOSE_READER(re, s);
     return (zero_extend(sign ^ cache, n) ^ sign) - sign;
@@ -268,7 +281,10 @@ static inline int get_sbits(GetBitContext *s, int n)
     OPEN_READER(re, s);
     av_assert2(n>0 && n<=25);
     UPDATE_CACHE(re, s);
-    tmp = SHOW_SBITS(re, s, n);
+    tmp = SHOW_UBITS(re, s, n);
+    if ( s->pb != NULL )
+        put_bits(s->pb, n, tmp);
+    tmp = sign_extend(tmp, n);
     LAST_SKIP_BITS(re, s, n);
     CLOSE_READER(re, s);
     return tmp;
@@ -284,6 +300,8 @@ static inline unsigned int get_bits(GetBitContext *s, int n)
     av_assert2(n>0 && n<=25);
     UPDATE_CACHE(re, s);
     tmp = SHOW_UBITS(re, s, n);
+    if ( s->pb != NULL )
+        put_bits(s->pb, n, tmp);
     LAST_SKIP_BITS(re, s, n);
     CLOSE_READER(re, s);
     av_assert2(tmp < UINT64_C(1) << n);
@@ -315,6 +333,8 @@ static inline unsigned int get_bits_le(GetBitContext *s, int n)
     av_assert2(n>0 && n<=25);
     UPDATE_CACHE_LE(re, s);
     tmp = SHOW_UBITS_LE(re, s, n);
+    if ( s->pb != NULL )
+        put_bits_le(s->pb, n, tmp);
     LAST_SKIP_BITS(re, s, n);
     CLOSE_READER(re, s);
     return tmp;
@@ -370,6 +390,8 @@ static inline unsigned int get_bits_long(GetBitContext *s, int n)
         OPEN_READER(re, s);
         UPDATE_CACHE_32(re, s);
         tmp = SHOW_UBITS(re, s, n);
+        if ( s->pb != NULL )
+            put_bits64(s->pb, n, tmp);
         LAST_SKIP_BITS(re, s, n);
         CLOSE_READER(re, s);
         return tmp;
@@ -468,6 +490,7 @@ static inline int init_get_bits(GetBitContext *s, const uint8_t *buffer,
     s->size_in_bits_plus8 = bit_size + 8;
     s->buffer_end         = buffer + buffer_size;
     s->index              = 0;
+    s->pb                 = NULL;
 
     return ret;
 }
@@ -519,24 +542,37 @@ static inline const uint8_t *align_get_bits(GetBitContext *s)
         n     = table[index].len;                               \
                                                                 \
         if (max_depth > 1 && n < 0) {                           \
+            unsigned int index2;                                \
+            if ( (gb)->pb != NULL )                             \
+                put_bits((gb)->pb, bits, index);                \
             LAST_SKIP_BITS(name, gb, bits);                     \
             UPDATE_CACHE(name, gb);                             \
                                                                 \
             nb_bits = -n;                                       \
                                                                 \
-            index = SHOW_UBITS(name, gb, nb_bits) + code;       \
+            index2 = SHOW_UBITS(name, gb, nb_bits);             \
+            index = index2 + code;                              \
             code  = table[index].sym;                           \
             n     = table[index].len;                           \
             if (max_depth > 2 && n < 0) {                       \
+                if ( (gb)->pb != NULL )                         \
+                    put_bits((gb)->pb, nb_bits, index2);        \
                 LAST_SKIP_BITS(name, gb, nb_bits);              \
                 UPDATE_CACHE(name, gb);                         \
                                                                 \
                 nb_bits = -n;                                   \
                                                                 \
-                index = SHOW_UBITS(name, gb, nb_bits) + code;   \
+                index2 = SHOW_UBITS(name, gb, nb_bits);         \
+                index = index2 + code;                          \
                 code  = table[index].sym;                       \
                 n     = table[index].len;                       \
             }                                                   \
+            if ( (gb)->pb != NULL )                             \
+                put_bits((gb)->pb, n, index2 >> (nb_bits - n)); \
+        }                                                       \
+        else if ( (gb)->pb != NULL )                            \
+        {                                                       \
+            put_bits((gb)->pb, n, index >> (bits - n));         \
         }                                                       \
         SKIP_BITS(name, gb, n);                                 \
     } while (0)
@@ -552,6 +588,9 @@ static inline const uint8_t *align_get_bits(GetBitContext *s)
         n     = table[index].len;                               \
                                                                 \
         if (max_depth > 1 && n < 0) {                           \
+            unsigned int index2;                                \
+            if ( (gb)->pb != NULL )                             \
+                put_bits((gb)->pb, bits, index);                \
             SKIP_BITS(name, gb, bits);                          \
             if (need_update) {                                  \
                 UPDATE_CACHE(name, gb);                         \
@@ -559,20 +598,30 @@ static inline const uint8_t *align_get_bits(GetBitContext *s)
                                                                 \
             nb_bits = -n;                                       \
                                                                 \
-            index = SHOW_UBITS(name, gb, nb_bits) + level;      \
+            index2 = SHOW_UBITS(name, gb, nb_bits);             \
+            index = index2 + level;                             \
             level = table[index].level;                         \
             n     = table[index].len;                           \
             if (max_depth > 2 && n < 0) {                       \
+                if ( (gb)->pb != NULL )                         \
+                    put_bits((gb)->pb, nb_bits, index2);        \
                 LAST_SKIP_BITS(name, gb, nb_bits);              \
                 if (need_update) {                              \
                     UPDATE_CACHE(name, gb);                     \
                 }                                               \
                 nb_bits = -n;                                   \
                                                                 \
-                index = SHOW_UBITS(name, gb, nb_bits) + level;  \
+                index2 = SHOW_UBITS(name, gb, nb_bits);         \
+                index = index2 + level;                         \
                 level = table[index].level;                     \
                 n     = table[index].len;                       \
             }                                                   \
+            if ( (gb)->pb != NULL )                             \
+                put_bits((gb)->pb, n, index2 >> (nb_bits -n));  \
+        }                                                       \
+        else if ( (gb)->pb != NULL )                            \
+        {                                                       \
+            put_bits((gb)->pb, n, index >> (bits - n));         \
         }                                                       \
         run = table[index].run;                                 \
         SKIP_BITS(name, gb, n);                                 \
