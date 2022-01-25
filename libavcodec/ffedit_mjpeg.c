@@ -13,6 +13,45 @@
 /*-------------------------------------------------------------------*/
 
 //---------------------------------------------------------------------
+static int ffe_mjpeg_build_vlc(
+        MJpegDecodeContext *s,
+        int class,
+        int index,
+        const uint8_t *bits_table,
+        const uint8_t *val_table,
+        int is_ac,
+        void *logctx)
+{
+    MJpegContext *m = &s->m;
+    VLC *vlc = &s->vlcs[class][index];
+    int ret = ff_mjpeg_build_vlc(vlc, bits_table, val_table, is_ac, logctx);
+    switch ( (class << 4) | index )
+    {
+    case 0x00:
+        memset(s->m.huff_size_dc_luminance, 0x00, sizeof(s->m.huff_size_dc_luminance));
+        memset(s->m.huff_code_dc_luminance, 0x00, sizeof(s->m.huff_code_dc_luminance));
+        ff_mjpeg_build_huffman_codes(m->huff_size_dc_luminance, m->huff_code_dc_luminance, bits_table, val_table);
+        break;
+    case 0x01:
+        memset(s->m.huff_size_dc_chrominance, 0x00, sizeof(s->m.huff_size_dc_chrominance));
+        memset(s->m.huff_code_dc_chrominance, 0x00, sizeof(s->m.huff_code_dc_chrominance));
+        ff_mjpeg_build_huffman_codes(m->huff_size_dc_chrominance, m->huff_code_dc_chrominance, bits_table, val_table);
+        break;
+    case 0x10:
+        memset(s->m.huff_size_ac_luminance, 0x00, sizeof(s->m.huff_size_ac_luminance));
+        memset(s->m.huff_code_ac_luminance, 0x00, sizeof(s->m.huff_code_ac_luminance));
+        ff_mjpeg_build_huffman_codes(m->huff_size_ac_luminance, m->huff_code_ac_luminance, bits_table, val_table);
+        break;
+    case 0x11:
+        memset(s->m.huff_size_ac_chrominance, 0x00, sizeof(s->m.huff_size_ac_chrominance));
+        memset(s->m.huff_code_ac_chrominance, 0x00, sizeof(s->m.huff_code_ac_chrominance));
+        ff_mjpeg_build_huffman_codes(m->huff_size_ac_chrominance, m->huff_code_ac_chrominance, bits_table, val_table);
+        break;
+    }
+    return ret;
+}
+
+//---------------------------------------------------------------------
 static void
 ffe_mjpeg_frame_unref(AVFrame *f)
 {

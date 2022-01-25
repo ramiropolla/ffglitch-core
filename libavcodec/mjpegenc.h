@@ -112,4 +112,13 @@ void ff_mjpeg_amv_encode_picture_header(MpegEncContext *s);
 void ff_mjpeg_encode_mb(MpegEncContext *s, int16_t block[12][64]);
 int  ff_mjpeg_encode_stuffing(MpegEncContext *s);
 
+void ff_mjpeg_encode_block(
+        PutBitContext *pb,
+        MJpegContext *m,
+        ScanTable *scantable,
+        int *last_dc,
+        int *block_last_index,
+        int16_t *block,
+        int n);
+
 #endif /* AVCODEC_MJPEGENC_H */

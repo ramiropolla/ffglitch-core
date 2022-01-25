@@ -88,9 +88,9 @@ static int init_default_huffman_tables(MJpegDecodeContext *s)
 
     for (i = 0; i < FF_ARRAY_ELEMS(ht); i++) {
         ff_vlc_free(&s->vlcs[ht[i].class][ht[i].index]);
-        ret = ff_mjpeg_build_vlc(&s->vlcs[ht[i].class][ht[i].index],
-                                 ht[i].bits, ht[i].values,
-                                 ht[i].class == 1, s->avctx);
+        ret = ffe_mjpeg_build_vlc(s, ht[i].class, ht[i].index,
+                                  ht[i].bits, ht[i].values,
+                                  ht[i].class == 1, s->avctx);
         if (ret < 0)
             return ret;
 
@@ -284,14 +284,14 @@ int ff_mjpeg_decode_dht(MJpegDecodeContext *s)
         ff_vlc_free(&s->vlcs[class][index]);
         av_log(s->avctx, AV_LOG_DEBUG, "class=%d index=%d nb_codes=%d\n",
                class, index, n);
-        if ((ret = ff_mjpeg_build_vlc(&s->vlcs[class][index], bits_table,
-                                      val_table, class > 0, s->avctx)) < 0)
+        if ((ret = ffe_mjpeg_build_vlc(s, class, index, bits_table,
+                                       val_table, class > 0, s->avctx)) < 0)
             return ret;
 
         if (class > 0) {
             ff_vlc_free(&s->vlcs[2][index]);
-            if ((ret = ff_mjpeg_build_vlc(&s->vlcs[2][index], bits_table,
-                                          val_table, 0, s->avctx)) < 0)
+            if ((ret = ffe_mjpeg_build_vlc(s, 2, index, bits_table,
+                                           val_table, 0, s->avctx)) < 0)
                 return ret;
         }
 
