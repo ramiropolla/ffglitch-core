@@ -5084,7 +5084,7 @@ test -n "$cc_type" && enable $cc_type ||
 : ${as_default:=$cc}
 : ${objcc_default:=$cc}
 : ${dep_cc_default:=$cc}
-: ${ld_default:=$cc}
+: ${ld_default:=$cxx}
 : ${host_ld_default:=$host_cc}
 set_default ar as objcc dep_cc ld ln_s host_ld windres
 
