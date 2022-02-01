@@ -404,6 +404,104 @@ ENDYUV2RGBLINE(24, 1)
     PUTBGR24(dst_2, py_2, 0);
 ENDYUV2RGBFUNC()
 
+#define PUTGBRP(dst_g, dst_b, dst_r, src, i)        \
+    Y              = src[2 * i];                    \
+    dst_g[2 * i + 0] = g[Y];                        \
+    dst_b[2 * i + 0] = b[Y];                        \
+    dst_r[2 * i + 0] = r[Y];                        \
+    Y              = src[2 * i + 1];                \
+    dst_g[2 * i + 1] = g[Y];                        \
+    dst_b[2 * i + 1] = b[Y];                        \
+    dst_r[2 * i + 1] = r[Y];
+
+static int yuv2gbrp_c(SwsContext *c, const uint8_t *src[],
+                     int srcStride[], int srcSliceY, int srcSliceH,
+                     uint8_t *dst[], int dstStride[])
+{
+    int y;
+
+    if (c->srcFormat == AV_PIX_FMT_YUV422P) {
+        srcStride[1] *= 2;
+        srcStride[2] *= 2;
+    }
+    for (y = 0; y < srcSliceH; y += 2) {
+        int yd = y + srcSliceY;
+        uint8_t *dst_g_1 = (uint8_t *)(dst[0] + (yd)     * dstStride[0]);
+        uint8_t *dst_g_2 = (uint8_t *)(dst[0] + (yd + 1) * dstStride[0]);
+        uint8_t *dst_b_1 = (uint8_t *)(dst[1] + (yd)     * dstStride[1]);
+        uint8_t *dst_b_2 = (uint8_t *)(dst[1] + (yd + 1) * dstStride[1]);
+        uint8_t *dst_r_1 = (uint8_t *)(dst[2] + (yd)     * dstStride[2]);
+        uint8_t *dst_r_2 = (uint8_t *)(dst[2] + (yd + 1) * dstStride[2]);
+        uint8_t av_unused *r, *g, *b;
+        const uint8_t *py_1 = src[0] +  y       * srcStride[0];
+        const uint8_t *py_2 = py_1   +            srcStride[0];
+        const uint8_t av_unused *pu = src[1] + (y >> 1) * srcStride[1];
+        const uint8_t av_unused *pv = src[2] + (y >> 1) * srcStride[2];
+        unsigned int h_size = c->dstW >> 3;
+        while (h_size--) {
+            int av_unused U, V, Y;
+
+            LOADCHROMA(0);
+            PUTGBRP(dst_g_1, dst_b_1, dst_r_1, py_1, 0);
+            PUTGBRP(dst_g_2, dst_b_2, dst_r_2, py_2, 0);
+
+            LOADCHROMA(1);
+            PUTGBRP(dst_g_1, dst_b_1, dst_r_1, py_1, 1);
+            PUTGBRP(dst_g_2, dst_b_2, dst_r_2, py_2, 1);
+
+            LOADCHROMA(2);
+            PUTGBRP(dst_g_1, dst_b_1, dst_r_1, py_1, 2);
+            PUTGBRP(dst_g_2, dst_b_2, dst_r_2, py_2, 2);
+
+            LOADCHROMA(3);
+            PUTGBRP(dst_g_1, dst_b_1, dst_r_1, py_1, 3);
+            PUTGBRP(dst_g_2, dst_b_2, dst_r_2, py_2, 3);
+
+            pu    += 4;
+            pv    += 4;
+            py_1  += 8;
+            py_2  += 8;
+            dst_g_1 += 8;
+            dst_g_2 += 8;
+            dst_b_1 += 8;
+            dst_b_2 += 8;
+            dst_r_1 += 8;
+            dst_r_2 += 8;
+        }
+        if (c->dstW & 4) {
+            int av_unused Y, U, V;
+
+            LOADCHROMA(0);
+            PUTGBRP(dst_g_1, dst_b_1, dst_r_1, py_1, 0);
+            PUTGBRP(dst_g_2, dst_b_2, dst_r_2, py_2, 0);
+
+            LOADCHROMA(1);
+            PUTGBRP(dst_g_1, dst_b_1, dst_r_1, py_1, 1);
+            PUTGBRP(dst_g_2, dst_b_2, dst_r_2, py_2, 1);
+
+            pu    += 2;
+            pv    += 2;
+            py_1  += 4;
+            py_2  += 4;
+            dst_g_1 += 4;
+            dst_g_2 += 4;
+            dst_b_1 += 4;
+            dst_b_2 += 4;
+            dst_r_1 += 4;
+            dst_r_2 += 4;
+        }
+        if (c->dstW & 2) {
+            int av_unused Y, U, V;
+
+            LOADCHROMA(0);
+            PUTGBRP(dst_g_1, dst_b_1, dst_r_1, py_1, 0);
+            PUTGBRP(dst_g_2, dst_b_2, dst_r_2, py_2, 0);
+
+        }
+    }
+    return srcSliceH;
+}
+
 YUV2RGBFUNC(yuv2rgb_c_16_ordered_dither, uint16_t, 0)
     const uint8_t *d16 = ff_dither_2x2_8[y & 1];
     const uint8_t *e16 = ff_dither_2x2_4[y & 1];
@@ -712,6 +810,8 @@ SwsFunc ff_yuv2rgb_get_func_ptr(SwsContext *c)
         return yuv2rgb_c_24_rgb;
     case AV_PIX_FMT_BGR24:
         return yuv2rgb_c_24_bgr;
+    case AV_PIX_FMT_GBRP:
+        return yuv2gbrp_c;
     case AV_PIX_FMT_RGB565:
     case AV_PIX_FMT_BGR565:
         return yuv2rgb_c_16_ordered_dither;
