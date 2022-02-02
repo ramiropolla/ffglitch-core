@@ -358,6 +358,150 @@ RET
 
 %endmacro
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+%macro yuv2gbrp_fn 0
+
+%define parameters index, dst_g, dst_b, dst_r, pu_index, pv_index, pointer_c_dither, py_2index
+%define GPR_num 8
+
+%define m_y m6
+%define m_u m0
+%define m_v m1
+
+%if mmsize == 8
+%define time_num 1
+%define reg_num 8
+%define y_offset [pointer_c_ditherq + 8  * 8]
+%define u_offset [pointer_c_ditherq + 9  * 8]
+%define v_offset [pointer_c_ditherq + 10 * 8]
+%define ug_coff  [pointer_c_ditherq + 7  * 8]
+%define vg_coff  [pointer_c_ditherq + 6  * 8]
+%define y_coff   [pointer_c_ditherq + 3  * 8]
+%define ub_coff  [pointer_c_ditherq + 5  * 8]
+%define vr_coff  [pointer_c_ditherq + 4  * 8]
+%elif mmsize == 16
+%define time_num 2
+%if ARCH_X86_32
+%define reg_num 8
+%define my_offset [pointer_c_ditherq + 8  * 8]
+%define mu_offset [pointer_c_ditherq + 9  * 8]
+%define mv_offset [pointer_c_ditherq + 10 * 8]
+%define mug_coff  [pointer_c_ditherq + 7  * 8]
+%define mvg_coff  [pointer_c_ditherq + 6  * 8]
+%define my_coff   [pointer_c_ditherq + 3  * 8]
+%define mub_coff  [pointer_c_ditherq + 5  * 8]
+%define mvr_coff  [pointer_c_ditherq + 4  * 8]
+%else ; ARCH_X86_64
+%define reg_num 16
+%define y_offset m8
+%define u_offset m9
+%define v_offset m10
+%define ug_coff  m11
+%define vg_coff  m12
+%define y_coff   m13
+%define ub_coff  m14
+%define vr_coff  m15
+%endif ; ARCH_X86_32/64
+%endif ; coeff define mmsize == 8/16
+
+cglobal yuv_420_gbrp, GPR_num, GPR_num, reg_num, parameters
+
+%if ARCH_X86_64
+    movsxd indexq, indexd
+%if mmsize == 16
+    VBROADCASTSD y_offset, [pointer_c_ditherq + 8  * 8]
+    VBROADCASTSD u_offset, [pointer_c_ditherq + 9  * 8]
+    VBROADCASTSD v_offset, [pointer_c_ditherq + 10 * 8]
+    VBROADCASTSD ug_coff,  [pointer_c_ditherq + 7  * 8]
+    VBROADCASTSD vg_coff,  [pointer_c_ditherq + 6  * 8]
+    VBROADCASTSD y_coff,   [pointer_c_ditherq + 3  * 8]
+    VBROADCASTSD ub_coff,  [pointer_c_ditherq + 5  * 8]
+    VBROADCASTSD vr_coff,  [pointer_c_ditherq + 4  * 8]
+%endif
+%endif
+    movu m_y, [py_2indexq + 2 * indexq]
+    movh m_u, [pu_indexq  +     indexq]
+    movh m_v, [pv_indexq  +     indexq]
+.loop0:
+    pxor m4, m4
+    mova m7, m6
+    punpcklbw m0, m4
+    punpcklbw m1, m4
+    punpcklbw m6, m4        ; m6 = Y0 00 Y1 00 Y2 00 Y3 00
+    punpckhbw m7, m4        ; m7 = Y4 00 Y5 00 Y6 00 Y7 00
+    psllw m0, 3
+    psllw m1, 3
+    psllw m6, 3
+    psllw m7, 3
+%if (ARCH_X86_32 && mmsize == 16)
+    VBROADCASTSD m2, mu_offset
+    VBROADCASTSD m3, mv_offset
+    VBROADCASTSD m4, my_offset
+    psubsw m0, m2 ; U = U - 128
+    psubsw m1, m3 ; V = V - 128
+    psubw  m6, m4
+    psubw  m7, m4
+    VBROADCASTSD m2, mug_coff
+    VBROADCASTSD m3, mvg_coff
+    VBROADCASTSD m4, my_coff
+    VBROADCASTSD m5, mub_coff
+    pmulhw m2, m0
+    pmulhw m3, m1
+    pmulhw m6, m4
+    pmulhw m7, m4
+    pmulhw m0, m5
+    VBROADCASTSD m4, mvr_coff
+    pmulhw m1, m4
+%else ; ARCH_X86_64 || mmsize == 8
+    psubsw m0, u_offset ; U = U - 128
+    psubsw m1, v_offset ; V = V - 128
+    psubw  m6, y_offset
+    psubw  m7, y_offset
+    mova m2, m0
+    mova m3, m1
+    pmulhw m2, ug_coff
+    pmulhw m3, vg_coff
+    pmulhw m6, y_coff
+    pmulhw m7, y_coff
+    pmulhw m0, ub_coff
+    pmulhw m1, vr_coff
+%endif
+    paddsw m2, m3
+    mova m3, m7
+    mova m5, m7
+    paddsw m3, m0 ; B4 B5 B6 B7 ...
+    paddsw m5, m1 ; R4 R5 R6 R7 ...
+    paddsw m7, m2 ; G4 G5 G6 G7 ...
+    paddsw m0, m6 ; B0 B1 B2 B3 ...
+    paddsw m1, m6 ; R0 R1 R2 R3 ...
+    paddsw m2, m6 ; G0 G1 G2 G3 ...
+    packuswb m0, m3 ; B0 B1 B2 B3 ... B4 B5 B6 B7 ...
+    packuswb m1, m5 ; R0 R1 R2 R3 ... R4 R5 R6 R7 ...
+    packuswb m2, m7 ; G0 G1 G2 G3 ... G4 G5 G6 G7 ...
+
+%if  mmsize == 8
+    movntq [dst_gq], m2
+    movntq [dst_bq], m0
+    movntq [dst_rq], m1
+%else ; mmsize == 16
+    movu [dst_gq], m2
+    movu [dst_bq], m0
+    movu [dst_rq], m1
+%endif ; mmsize = 16
+
+movu m_y, [py_2indexq + 2 * indexq + 8 * time_num]
+movh m_v, [pv_indexq  +     indexq + 4 * time_num]
+movh m_u, [pu_indexq  +     indexq + 4 * time_num]
+add dst_gq, 8 * time_num
+add dst_bq, 8 * time_num
+add dst_rq, 8 * time_num
+add indexq, 4 * time_num
+js .loop0
+
+REP_RET
+
+%endmacro
+
 INIT_MMX mmx
 yuv2rgb_fn yuv,  rgb, 32
 yuv2rgb_fn yuv,  bgr, 32
@@ -379,3 +523,4 @@ yuv2rgb_fn yuva, rgb, 32
 yuv2rgb_fn yuva, bgr, 32
 yuv2rgb_fn yuv,  rgb, 15
 yuv2rgb_fn yuv,  rgb, 16
+yuv2gbrp_fn
