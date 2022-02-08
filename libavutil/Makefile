@@ -194,6 +194,9 @@ OBJS = adler32.o                                                        \
        video_enc_params.o                                               \
        video_hint.o                                                     \
        film_grain_params.o                                              \
+       script_python.o                                                  \
+       script_quickjs.o                                                 \
+       script.o                                                         \
 
 
 OBJS-$(CONFIG_CUDA)                     += hwcontext_cuda.o
