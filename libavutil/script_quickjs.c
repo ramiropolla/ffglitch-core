@@ -24,6 +24,10 @@
 #include "libavutil/mem.h"
 #include "libavutil/script.h"
 
+#if CONFIG_RTMIDI
+#include "libavutil/quickjs-rtmidi.h"
+#endif
+
 /*********************************************************************/
 static const AVClass quickjs_class = {
     .class_name = "quickjs",
@@ -359,6 +363,11 @@ FFQuickJSContext *ff_quickjs_init(const char *script_fname, int flags)
     js_std_add_helpers(qjs_ctx, 0, NULL);
 
     js_ctx->global_object = JS_GetGlobalObject(qjs_ctx);
+
+    /* extra features */
+#if CONFIG_RTMIDI
+    ff_quickjs_rtmidi_init(qjs_ctx, js_ctx->global_object);
+#endif
 
     /* system modules */
     js_init_module_std(qjs_ctx, "std");

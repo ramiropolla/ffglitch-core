@@ -258,6 +258,7 @@ RTMIDI_OBJS += rtmidi/RtMidi.o
 $(SUBDIR)rtmidi/RtMidi.o: CXXFLAGS += -DRTMIDI_EXPORT $(RTMIDI_API)
 
 OBJS-$(CONFIG_RTMIDI) += $(RTMIDI_OBJS)
+OBJS-$(CONFIG_RTMIDI) += quickjs-rtmidi.o
 
 RTMIDI-REPEATER_OBJS += rtmidi-repeater.o
 
