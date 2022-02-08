@@ -1,0 +1,292 @@
+/*
+ * Crappy JSON library
+ *
+ * Copyright (c) 2018-2023 Ramiro Polla
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+ * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+ * DEALINGS IN THE SOFTWARE.
+ */
+
+#include "json.h"
+
+//---------------------------------------------------------------------
+void json_ctx_start(json_ctx_t *jctx, int large)
+{
+    jctx->data.chunks = NULL;
+    jctx->data.ptr = NULL;
+    jctx->data.len = 0;
+    jctx->data.bytes_left = 0;
+
+    jctx->str.chunks = NULL;
+    jctx->str.ptr = NULL;
+    jctx->str.len = 0;
+    jctx->str.bytes_left = 0;
+
+    jctx->next = NULL;
+
+    jctx->data_chunk = large ? LARGE_DATA_CHUNK : SMALL_DATA_CHUNK;
+    jctx->str_chunk = large ? LARGE_STR_CHUNK : SMALL_STR_CHUNK;
+}
+
+//---------------------------------------------------------------------
+json_ctx_t *json_ctx_start_thread(json_ctx_t *jctx, int large, int n)
+{
+    json_ctx_t *prev_jctx = jctx;
+    json_ctx_t *cur_jctx = jctx;
+
+    // walk up to current jctx ptr
+    for ( int i = 0; i < n; i++ )
+    {
+        prev_jctx = cur_jctx;
+        cur_jctx = cur_jctx->next;
+    }
+
+    // create it if needed
+    if ( cur_jctx == NULL )
+    {
+        cur_jctx = json_allocator_get0(prev_jctx, sizeof(json_ctx_t));
+        json_ctx_start(cur_jctx, large);
+        prev_jctx->next = cur_jctx;
+    }
+
+    return cur_jctx;
+}
+
+static void *json_allocator_get_internal(
+        json_allocator_t *jal,
+        size_t chunk_size,
+        size_t len)
+{
+    void *ptr;
+    if ( jal->bytes_left < len )
+    {
+        size_t cur_i = jal->len++;
+        jal->chunks = realloc(jal->chunks, jal->len * sizeof(char *));
+        if ( chunk_size < len )
+            chunk_size = len;
+        jal->chunks[cur_i] = malloc(chunk_size);
+        jal->ptr = jal->chunks[cur_i];
+        jal->bytes_left = chunk_size;
+    }
+    ptr = jal->ptr;
+    jal->bytes_left -= len;
+    jal->ptr += len;
+    return ptr;
+}
+
+void *json_allocator_get(json_ctx_t *jctx, size_t len)
+{
+    return json_allocator_get_internal(&jctx->data, jctx->data_chunk, len);
+}
+
+void *json_allocator_get0(json_ctx_t *jctx, size_t len)
+{
+    void *ptr = json_allocator_get(jctx, len);
+    memset(ptr, 0, len);
+    return ptr;
+}
+
+void *json_allocator_dup(json_ctx_t *jctx, const void *src, size_t len)
+{
+    void *ptr = json_allocator_get(jctx, len);
+    memcpy(ptr, src, len);
+    return ptr;
+}
+
+void *json_allocator_strget(json_ctx_t *jctx, size_t len)
+{
+    return json_allocator_get_internal(&jctx->str, jctx->str_chunk, len);
+}
+
+void *json_allocator_strdup(json_ctx_t *jctx, const void *src, size_t len)
+{
+    void *ptr = json_allocator_strget(jctx, len);
+    memcpy(ptr, src, len);
+    return ptr;
+}
+
+static void json_allocator_free(json_allocator_t *jal)
+{
+    for ( size_t i = 0; i < jal->len; i++ )
+        free(jal->chunks[i]);
+    free(jal->chunks);
+}
+
+void json_ctx_free(json_ctx_t *jctx)
+{
+    if ( jctx == NULL )
+        return;
+    while ( jctx->next != NULL )
+    {
+        json_ctx_t *prev_jctx = jctx;
+        json_ctx_t *cur_jctx = jctx->next;
+        while ( cur_jctx->next != NULL )
+        {
+            prev_jctx = cur_jctx;
+            cur_jctx = cur_jctx->next;
+        }
+        json_ctx_free(cur_jctx);
+        prev_jctx->next = NULL;
+    }
+    json_allocator_free(&jctx->data);
+    json_allocator_free(&jctx->str);
+}
+
+json_t *alloc_json_t(json_ctx_t *jctx)
+{
+    return json_allocator_get(jctx, sizeof(json_t));
+}
+
+//---------------------------------------------------------------------
+// Dynamic object.
+// json_object_new();
+// json_object_(add|del)();
+// json_object_get();
+// json_object_done(); // MUST be called to copy data to json_ctx_t.
+// note: len contains the size of the array;
+//       deleted elements have name == NULL;
+//       names are strdup'd (free'd on del and done()).
+
+json_t *json_object_new(json_ctx_t *jctx)
+{
+    json_t *jso = alloc_json_t(jctx);
+    jso->flags = JSON_TYPE_OBJECT;
+    jso->obj = json_allocator_get(jctx, sizeof(json_obj_t));
+    jso->obj->names = NULL;
+    jso->obj->values = NULL;
+    return jso;
+}
+
+int json_object_add(json_t *jso, const char *str, json_t *jval)
+{
+    size_t len = json_object_length(jso);
+    size_t cur_i = len++;
+    jso->obj->names = realloc(jso->obj->names, len * sizeof(char *));
+    jso->obj->values = realloc(jso->obj->values, len * sizeof(json_t *));
+    jso->obj->names[cur_i] = strdup(str);
+    jso->obj->values[cur_i] = jval;
+    json_set_len(jso, len);
+    return 0;
+}
+
+int json_object_del(json_t *jso, const char *str)
+{
+    size_t len = json_object_length(jso);
+    for ( size_t i = 0; i < len; i++ )
+    {
+        char *name = jso->obj->names[i];
+        if ( name != NULL && strcmp(name, str) == 0 )
+        {
+            free(name);
+            jso->obj->names[i] = NULL;
+            return 0;
+        }
+    }
+    return -1;
+}
+
+json_t *json_object_get(json_t *jso, const char *str)
+{
+    size_t len = json_object_length(jso);
+    for ( size_t i = 0; i < len; i++ )
+    {
+        char *name = jso->obj->names[i];
+        if ( name != NULL && strcmp(name, str) == 0 )
+            return jso->obj->values[i];
+    }
+    return NULL;
+}
+
+int json_object_done(json_ctx_t *jctx, json_t *jso)
+{
+    size_t len = json_object_length(jso);
+    char **orig_names = jso->obj->names;
+    json_t **orig_values = jso->obj->values;
+    char **names = NULL;
+    json_t **values = NULL;
+    size_t real_len = 0;
+
+    // Calculate real length.
+    for ( size_t i = 0; i < len; i++ )
+        if ( orig_names[i] != NULL )
+            real_len++;
+
+    // Populate new arrays if object is not empty.
+    if ( real_len != 0 )
+    {
+        size_t real_i = 0;
+        names = json_allocator_get(jctx, real_len * sizeof(char *));
+        values = json_allocator_get(jctx, real_len * sizeof(json_t *));
+
+        for ( size_t i = 0; i < len; i++ )
+        {
+            char *name = orig_names[i];
+            if ( name == NULL )
+                continue;
+            names[real_i] = json_allocator_strdup(jctx, name, strlen(name)+1);
+            free(name);
+            values[real_i] = orig_values[i];
+            real_i++;
+        }
+    }
+
+    // Free old arrays.
+    if ( orig_names != NULL )
+        free(orig_names);
+    if ( orig_values != NULL )
+        free(orig_values);
+
+    // Update object struct with new arrays (or NULL if empty).
+    jso->obj->names = names;
+    jso->obj->values = values;
+    json_set_len(jso, real_len);
+
+    return 0;
+}
+
+//---------------------------------------------------------------------
+// array (dynamic)
+json_t *json_dynamic_array_new(json_ctx_t *jctx)
+{
+    json_t *jso = alloc_json_t(jctx);
+    jso->flags = JSON_TYPE_ARRAY;
+    jso->array = NULL;
+    return jso;
+}
+
+int json_dynamic_array_add(json_t *jso, json_t *jval)
+{
+    size_t len = json_array_length(jso);
+    size_t cur_i = len++;
+    jso->array = realloc(jso->array, len * sizeof(json_t *));
+    jso->array[cur_i] = jval;
+    json_set_len(jso, len);
+    return 0;
+}
+
+int json_dynamic_array_done(json_ctx_t *jctx, json_t *jso)
+{
+    json_t **orig_array = jso->array;
+    if ( orig_array != NULL )
+    {
+        size_t len = json_array_length(jso);
+        jso->array = json_allocator_dup(jctx, orig_array, len * sizeof(json_t *));
+        free(orig_array);
+    }
+    return 0;
+}
