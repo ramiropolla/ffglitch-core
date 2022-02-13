@@ -42,6 +42,8 @@
 #include "libavcodec/exif.h"
 #include "libavcodec/startcode.h"
 
+#include "ffedit.h"
+
 typedef struct AVIStream {
     int64_t frame_offset;   /* current frame (video) or byte (audio) counter
                              * (used to compute the pts) */
@@ -128,6 +130,7 @@ static const AVMetadataConv avi_metadata_conv[] = {
     { 0 },
 };
 
+static int avi_read_idx1(AVFormatContext *s, int size);
 static int avi_load_index(AVFormatContext *s);
 static int guess_ni_flag(AVFormatContext *s);
 
@@ -147,15 +150,22 @@ static inline int get_duration(AVIStream *ast, int len)
 
 static int get_riff(AVFormatContext *s, AVIOContext *pb)
 {
+    FFEditOutputContext *ectx = s->ectx;
+    int64_t pos_in_file;
+    int size;
     AVIContext *avi = s->priv_data;
     char header[8] = {0};
     int i;
 
     /* check RIFF header */
     avio_read(pb, header, 4);
-    avi->riff_end  = avio_rl32(pb); /* RIFF chunk size */
-    avi->riff_end += avio_tell(pb); /* RIFF chunk end */
+    pos_in_file = avio_tell(pb);
+    size = avio_rl32(pb);
+    avi->riff_end  = size;            /* RIFF chunk size */
+    avi->riff_end += pos_in_file + 4; /* RIFF chunk end */
     avio_read(pb, header + 4, 4);
+
+    ffe_output_fixup(ectx, FFEDIT_FIXUP_SIZE_LE32, pos_in_file, size, pos_in_file + 4, size);
 
     for (i = 0; avi_headers[i][0]; i++)
         if (!memcmp(header, avi_headers[i], 8))
@@ -172,6 +182,7 @@ static int get_riff(AVFormatContext *s, AVIOContext *pb)
 
 static int read_odml_index(AVFormatContext *s, int64_t frame_num)
 {
+    FFEditOutputContext *ectx = s->ectx;
     AVIContext *avi     = s->priv_data;
     AVIOContext *pb     = s->pb;
     int longs_per_entry = avio_rl16(pb);
@@ -231,11 +242,20 @@ static int read_odml_index(AVFormatContext *s, int64_t frame_num)
             return AVERROR_INVALIDDATA;
 
         if (index_type) {
+            int64_t pos_in_file = avio_tell(pb);
+
             int64_t pos = avio_rl32(pb) + base - 8;
+            int64_t orig_pos = pos;
             int len     = avio_rl32(pb);
+            int64_t orig_len = len;
             int key     = len >= 0;
             len &= 0x7FFFFFFF;
             avi->odml_read += 8;
+
+            ffe_output_fixup(ectx, FFEDIT_FIXUP_OFFSET_LE32, pos_in_file, orig_pos, pos, 0);
+            ffe_output_fixup(ectx, FFEDIT_FIXUP_SIZE_LE32, pos_in_file + 4, orig_len, pos, len);
+            ffe_output_fixup(ectx, FFEDIT_FIXUP_SIZE_LE32, pos + 4, orig_len, pos + 8, len);
+            ffe_output_padding(ectx, pos + 8 + len, len & 1, 0x00, 2);
 
             av_log(s, AV_LOG_TRACE, "pos:%"PRId64", len:%X\n", pos, len);
 
@@ -500,6 +520,7 @@ static int calculate_bitrate(AVFormatContext *s)
 
 static int avi_read_header(AVFormatContext *s)
 {
+    FFEditOutputContext *ectx = s->ectx;
     AVIContext *avi = s->priv_data;
     AVIOContext *pb = s->pb;
     unsigned int tag, tag1, handler;
@@ -532,10 +553,16 @@ static int avi_read_header(AVFormatContext *s)
     codec_type   = -1;
     frame_period = 0;
     for (;;) {
+        int64_t pos_in_file;
+
         if (avio_feof(pb))
             return AVERROR_INVALIDDATA;
         tag  = avio_rl32(pb);
+        pos_in_file = avio_tell(pb);
         size = avio_rl32(pb);
+
+        ffe_output_fixup(ectx, FFEDIT_FIXUP_SIZE_LE32, pos_in_file, size, pos_in_file + 4, size);
+        ffe_output_padding(ectx, pos_in_file + 4 + size, size & 1, 0x00, 2);
 
         print_tag(s, "tag", tag, size);
 
@@ -986,9 +1013,10 @@ static int avi_read_header(AVFormatContext *s)
             break;
         case MKTAG('i', 'n', 'd', 'x'):
             pos = avio_tell(pb);
-            if ((pb->seekable & AVIO_SEEKABLE_NORMAL) && !(s->flags & AVFMT_FLAG_IGNIDX) &&
+            /* ffedit: always read odml index (for transplication) */
+            if (read_odml_index(s, 0) < 0 &&
                 avi->use_odml &&
-                read_odml_index(s, 0) < 0 &&
+                (pb->seekable & AVIO_SEEKABLE_NORMAL) && !(s->flags & AVFMT_FLAG_IGNIDX) &&
                 (s->error_recognition & AV_EF_EXPLODE))
                 return AVERROR_INVALIDDATA;
             avio_seek(pb, pos + size, SEEK_SET);
@@ -1049,11 +1077,16 @@ static int avi_read_header(AVFormatContext *s)
                 avi->movi_end  = avi->fsize;
                 goto end_of_header;
             }
-        /* Do not fail for very large idx1 tags */
-        case MKTAG('i', 'd', 'x', '1'):
             /* skip tag */
             size += (size & 1);
             avio_skip(pb, size);
+            break;
+        case MKTAG('i', 'd', 'x', '1'):
+            pos = avio_tell(pb);
+            /* ffedit: always read idx1 (for transplication) */
+            if ( avi_read_idx1(s, size) < 0 )
+                return AVERROR_INVALIDDATA;
+            avio_seek(pb, pos + size, SEEK_SET);
             break;
         }
     }
@@ -1609,6 +1642,7 @@ resync:
  * for each stream. */
 static int avi_read_idx1(AVFormatContext *s, int size)
 {
+    FFEditOutputContext *ectx = s->ectx;
     AVIContext *avi = s->priv_data;
     AVIOContext *pb = s->pb;
     int nb_index_entries, i;
@@ -1639,6 +1673,9 @@ static int avi_read_idx1(AVFormatContext *s, int size)
 
     /* Read the entries and sort them in each stream component. */
     for (i = 0; i < nb_index_entries; i++) {
+        int64_t pos_in_file = avio_tell(pb);
+        uint32_t orig_pos;
+
         if (avio_feof(pb))
             return -1;
 
@@ -1666,7 +1703,13 @@ static int avi_read_idx1(AVFormatContext *s, int size)
                 data_offset  = first_packet_pos - pos;
             first_packet = 0;
         }
+        orig_pos = pos;
         pos += data_offset;
+
+        ffe_output_fixup(ectx, FFEDIT_FIXUP_OFFSET_LE32, pos_in_file + 8, orig_pos, pos, 0);
+        ffe_output_fixup(ectx, FFEDIT_FIXUP_SIZE_LE32, pos_in_file + 12, len, pos, len);
+        ffe_output_fixup(ectx, FFEDIT_FIXUP_SIZE_LE32, pos + 4, len, pos + 8, len);
+        ffe_output_padding(ectx, pos + 8 + len, len & 1, 0x00, 2);
 
         av_log(s, AV_LOG_TRACE, "%d cum_len=%"PRId64"\n", len, ast->cum_len);
 
@@ -2020,6 +2063,7 @@ const FFInputFormat ff_avi_demuxer = {
     .p.name         = "avi",
     .p.long_name    = NULL_IF_CONFIG_SMALL("AVI (Audio Video Interleaved)"),
     .p.extensions   = "avi",
+    .p.flags        = AVFMT_FFEDIT_BITSTREAM,
     .p.priv_class   = &demuxer_class,
     .priv_data_size = sizeof(AVIContext),
     .flags_internal = FF_INFMT_FLAG_INIT_CLEANUP,
