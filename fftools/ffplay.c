@@ -61,7 +61,7 @@
 #include "ffplay_renderer.h"
 #include "opt_common.h"
 
-const char program_name[] = "ffplay";
+const char program_name[] = "fflive";
 const int program_birth_year = 2003;
 
 #define MAX_QUEUE_SIZE (15 * 1024 * 1024)
