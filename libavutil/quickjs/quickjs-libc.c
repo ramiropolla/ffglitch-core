@@ -453,7 +453,8 @@ typedef JSModuleDef *(JSInitModuleFunc)(JSContext *ctx,
                                         const char *module_name);
 
 
-#if defined(_WIN32)
+/* ffedit: disable module loader */
+#if 1
 static JSModuleDef *js_module_loader_so(JSContext *ctx,
                                         const char *module_name)
 {
