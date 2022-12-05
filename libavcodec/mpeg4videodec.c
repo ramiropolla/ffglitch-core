@@ -426,8 +426,67 @@ static inline int mpeg4_is_resync(Mpeg4DecContext *ctx)
     return 0;
 }
 
+#if CONFIG_GPL
+/* Copyright (C) 2002 Michael Militzer <isibaar@xvid.org> */
+typedef struct
+{
+    uint32_t code;
+    uint8_t len;
+}
+xvid_vlc;
+static xvid_vlc sprite_trajectory_len[15] =
+{
+    { 0x00 , 2},
+    { 0x02 , 3}, { 0x03, 3}, { 0x04, 3}, { 0x05, 3}, { 0x06, 3},
+    { 0x0E , 4}, { 0x1E, 5}, { 0x3E, 6}, { 0x7E, 7}, { 0xFE, 8},
+    { 0x1FE, 9}, {0x3FE,10}, {0x7FE,11}, {0xFFE,12}
+};
+static xvid_vlc sprite_trajectory_code[32768];
+static int sprite_trajectory_inited;
+static void init_sprite_trajectory(void)
+{
+    if ( sprite_trajectory_inited )
+        return;
+
+    /* init sprite_trajectory tables
+     * even if GMC is not specified (it might be used later...) */
+
+    sprite_trajectory_code[0 + 16384].code = 0;
+    sprite_trajectory_code[0 + 16384].len = 0;
+    for ( size_t i = 0; i < 14; i++ )
+    {
+        int limit = (1 << i);
+
+        for ( int l = -(2 * limit - 1); l <= -limit; l++ )
+        {
+            sprite_trajectory_code[l + 16384].code = (2 * limit - 1) + l;
+            sprite_trajectory_code[l + 16384].len = i + 1;
+        }
+
+        for ( int l = limit; l <= (2 * limit - 1); l++ )
+        {
+            sprite_trajectory_code[l + 16384].code = l;
+            sprite_trajectory_code[l + 16384].len = i + 1;
+        }
+    }
+
+    sprite_trajectory_inited = 1;
+}
+static void ffe_mpeg4_encode_sprite_trajectory(PutBitContext *pb, int val)
+{
+    const int code = sprite_trajectory_code[val + 16384].code;
+    const int len = sprite_trajectory_code[val + 16384].len;
+    const int code2 = sprite_trajectory_len[len].code;
+    const int len2 = sprite_trajectory_len[len].len;
+    put_bits(pb, len2, code2);
+    if ( len )
+        put_bits(pb, len, code);
+}
+#endif
+
 static int mpeg4_decode_sprite_trajectory(Mpeg4DecContext *ctx, GetBitContext *gb)
 {
+    PutBitContext *saved = NULL;
     MpegEncContext *s = &ctx->m;
     int a     = 2 << ctx->sprite_warping_accuracy;
     int rho   = 3  - ctx->sprite_warping_accuracy;
@@ -450,6 +509,9 @@ static int mpeg4_decode_sprite_trajectory(Mpeg4DecContext *ctx, GetBitContext *g
     if (w <= 0 || h <= 0)
         return AVERROR_INVALIDDATA;
 
+    if ( (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_GMC)) != 0 )
+        saved = ffe_transplicate_save(&s->ffe_xp);
+
     for (i = 0; i < ctx->num_sprite_warping_points; i++) {
         int length;
         int x = 0, y = 0;
@@ -469,6 +531,46 @@ static int mpeg4_decode_sprite_trajectory(Mpeg4DecContext *ctx, GetBitContext *g
         ctx->sprite_traj[i][0] = d[i][0] = x;
         ctx->sprite_traj[i][1] = d[i][1] = y;
     }
+
+    if ( (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_GMC)) != 0 )
+    {
+        size_t length = json_array_length(s->jgmc);
+        for ( size_t i = 0; i < length; i++ )
+        {
+            json_t *src = json_array_get(s->jgmc, i);
+            ctx->sprite_traj[i][0] = d[i][0] = src->array_of_ints[0];
+            ctx->sprite_traj[i][1] = d[i][1] = src->array_of_ints[1];
+        }
+    }
+    if ( (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_GMC)) != 0 )
+    {
+#if CONFIG_GPL
+        init_sprite_trajectory();
+        for ( size_t i = 0; i < ctx->num_sprite_warping_points; i++ )
+        {
+            ffe_mpeg4_encode_sprite_trajectory(saved, d[i][0]);
+            put_bits(saved, 1, 1);
+            ffe_mpeg4_encode_sprite_trajectory(saved, d[i][1]);
+            put_bits(saved, 1, 1);
+        }
+#else
+        av_log(ffe_class, AV_LOG_FATAL, "GPL must be enabled to glitch GMC in MPEG-4\n");
+        exit(1);
+#endif
+        ffe_transplicate_restore(&s->ffe_xp, saved);
+    }
+    if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_GMC)) != 0 )
+    {
+        s->jgmc = json_array_new(s->jctx_header, ctx->num_sprite_warping_points);
+        for ( size_t i = 0; i < ctx->num_sprite_warping_points; i++ )
+        {
+            json_t *jsprite_traj = json_array_of_ints_new(s->jctx_header, 2);
+            jsprite_traj->array_of_ints[0] = d[i][0];
+            jsprite_traj->array_of_ints[1] = d[i][1];
+            json_array_set(s->jgmc, i, jsprite_traj);
+        }
+    }
+
     for (; i < 4; i++)
         ctx->sprite_traj[i][0] = ctx->sprite_traj[i][1] = 0;
 
@@ -649,6 +751,7 @@ static int mpeg4_decode_sprite_trajectory(Mpeg4DecContext *ctx, GetBitContext *g
                 sprite_delta[i][1] - a * (1LL<<16)
             };
 
+            /* NOTE: some players will fail to play GMC */
             if (llabs(sprite_offset[0][i] + sprite_delta[i][0] * (w+16LL)) >= INT_MAX ||
                 llabs(sprite_offset[0][i] + sprite_delta[i][1] * (h+16LL)) >= INT_MAX ||
                 llabs(sprite_offset[0][i] + sprite_delta[i][0] * (w+16LL) + sprite_delta[i][1] * (h+16LL)) >= INT_MAX ||
@@ -3991,5 +4094,6 @@ const FFCodec ff_mpeg4_decoder = {
                        | (1 << FFEDIT_FEAT_MV)
                        | (1 << FFEDIT_FEAT_MV_DELTA)
                        | (1 << FFEDIT_FEAT_MB)
+                       | (1 << FFEDIT_FEAT_GMC)
 };
 #endif /* CONFIG_MPEG4_DECODER */

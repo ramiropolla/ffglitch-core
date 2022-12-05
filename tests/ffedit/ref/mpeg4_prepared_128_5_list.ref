@@ -4,3 +4,4 @@ FFEdit support for codec 'MPEG-4 part 2':
 	[mv          ]: motion vectors
 	[mv_delta    ]: motion vectors (delta only)
 	[mb          ]: macroblock
+	[gmc         ]: global motion compensation

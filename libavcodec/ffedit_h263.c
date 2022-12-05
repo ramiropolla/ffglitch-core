@@ -98,6 +98,27 @@ ffe_h263_export_init(MpegEncContext *s)
         ffe_mb_export_init(s->jctx, f, s->mb_height, s->mb_width);
     else if ( (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_MB)) != 0 )
         ffe_mb_import_init(s->jctx, f);
+
+    if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_GMC)) != 0 )
+    {
+        if ( s->jgmc != NULL )
+        {
+            /* move data from header_jctx to jctx */
+            size_t length = json_array_length(s->jgmc);
+            json_t *jgmc = json_array_new(s->jctx, length);
+            for ( size_t i = 0; i < length; i++ )
+            {
+                json_t *src = json_array_get(s->jgmc, i);
+                json_t *dst = json_array_of_ints_new(s->jctx, 2);
+                json_set_pflags(dst, JSON_PFLAGS_NO_LF);
+                dst->array_of_ints[0] = src->array_of_ints[0];
+                dst->array_of_ints[1] = src->array_of_ints[1];
+                json_array_set(jgmc, i, dst);
+            }
+            f->ffedit_sd[FFEDIT_FEAT_GMC] = jgmc;
+            s->jgmc = NULL;
+        }
+    }
 }
 
 //---------------------------------------------------------------------

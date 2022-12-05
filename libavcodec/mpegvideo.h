@@ -560,6 +560,8 @@ typedef struct MpegEncContext {
     FFEditTransplicateContext ffe_xp;
 
     /* ffedit JSON context */
+    void *jctx_header;
+    void *jgmc;
     void *jctx;
 
     /* ffedit sidedata (for importing) */

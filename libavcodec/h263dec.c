@@ -526,6 +526,20 @@ retry:
     if ( transplicate_pb != NULL )
         retry_pb = *transplicate_pb;
 
+    if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_GMC)) != 0 )
+    {
+        /* pre-init jctx_header if needed */
+        if ( s->jctx_header == NULL )
+        {
+            s->jctx_header = av_mallocz(sizeof(json_ctx_t));
+            json_ctx_start(s->jctx_header, 1);
+        }
+    }
+    else if ( (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_GMC)) != 0 )
+    {
+        s->jgmc = s->ffedit_sd[FFEDIT_FEAT_GMC];
+    }
+
     /* let's go :-) */
     if (CONFIG_WMV2_DECODER && s->msmpeg4_version == 5) {
         ret = ff_wmv2_decode_picture_header(s);
@@ -753,6 +767,12 @@ the_end:
 
     if ( (avctx->ffedit_apply & (1 << FFEDIT_FEAT_LAST)) != 0 )
         ffe_transplicate_flush(avctx, &s->ffe_xp, avpkt);
+
+    if ( s->jctx_header != NULL )
+    {
+        json_ctx_free(s->jctx_header);
+        av_freep(&s->jctx_header);
+    }
 
     return ret;
 }

@@ -3,7 +3,8 @@
   "sha1sum":"9fa3778196775557e10a5de9b0521b700c1e9ace",
   "features":[
     "info",
-    "mv"
+    "mv",
+    "gmc"
   ],
   "streams":[
     {
@@ -59,7 +60,12 @@
             ],
             "fcode":[ 1 ],
             "overflow":"warn"
-          }
+          },
+          "gmc":[
+            [ 1, 0 ],
+            [ 1, 1 ],
+            [ 0, 1 ]
+          ]
         },
         {
           "pkt_pos":5588,
@@ -200,7 +206,12 @@
             ],
             "fcode":[ 1 ],
             "overflow":"warn"
-          }
+          },
+          "gmc":[
+            [ -1, -1 ],
+            [ 3, 0 ],
+            [ 0, 3 ]
+          ]
         },
         {
           "pkt_pos":7840,
