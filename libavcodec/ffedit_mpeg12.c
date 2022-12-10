@@ -485,6 +485,8 @@ e_which_dct_feat(MpegEncContext *s)
 {
     return (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_Q_DCT))       != 0 ? FFEDIT_FEAT_Q_DCT
          : (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_Q_DCT_DELTA)) != 0 ? FFEDIT_FEAT_Q_DCT_DELTA
+         : (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_Q_DC))        != 0 ? FFEDIT_FEAT_Q_DC
+         : (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_Q_DC_DELTA))  != 0 ? FFEDIT_FEAT_Q_DC_DELTA
          :                                                                   FFEDIT_FEAT_LAST;
 }
 
@@ -494,6 +496,8 @@ i_which_dct_feat(MpegEncContext *s)
 {
     return (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_Q_DCT))       != 0 ? FFEDIT_FEAT_Q_DCT
          : (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_Q_DCT_DELTA)) != 0 ? FFEDIT_FEAT_Q_DCT_DELTA
+         : (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_Q_DC))        != 0 ? FFEDIT_FEAT_Q_DC
+         : (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_Q_DC_DELTA))  != 0 ? FFEDIT_FEAT_Q_DC_DELTA
          :                                                                   FFEDIT_FEAT_LAST;
 }
 
@@ -503,6 +507,8 @@ a_which_dct_feat(MpegEncContext *s)
 {
     return (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_Q_DCT))       != 0 ? FFEDIT_FEAT_Q_DCT
          : (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_Q_DCT_DELTA)) != 0 ? FFEDIT_FEAT_Q_DCT_DELTA
+         : (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_Q_DC))        != 0 ? FFEDIT_FEAT_Q_DC
+         : (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_Q_DC_DELTA))  != 0 ? FFEDIT_FEAT_Q_DC_DELTA
          :                                                                  FFEDIT_FEAT_LAST;
 }
 
@@ -518,6 +524,12 @@ ffe_mpeg12_export_dct_init(MpegEncContext *s, AVFrame *f)
 
     if ( !s->chroma_y_shift )
         v_count[1] = v_count[2] = 2;
+
+    if ( e_dct_feat == FFEDIT_FEAT_Q_DC
+      || e_dct_feat == FFEDIT_FEAT_Q_DC_DELTA )
+    {
+        pflags = JSON_PFLAGS_NO_LF;
+    }
 
     jframe = ffe_jmb_new(s->jctx,
                          s->mb_width, s->mb_height,
@@ -580,11 +592,18 @@ static void ffe_mpeg12_use_block(
         json_t *jso;
 
         if ( is_intra
-          && e_dct_feat == FFEDIT_FEAT_Q_DCT_DELTA )
+          && (e_dct_feat == FFEDIT_FEAT_Q_DCT_DELTA
+           || e_dct_feat == FFEDIT_FEAT_Q_DC_DELTA) )
         {
             ctx->qblock[0] -= ctx->last_dc[component];
         }
 
+        if ( e_dct_feat == FFEDIT_FEAT_Q_DC
+          || e_dct_feat == FFEDIT_FEAT_Q_DC_DELTA )
+        {
+            jso = json_int_new(s->jctx, ctx->qblock[0]);
+        }
+        else
         {
             jso = json_array_of_ints_new(s->jctx, 64);
             json_set_pflags(jso, JSON_PFLAGS_NO_LF);
@@ -600,6 +619,13 @@ static void ffe_mpeg12_use_block(
     else if ( i_dct_feat != FFEDIT_FEAT_LAST )
     {
         json_t *jframe = f->ffedit_sd[i_dct_feat];
+        if ( i_dct_feat == FFEDIT_FEAT_Q_DC
+          || i_dct_feat == FFEDIT_FEAT_Q_DC_DELTA )
+        {
+            int val = ffe_jmb_int_get(jframe, component, s->mb_y, s->mb_x, blockn);
+            ctx->qblock[0] = val;
+        }
+        else
         {
             json_t *jso = ffe_jmb_get(jframe, component, s->mb_y, s->mb_x, blockn);
             for ( j = 0; j < 64; j++ )
@@ -609,7 +635,8 @@ static void ffe_mpeg12_use_block(
             }
         }
         if ( is_intra
-          && i_dct_feat == FFEDIT_FEAT_Q_DCT_DELTA )
+          && (i_dct_feat == FFEDIT_FEAT_Q_DCT_DELTA
+           || i_dct_feat == FFEDIT_FEAT_Q_DC_DELTA) )
         {
             ctx->qblock[0] += ctx->last_dc[component];
         }

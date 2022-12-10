@@ -2825,6 +2825,8 @@ const FFCodec ff_mpeg1video_decoder = {
                        | (1 << FFEDIT_FEAT_QSCALE)
                        | (1 << FFEDIT_FEAT_Q_DCT)
                        | (1 << FFEDIT_FEAT_Q_DCT_DELTA)
+                       | (1 << FFEDIT_FEAT_Q_DC)
+                       | (1 << FFEDIT_FEAT_Q_DC_DELTA)
 };
 
 #define M2V_OFFSET(x) offsetof(Mpeg1Context, x)
@@ -2905,6 +2907,8 @@ const FFCodec ff_mpeg2video_decoder = {
                        | (1 << FFEDIT_FEAT_QSCALE)
                        | (1 << FFEDIT_FEAT_Q_DCT)
                        | (1 << FFEDIT_FEAT_Q_DCT_DELTA)
+                       | (1 << FFEDIT_FEAT_Q_DC)
+                       | (1 << FFEDIT_FEAT_Q_DC_DELTA)
 };
 
 //legacy decoder
@@ -2930,6 +2934,8 @@ const FFCodec ff_mpegvideo_decoder = {
                        | (1 << FFEDIT_FEAT_QSCALE)
                        | (1 << FFEDIT_FEAT_Q_DCT)
                        | (1 << FFEDIT_FEAT_Q_DCT_DELTA)
+                       | (1 << FFEDIT_FEAT_Q_DC)
+                       | (1 << FFEDIT_FEAT_Q_DC_DELTA)
 };
 
 typedef struct IPUContext {

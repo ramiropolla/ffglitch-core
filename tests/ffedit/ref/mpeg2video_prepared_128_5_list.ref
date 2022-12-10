@@ -3,6 +3,8 @@ FFEdit support for codec 'MPEG-2 video':
 	[info        ]: info
 	[q_dct       ]: quantized DCT coefficients
 	[q_dct_delta ]: quantized DCT coefficients (with DC delta)
+	[q_dc        ]: quantized DCT coefficients (DC only)
+	[q_dc_delta  ]: quantized DCT coefficients (DC delta only)
 	[mv          ]: motion vectors
 	[mv_delta    ]: motion vectors (delta only)
 	[qscale      ]: quantization scale
