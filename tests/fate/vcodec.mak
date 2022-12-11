@@ -250,6 +250,8 @@ FATE_MPEG2 := mpeg2                                                     \
              mpeg2-idct-int                                             \
              mpeg2-ilace                                                \
              mpeg2-ivlc-qprd                                            \
+             mpeg2-mb_type_script                                       \
+             mpeg2-pict_type_script                                     \
              mpeg2-thread                                               \
              mpeg2-thread-ivlc
 
@@ -276,6 +278,8 @@ fate-vsynth%-mpeg2-ivlc-qprd:    ENCOPTS = -b:v 500k                    \
                                            -intra_vlc 1                 \
                                            -cmp 2 -subcmp 2             \
                                            -mbd rd
+fate-vsynth%-mpeg2-mb_type_script: ENCOPTS = -mb_type_script $(SRC_PATH)/tests/ffgac/scripts/mb_types.js
+fate-vsynth%-mpeg2-pict_type_script: ENCOPTS = -pict_type_script $(SRC_PATH)/tests/ffgac/scripts/pict_types.js
 fate-vsynth%-mpeg2-thread:       ENCOPTS = -qscale 10 -bf 2 -flags +ildct+ilme \
                                            -threads 2 -slices 2
 fate-vsynth%-mpeg2-thread-ivlc:  ENCOPTS = -qscale 10 -bf 2 -flags +ildct+ilme \

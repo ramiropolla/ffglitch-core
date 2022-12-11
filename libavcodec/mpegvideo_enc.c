@@ -1023,6 +1023,54 @@ av_cold int ff_mpv_encode_init(AVCodecContext *avctx)
     cpb_props->avg_bitrate = avctx->bit_rate;
     cpb_props->buffer_size = avctx->rc_buffer_size;
 
+    /* ffgac extra */
+    if ( s->mb_type_script_fname != NULL )
+    {
+        FFScriptContext *script;
+        FFScriptObject *setup_func;
+        script = ff_script_init(s->mb_type_script_fname, 0);
+        if ( script == NULL )
+            return AVERROR(EINVAL);
+        s->mb_type_script = script;
+        s->mb_type_func = ff_script_get_func(script, "mb_type_func", 1);
+        if ( s->mb_type_func == NULL )
+            return AVERROR(EINVAL);
+        setup_func = ff_script_get_func(script, "setup", 0);
+        if ( setup_func != NULL )
+        {
+            ret = ff_script_call_func(script, NULL, setup_func, NULL);
+            ff_script_free_obj(script, setup_func);
+            if ( ret < 0 )
+            {
+                av_log(script, AV_LOG_FATAL, "Error calling setup() function in %s\n", s->mb_type_script_fname);
+                return AVERROR(EINVAL);
+            }
+        }
+    }
+    if ( s->pict_type_script_fname != NULL )
+    {
+        FFScriptContext *script;
+        FFScriptObject *setup_func;
+        script = ff_script_init(s->pict_type_script_fname, 0);
+        if ( script == NULL )
+            return AVERROR(EINVAL);
+        s->pict_type_script = script;
+        s->pict_type_func = ff_script_get_func(script, "pict_type_func", 1);
+        if ( s->pict_type_func == NULL )
+            return AVERROR(EINVAL);
+        setup_func = ff_script_get_func(script, "setup", 0);
+        if ( setup_func != NULL )
+        {
+            ret = ff_script_call_func(script, NULL, setup_func, NULL);
+            ff_script_free_obj(script, setup_func);
+            if ( ret < 0 )
+            {
+                av_log(script, AV_LOG_FATAL, "Error calling setup() function in %s\n", s->pict_type_script_fname);
+                return AVERROR(EINVAL);
+            }
+        }
+    }
+
     return 0;
 }
 
@@ -1030,6 +1078,22 @@ av_cold int ff_mpv_encode_end(AVCodecContext *avctx)
 {
     MpegEncContext *s = avctx->priv_data;
     int i;
+
+    /* ffgac extra */
+    if ( s->mb_type_script != NULL )
+    {
+        if ( s->mb_type_func != NULL )
+            ff_script_free_obj(s->mb_type_script, s->mb_type_func);
+        s->mb_type_func = NULL;
+        ff_script_uninit(&s->mb_type_script);
+    }
+    if ( s->pict_type_script != NULL )
+    {
+        if ( s->pict_type_func != NULL )
+            ff_script_free_obj(s->pict_type_script, s->pict_type_func);
+        s->pict_type_func = NULL;
+        ff_script_uninit(&s->pict_type_script);
+    }
 
     ff_rate_control_uninit(s);
 
@@ -1634,6 +1698,44 @@ static int select_input_picture(MpegEncContext *s)
                     AV_PICTURE_TYPE_B;
                 s->reordered_input_picture[i + 1]->coded_picture_number =
                     s->coded_picture_number++;
+            }
+
+            /* ffgac extra */
+            if ( s->pict_type_func != NULL )
+            {
+                FFScriptContext *script = s->pict_type_script;
+                FFScriptObject *script_ret;
+                json_ctx_t jctx;
+                json_t *jret;
+                ret = ff_script_call_func(script, &script_ret, s->pict_type_func, NULL);
+                if ( ret < 0 )
+                {
+                    av_log(script, AV_LOG_FATAL, "Error calling pict_type_func() function in %s\n", s->pict_type_script_fname);
+                    return -1;
+                }
+                json_ctx_start(&jctx, 0);
+                jret = ff_script_to_json(&jctx, script, script_ret);
+                ret = 0;
+                if ( JSON_TYPE(jret->flags) != JSON_TYPE_STRING )
+                {
+pict_type_func_return_error:
+                    av_log(script, AV_LOG_FATAL, "pict_type_func() must return a string of either 'I' or 'P'\n");
+                    ret = -1;
+                }
+                if ( ret == 0 )
+                {
+                    const char *str = json_string_get(jret);
+                    switch ( str[i] )
+                    {
+                    case 'I': s->reordered_input_picture[0]->f->pict_type = AV_PICTURE_TYPE_I; break;
+                    case 'P': s->reordered_input_picture[0]->f->pict_type = AV_PICTURE_TYPE_P; break;
+                    default: goto pict_type_func_return_error;
+                    }
+                }
+                ff_script_free_obj(script, script_ret);
+                json_ctx_free(&jctx);
+                if ( ret < 0 )
+                    return ret;
             }
         }
     }
@@ -3723,6 +3825,54 @@ static int encode_picture(MpegEncContext *s)
 
     /* Estimate motion for every MB */
     if(s->pict_type != AV_PICTURE_TYPE_I){
+        /* ffgac extra */
+        if ( s->mb_type_func != NULL )
+        {
+            FFScriptContext *script = s->mb_type_script;
+            FFScriptObject *func_args = NULL;
+            json_ctx_t jctx;
+            json_t *jmb_types;
+            json_t *args;
+
+            /* prepare args */
+            json_ctx_start(&jctx, 0);
+            jmb_types = json_array_new(&jctx, s->mb_height);
+            for ( int mb_y = 0; mb_y < s->mb_height; mb_y++ )
+            {
+                json_t *jrow = json_array_of_ints_new(&jctx, s->mb_width);
+                for ( int mb_x = 0; mb_x < s->mb_width; mb_x++ )
+                    jrow->array_of_ints[mb_x] = 0;
+                json_array_set(jmb_types, mb_y, jrow);
+            }
+            args = json_object_new(&jctx);
+            json_object_add(args, "mb_types", jmb_types);
+            json_object_done(&jctx, args);
+
+            /* convert to python/quickjs */
+            func_args = ff_script_from_json(script, args);
+
+            /* call mb_type_func() */
+            ret = ff_script_call_func(script, NULL, s->mb_type_func, func_args, NULL);
+            if ( ret < 0 )
+            {
+                av_log(script, AV_LOG_FATAL, "Error calling mb_type_func() function in %s\n", s->mb_type_script_fname);
+                json_ctx_free(&jctx);
+                return -1;
+            }
+
+            /* convert back from python/quickjs */
+            args = ff_script_to_json(&jctx, script, func_args);
+            ff_script_free_obj(script, func_args);
+            jmb_types = json_object_get(args, "mb_types");
+            for ( int mb_y = 0; mb_y < s->mb_height; mb_y++ )
+            {
+                json_t *jrow = json_array_get(jmb_types, mb_y);
+                for ( int mb_x = 0; mb_x < s->mb_width; mb_x++ )
+                    s->mb_type[mb_y * s->mb_stride + mb_x] = jrow->array_of_ints[mb_x];
+            }
+            json_ctx_free(&jctx);
+        }
+
         s->lambda  = (s->lambda  * s->me_penalty_compensation + 128) >> 8;
         s->lambda2 = (s->lambda2 * (int64_t) s->me_penalty_compensation + 128) >> 8;
         if (s->pict_type != AV_PICTURE_TYPE_B) {

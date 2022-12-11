@@ -1,0 +1,4 @@
+f14bc4f5d5bb7d429b4ecdd672d9dfb8 *tests/data/fate/vsynth_lena-mpeg2-pict_type_script.mpeg2video
+198854 tests/data/fate/vsynth_lena-mpeg2-pict_type_script.mpeg2video
+29ce9aa14047fe7e6dc36fce40ed5122 *tests/data/fate/vsynth_lena-mpeg2-pict_type_script.out.rawvideo
+stddev:    7.31 PSNR: 30.84 MAXDIFF:  125 bytes:  7603200/  7603200

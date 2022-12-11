@@ -970,6 +970,28 @@ void ff_estimate_p_frame_motion(MpegEncContext * s,
     s->mc_mb_var[s->mb_stride * mb_y + mb_x] = (vard+128)>>8;
     c->mc_mb_var_sum_temp += (vard+128)>>8;
 
+    /* ffgac extra */
+    if ( s->mb_type_func != NULL )
+    {
+        int candidate_mb_type = s->mb_type[mb_y*s->mb_stride + mb_x];
+        int candidate_inter   = !!(candidate_mb_type & CANDIDATE_MB_TYPE_INTER);
+        int candidate_mv4     = !!(candidate_mb_type & CANDIDATE_MB_TYPE_INTER4V);
+        int candidate_inter_i = !!(candidate_mb_type & CANDIDATE_MB_TYPE_INTER_I);
+
+        if ( candidate_inter )
+            c->sub_motion_search(s, &mx, &my, INT_MAX, 0, 0, 0, 16);
+        if ( candidate_mv4 )
+            h263_mv4_search(s, mx, my, shift);
+        if ( candidate_inter_i )
+            interlaced_search(s, 0, s->p_field_mv_table, s->p_field_select_table, mx, my, 0);
+
+        set_p_mv_tables(s, mx, my, candidate_mv4);
+
+        mb_type = candidate_mb_type;
+        if ( mb_type != 0 )
+            goto scene_change_score;
+    }
+
     if (c->avctx->mb_decision > FF_MB_DECISION_SIMPLE) {
         int p_score= FFMIN(vard, varc-500+(s->lambda2>>FF_LAMBDA_SHIFT)*100);
         int i_score= varc-500+(s->lambda2>>FF_LAMBDA_SHIFT)*20;
@@ -1052,6 +1074,7 @@ void ff_estimate_p_frame_motion(MpegEncContext * s,
         }else
             s->current_picture.mb_type[mb_y*s->mb_stride + mb_x] = 0;
 
+scene_change_score:
         {
             int p_score= FFMIN(vard, varc-500+(s->lambda2>>FF_LAMBDA_SHIFT)*100);
             int i_score= varc-500+(s->lambda2>>FF_LAMBDA_SHIFT)*20;
