@@ -267,6 +267,11 @@ typedef struct MOVStreamContext {
     } cenc;
 
     struct IAMFDemuxContext *iamf;
+
+    /* ffedit */
+    int64_t stsz_sample_size_pos;
+    int64_t stsz_pos;
+    int64_t stco_pos;
 } MOVStreamContext;
 
 typedef struct HEIFItem {

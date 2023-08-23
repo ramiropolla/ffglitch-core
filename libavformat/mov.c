@@ -74,6 +74,8 @@
 
 #include "qtpalette.h"
 
+#include "ffedit.h"
+
 /* those functions parse an atom */
 /* links atom IDs to parse functions */
 typedef struct MOVParseTableEntry {
@@ -2371,6 +2373,44 @@ static int mov_read_strf(MOVContext *c, AVIOContext *pb, MOVAtom atom)
     return 0;
 }
 
+static inline int mov_stsc_index_valid(unsigned int index, unsigned int count);
+static void mov_ectx_fixup_stco_stsz(MOVContext *c, MOVStreamContext *sc)
+{
+    FFEditOutputContext *ectx = c->fc->ectx;
+    size_t current_sample = 0;
+    size_t stsc_index = 0;
+    for ( size_t i = 0; i < sc->chunk_count; i++ )
+    {
+        int64_t offset = sc->chunk_offsets[i];
+        int64_t pos_in_file = sc->stco_pos + i * sizeof(uint32_t);
+        ffe_output_fixup(ectx, FFEDIT_FIXUP_OFFSET_BE32, pos_in_file, offset, offset, 0);
+
+        while ( mov_stsc_index_valid(stsc_index, sc->stsc_count)
+            && (i + 1 == sc->stsc_data[stsc_index + 1].first) )
+        {
+            stsc_index++;
+        }
+
+        /* TODO I'm not sure this is correct */
+        if ( sc->stsz_sample_size > 0 )
+        {
+            size_t sample_size = sc->stsz_sample_size;
+            pos_in_file = sc->stsz_sample_size_pos;
+            ffe_output_fixup(ectx, FFEDIT_FIXUP_SIZE_BE32, pos_in_file, sample_size, offset, sample_size);
+            continue;
+        }
+
+        for ( size_t j = 0; j < sc->stsc_data[stsc_index].count; j++ )
+        {
+            size_t sample_size = sc->sample_sizes[current_sample];
+            pos_in_file = sc->stsz_pos + current_sample * sizeof(uint32_t);
+            ffe_output_fixup(ectx, FFEDIT_FIXUP_SIZE_BE32, pos_in_file, sample_size, offset, sample_size);
+            offset += sample_size;
+            current_sample++;
+        }
+    }
+}
+
 static int mov_read_stco(MOVContext *c, AVIOContext *pb, MOVAtom atom)
 {
     AVStream *st;
@@ -2392,6 +2432,7 @@ static int mov_read_stco(MOVContext *c, AVIOContext *pb, MOVAtom atom)
     // Clamp allocation size for `chunk_offsets` -- don't throw an error for an
     // invalid count since the EOF path doesn't throw either.
     entries = avio_rb32(pb);
+    sc->stco_pos = avio_tell(pb);
     entries =
         FFMIN(entries,
               FFMAX(0, (atom.size - 8) /
@@ -3248,6 +3289,7 @@ static int mov_read_stsz(MOVContext *c, AVIOContext *pb, MOVAtom atom)
     avio_r8(pb); /* version */
     avio_rb24(pb); /* flags */
 
+    sc->stsz_sample_size_pos = avio_tell(pb);
     if (atom.type == MKTAG('s','t','s','z')) {
         sample_size = avio_rb32(pb);
         if (!sc->sample_size) /* do not overwrite value computed in stsd */
@@ -3260,6 +3302,7 @@ static int mov_read_stsz(MOVContext *c, AVIOContext *pb, MOVAtom atom)
         field_size = avio_r8(pb);
     }
     entries = avio_rb32(pb);
+    sc->stsz_pos = avio_tell(pb);
 
     av_log(c->fc, AV_LOG_TRACE, "sample_size = %u sample_count = %u\n", sc->sample_size, entries);
 
@@ -4915,6 +4958,9 @@ static int mov_read_trak(MOVContext *c, AVIOContext *pb, MOVAtom atom)
     }
 
     mov_build_index(c, st);
+
+    /* ffedit */
+    mov_ectx_fixup_stco_stsz(c, sc);
 
     if (sc->iamf) {
         ret = mov_update_iamf_streams(c, st);
@@ -8576,6 +8622,7 @@ static const MOVParseTableEntry mov_default_parse_table[] = {
 
 static int mov_read_default(MOVContext *c, AVIOContext *pb, MOVAtom atom)
 {
+    FFEditOutputContext *ectx = c->fc->ectx;
     int64_t total_size = 0;
     MOVAtom a;
     int i;
@@ -8590,7 +8637,9 @@ static int mov_read_default(MOVContext *c, AVIOContext *pb, MOVAtom atom)
         atom.size = INT64_MAX;
     while (total_size <= atom.size - 8) {
         int (*parse)(MOVContext*, AVIOContext*, MOVAtom) = NULL;
+        int64_t pos_in_file = avio_tell(pb);
         a.size = avio_rb32(pb);
+        ffe_output_fixup(ectx, FFEDIT_FIXUP_SIZE_BE32, pos_in_file, a.size, pos_in_file + 4, a.size);
         a.type = avio_rl32(pb);
         if (avio_feof(pb))
             break;
@@ -10288,7 +10337,7 @@ const FFInputFormat ff_mov_demuxer = {
     .p.long_name    = NULL_IF_CONFIG_SMALL("QuickTime / MOV"),
     .p.priv_class   = &mov_class,
     .p.extensions   = "mov,mp4,m4a,3gp,3g2,mj2,psp,m4b,ism,ismv,isma,f4v,avif,heic,heif",
-    .p.flags        = AVFMT_NO_BYTE_SEEK | AVFMT_SEEK_TO_PTS | AVFMT_SHOW_IDS,
+    .p.flags        = AVFMT_NO_BYTE_SEEK | AVFMT_SEEK_TO_PTS | AVFMT_SHOW_IDS | AVFMT_FFEDIT_BITSTREAM,
     .priv_data_size = sizeof(MOVContext),
     .flags_internal = FF_INFMT_FLAG_INIT_CLEANUP,
     .read_probe     = mov_probe,
