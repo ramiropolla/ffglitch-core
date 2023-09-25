@@ -19,7 +19,6 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#define CACHED_BITSTREAM_READER !ARCH_X86_32
 #define SHEER_VLC_BITS 12
 
 #include "libavutil/intreadwrite.h"

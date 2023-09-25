@@ -29,8 +29,6 @@
  * Supports resolutions up to 3072x2048.
  */
 
-#define CACHED_BITSTREAM_READER !ARCH_X86_32
-
 #include "libavutil/intreadwrite.h"
 #include "libavutil/opt.h"
 #include "avcodec.h"

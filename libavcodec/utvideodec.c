@@ -27,7 +27,6 @@
 #include <inttypes.h>
 #include <stdlib.h>
 
-#define CACHED_BITSTREAM_READER !ARCH_X86_32
 #define UNCHECKED_BITSTREAM_READER 1
 
 #include "libavutil/intreadwrite.h"
@@ -118,14 +117,6 @@ static int build_huff(UtvideoContext *c, const uint8_t *src, VLC *vlc,
 { \
     buf = !use_pred ? dest : c->buffer; \
     i = 0; \
-    for (; CACHED_BITSTREAM_READER && i < width-end && get_bits_left(&gb) > 0;) {\
-        ret = get_vlc_multi(&gb, (uint8_t *)buf + i * b, multi.table, \
-                            vlc.table, VLC_BITS, 3, b); \
-        if (ret > 0) \
-            i += ret; \
-        if (ret <= 0) \
-            goto fail; \
-    } \
     for (; i < width && get_bits_left(&gb) > 0; i++) \
         buf[i] = get_vlc2(&gb, vlc.table, VLC_BITS, 3); \
     if (use_pred) { \

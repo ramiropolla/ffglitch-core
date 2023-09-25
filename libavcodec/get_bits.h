@@ -53,58 +53,6 @@
 #define UNCHECKED_BITSTREAM_READER !CONFIG_SAFE_BITSTREAM_READER
 #endif
 
-#ifndef CACHED_BITSTREAM_READER
-#define CACHED_BITSTREAM_READER 0
-#endif
-
-#if CACHED_BITSTREAM_READER
-
-// we always want the LE implementation, to provide get_bits_le()
-#define BITSTREAM_LE
-
-#ifndef BITSTREAM_READER_LE
-# define BITSTREAM_BE
-# define BITSTREAM_DEFAULT_BE
-#endif
-
-#include "bitstream.h"
-
-#undef BITSTREAM_LE
-#undef BITSTREAM_BE
-#undef BITSTREAM_DEFAULT_BE
-
-typedef BitstreamContext GetBitContext;
-
-#define get_bits_count      bits_tell
-#define get_bits_left       bits_left
-#define skip_bits_long      bits_skip
-#define skip_bits           bits_skip
-#define get_bits            bits_read_nz
-#define get_bitsz           bits_read
-#define get_bits_long       bits_read
-#define get_bits1           bits_read_bit
-#define get_bits64          bits_read_64
-#define get_xbits           bits_read_xbits
-#define get_sbits           bits_read_signed_nz
-#define get_sbits_long      bits_read_signed
-#define show_bits           bits_peek
-#define show_bits_long      bits_peek
-#define init_get_bits       bits_init
-#define init_get_bits8      bits_init8
-#define align_get_bits      bits_align
-#define get_vlc2            bits_read_vlc
-#define get_vlc_multi       bits_read_vlc_multi
-
-#define init_get_bits8_le(s, buffer, byte_size) bits_init8_le((BitstreamContextLE*)s, buffer, byte_size)
-#define get_bits_le(s, n)                       bits_read_le((BitstreamContextLE*)s, n)
-
-#define show_bits1(s)       bits_peek(s, 1)
-#define skip_bits1(s)       bits_skip(s, 1)
-
-#define skip_1stop_8data_bits bits_skip_1stop_8data
-
-#else   // CACHED_BITSTREAM_READER
-
 typedef struct GetBitContext {
     const uint8_t *buffer, *buffer_end;
     int index;
@@ -710,7 +658,5 @@ static inline int skip_1stop_8data_bits(GetBitContext *gb)
 
     return 0;
 }
-
-#endif // CACHED_BITSTREAM_READER
 
 #endif /* AVCODEC_GET_BITS_H */
