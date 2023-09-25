@@ -122,6 +122,9 @@ libavutil/quickjs/quickjs-ffarray.c
 libavutil/quickjs/quickjs-mv.c
 libavutil/quickjs/repl.c
 libavutil/quickjs/unicode_gen_def.h
+libavutil/rtmidi/contrib/go/rtmidi/rtmidi_stub.h
+libavutil/rtmidi/rtmidi_c.h
+libavutil/rtmidi/tests/testcapi.c
 libswresample/log2_tab.c
 libswscale/log2_tab.c
 tools/uncoded_frame.c
@@ -177,6 +180,9 @@ libavutil/quickjs/quickjs-libc.h
 libavutil/quickjs/quickjs-opcode.h
 libavutil/quickjs/quickjs.h
 libavutil/quickjs/unicode_gen_def.h
+libavutil/rtmidi/RtMidi.h
+libavutil/rtmidi/contrib/go/rtmidi/rtmidi_stub.h
+libavutil/rtmidi/rtmidi_c.h
 tools/decode_simple.h
 Use of av_clip() where av_clip_uintp2() could be used:
 Use of av_clip() where av_clip_intp2() could be used:
