@@ -245,6 +245,13 @@ qjs$(EXESUF): $(addprefix $(SUBDIR), $(QUICKJS_OBJS) $(QUICKJS_QJS_OBJS))
 
 OBJS += $(QUICKJS_OBJS)
 
+# rtmidi
+RTMIDI_OBJS += rtmidi/RtMidi.o
+
+$(SUBDIR)rtmidi/RtMidi.o: CXXFLAGS += -DRTMIDI_EXPORT $(RTMIDI_API)
+
+OBJS-$(CONFIG_RTMIDI) += $(RTMIDI_OBJS)
+
 # Windows resource file
 SHLIBOBJS-$(HAVE_GNU_WINDRES)           += avutilres.o
 

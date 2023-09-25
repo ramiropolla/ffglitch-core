@@ -1847,6 +1847,7 @@ EXTERNAL_AUTODETECT_LIBRARY_LIST="
     lzma
     mediafoundation
     metal
+    rtmidi
     schannel
     sdl2
     securetransport
@@ -3997,7 +3998,7 @@ swscale_suggest="libm stdatomic"
 
 avcodec_extralibs="pthreads_extralibs iconv_extralibs dxva2_extralibs lcms2_extralibs"
 avfilter_extralibs="pthreads_extralibs"
-avutil_extralibs="d3d11va_extralibs d3d12va_extralibs mediacodec_extralibs nanosleep_extralibs pthreads_extralibs vaapi_drm_extralibs vaapi_x11_extralibs vaapi_win32_extralibs vdpau_x11_extralibs"
+avutil_extralibs="d3d11va_extralibs d3d12va_extralibs mediacodec_extralibs nanosleep_extralibs pthreads_extralibs rtmidi_extralibs vaapi_drm_extralibs vaapi_x11_extralibs vaapi_win32_extralibs vdpau_x11_extralibs"
 
 # programs
 ffmpeg_deps="avcodec avfilter avformat threads"
@@ -5763,6 +5764,8 @@ case $target_os in
             clang_version=$($cc -dumpversion)
             test ${clang_version%%.*} -eq 11 && add_cflags -fno-stack-check
         fi
+        RTMIDI_API=-D__MACOSX_CORE__
+        rtmidi_extralibs="-framework CoreAudio -framework CoreMIDI"
         ;;
     msys*)
         die "Native MSYS builds are discouraged, please use the MINGW environment."
@@ -5822,6 +5825,8 @@ case $target_os in
             add_ldexeflags -Wl,--image-base,0x140000000
             append SHFLAGS -Wl,--image-base,0x180000000
         fi
+        RTMIDI_API=-D__WINDOWS_MM__
+        rtmidi_extralibs="-lwinmm"
         ;;
     win32|win64)
         disable symver
@@ -5875,6 +5880,8 @@ case $target_os in
     linux)
         enable section_data_rel_ro
         enabled_any arm aarch64 && enable_weak linux_perf
+        RTMIDI_API=-D__LINUX_ALSA__
+        rtmidi_extralibs="-lasound"
         ;;
     irix*)
         target_os=irix
@@ -8149,6 +8156,7 @@ NOREDZONE_FLAGS=$noredzone_flags
 LIBFUZZER_PATH=$libfuzzer_path
 IGNORE_TESTS=$ignore_tests
 VERSION_TRACKING=$version_tracking
+RTMIDI_API=${RTMIDI_API}
 EOF
 
 map 'eval echo "${v}_FFLIBS=\$${v}_deps" >> ffbuild/config.mak' $LIBRARY_LIST

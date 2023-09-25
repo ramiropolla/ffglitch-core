@@ -43,6 +43,8 @@
 #include <TargetConditionals.h>
 #endif
 
+#if 0
+
 #if (TARGET_OS_IPHONE == 1)
 
     #define AudioGetCurrentHostTime CAHostTimeBase::GetCurrentTime
@@ -67,6 +69,8 @@
   #define AudioGetCurrentHostTime (uint64_t) mach_absolute_time
   #define AudioConvertHostTimeToNanos(t) t *CTime2nsFactor::Factor
   #define EndianS32_BtoN(n) n
+
+#endif
 
 #endif
 
@@ -968,10 +972,12 @@ struct CoreMidiData {
 
 static MIDIClientRef CoreMidiClientSingleton = 0;
 
+void RtMidi_setCoreMidiClientSingleton(MIDIClientRef client);
 void RtMidi_setCoreMidiClientSingleton(MIDIClientRef client){
   CoreMidiClientSingleton = client;
 }
 
+void RtMidi_disposeCoreMidiClientSingleton();
 void RtMidi_disposeCoreMidiClientSingleton(){
   if (CoreMidiClientSingleton == 0){
     return;
@@ -1312,6 +1318,7 @@ unsigned int MidiInCore :: getPortCount()
 
 // This function was submitted by Douglas Casey Tucker and apparently
 // derived largely from PortMidi.
+static
 CFStringRef CreateEndpointName( MIDIEndpointRef endpoint, bool isExternal )
 {
   CFMutableStringRef result = CFStringCreateMutable( NULL, 0 );
@@ -2034,6 +2041,7 @@ void MidiInAlsa :: initialize( const std::string& clientName )
 
   // Save our api-specific connection information.
   AlsaMidiData *data = (AlsaMidiData *) new AlsaMidiData;
+  data->lastTime = {};
   data->seq = seq;
   data->portNum = -1;
   data->vport = -1;
@@ -2393,6 +2401,7 @@ void MidiOutAlsa :: initialize( const std::string& clientName )
 
   // Save our api-specific connection information.
   AlsaMidiData *data = (AlsaMidiData *) new AlsaMidiData;
+  data->lastTime = {};
   data->seq = seq;
   data->portNum = -1;
   data->vport = -1;
