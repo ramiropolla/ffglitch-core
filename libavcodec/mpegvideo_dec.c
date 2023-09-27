@@ -341,7 +341,7 @@ int ff_mpv_frame_start(MpegEncContext *s, AVCodecContext *avctx)
     pic->reference = 0;
     if (!s->droppable) {
         if (s->pict_type != AV_PICTURE_TYPE_B)
-            pic->reference = 3;
+            pic->reference = 1;
     }
 
     if (alloc_picture(s, pic) < 0)
@@ -399,7 +399,7 @@ int ff_mpv_frame_start(MpegEncContext *s, AVCodecContext *avctx)
         }
         s->last_picture_ptr = &s->picture[idx];
 
-        s->last_picture_ptr->reference    = 3;
+        s->last_picture_ptr->reference    = 1;
         s->last_picture_ptr->f->flags &= ~AV_FRAME_FLAG_KEY;
         s->last_picture_ptr->f->pict_type = AV_PICTURE_TYPE_P;
 
@@ -426,7 +426,7 @@ int ff_mpv_frame_start(MpegEncContext *s, AVCodecContext *avctx)
         }
         s->next_picture_ptr = &s->picture[idx];
 
-        s->next_picture_ptr->reference   = 3;
+        s->next_picture_ptr->reference   = 1;
         s->next_picture_ptr->f->flags &= ~AV_FRAME_FLAG_KEY;
         s->next_picture_ptr->f->pict_type = AV_PICTURE_TYPE_P;
 

@@ -1177,7 +1177,7 @@ static int load_input_picture(MpegEncContext *s, const AVFrame *pic_arg)
             return i;
 
         pic = &s->picture[i];
-        pic->reference = 3;
+        pic->reference = 1;
 
         if (direct) {
             if ((ret = av_frame_ref(pic->f, pic_arg)) < 0)
@@ -1597,7 +1597,7 @@ no_output_pic:
     if (s->reordered_input_picture[0]) {
         s->reordered_input_picture[0]->reference =
            s->reordered_input_picture[0]->f->pict_type !=
-               AV_PICTURE_TYPE_B ? 3 : 0;
+               AV_PICTURE_TYPE_B;
 
         if ((ret = av_frame_ref(s->new_picture,
                                 s->reordered_input_picture[0]->f)))
