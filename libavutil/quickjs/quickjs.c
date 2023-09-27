@@ -43129,6 +43129,7 @@ static const JSCFunctionListEntry js_math_funcs[] = {
     JS_CFUNC_SPECIAL_DEF("floor", 1, f_f, floor ),
     JS_CFUNC_SPECIAL_DEF("ceil", 1, f_f, ceil ),
     JS_CFUNC_SPECIAL_DEF("round", 1, f_f, js_math_round ),
+    JS_CFUNC_SPECIAL_DEF("lround", 1, f_f, round ),
     JS_CFUNC_SPECIAL_DEF("sqrt", 1, f_f, sqrt ),
 
     JS_CFUNC_SPECIAL_DEF("acos", 1, f_f, acos ),
