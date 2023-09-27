@@ -376,6 +376,7 @@ void JS_AddIntrinsicJSON(JSContext *ctx);
 void JS_AddIntrinsicProxy(JSContext *ctx);
 void JS_AddIntrinsicMapSet(JSContext *ctx);
 void JS_AddIntrinsicTypedArrays(JSContext *ctx);
+void JS_AddIntrinsicFFArrays(JSContext *ctx);
 void JS_AddIntrinsicPromise(JSContext *ctx);
 void JS_AddIntrinsicBigInt(JSContext *ctx);
 void JS_AddIntrinsicBigFloat(JSContext *ctx);
@@ -743,6 +744,60 @@ int JS_IsArray(JSContext *ctx, JSValueConst val);
 
 JSValue JS_NewFastArray(JSContext *ctx, JSValue **parray, uint32_t len, int set_null);
 int JS_GetFastArray(JSValueConst val, JSValue **parray, uint32_t *plen);
+
+JSValue JS_NewInt8FFArray  (JSContext *ctx, int8_t   **pint8,   uint32_t len, int set_zero);
+JSValue JS_NewUint8FFArray (JSContext *ctx, uint8_t  **puint8,  uint32_t len, int set_zero);
+JSValue JS_NewInt16FFArray (JSContext *ctx, int16_t  **pint16,  uint32_t len, int set_zero);
+JSValue JS_NewUint16FFArray(JSContext *ctx, uint16_t **puint16, uint32_t len, int set_zero);
+JSValue JS_NewInt32FFArray (JSContext *ctx, int32_t  **pint32,  uint32_t len, int set_zero);
+JSValue JS_NewUint32FFArray(JSContext *ctx, uint32_t **puint32, uint32_t len, int set_zero);
+JSValue JS_NewInt64FFArray (JSContext *ctx, int64_t  **pint64,  uint32_t len, int set_zero);
+JSValue JS_NewUint64FFArray(JSContext *ctx, uint64_t **puint64, uint32_t len, int set_zero);
+
+int JS_IsInt8FFArray  (JSValueConst val);
+int JS_IsUint8FFArray (JSValueConst val);
+int JS_IsInt16FFArray (JSValueConst val);
+int JS_IsUint16FFArray(JSValueConst val);
+int JS_IsInt32FFArray (JSValueConst val);
+int JS_IsUint32FFArray(JSValueConst val);
+int JS_IsInt64FFArray (JSValueConst val);
+int JS_IsUint64FFArray(JSValueConst val);
+
+int JS_GetInt8FFArray  (JSValueConst val, int8_t   **pint8,   uint32_t *plen);
+int JS_GetUint8FFArray (JSValueConst val, uint8_t  **puint8,  uint32_t *plen);
+int JS_GetInt16FFArray (JSValueConst val, int16_t  **pint16,  uint32_t *plen);
+int JS_GetUint16FFArray(JSValueConst val, uint16_t **puint16, uint32_t *plen);
+int JS_GetInt32FFArray (JSValueConst val, int32_t  **pint32,  uint32_t *plen);
+int JS_GetUint32FFArray(JSValueConst val, uint32_t **puint32, uint32_t *plen);
+int JS_GetInt64FFArray (JSValueConst val, int64_t  **pint64,  uint32_t *plen);
+int JS_GetUint64FFArray(JSValueConst val, uint64_t **puint64, uint32_t *plen);
+
+JSValue JS_NewInt8FFPtr  (JSContext *ctx, int8_t   *pint8,   uint32_t len);
+JSValue JS_NewUint8FFPtr (JSContext *ctx, uint8_t  *puint8,  uint32_t len);
+JSValue JS_NewInt16FFPtr (JSContext *ctx, int16_t  *pint16,  uint32_t len);
+JSValue JS_NewUint16FFPtr(JSContext *ctx, uint16_t *puint16, uint32_t len);
+JSValue JS_NewInt32FFPtr (JSContext *ctx, int32_t  *pint32,  uint32_t len);
+JSValue JS_NewUint32FFPtr(JSContext *ctx, uint32_t *puint32, uint32_t len);
+JSValue JS_NewInt64FFPtr (JSContext *ctx, int64_t  *pint64,  uint32_t len);
+JSValue JS_NewUint64FFPtr(JSContext *ctx, uint64_t *puint64, uint32_t len);
+
+int JS_IsInt8FFPtr  (JSValueConst val);
+int JS_IsUint8FFPtr (JSValueConst val);
+int JS_IsInt16FFPtr (JSValueConst val);
+int JS_IsUint16FFPtr(JSValueConst val);
+int JS_IsInt32FFPtr (JSValueConst val);
+int JS_IsUint32FFPtr(JSValueConst val);
+int JS_IsInt64FFPtr (JSValueConst val);
+int JS_IsUint64FFPtr(JSValueConst val);
+
+int JS_GetInt8FFPtr  (JSValueConst val, int8_t   **pint8,   uint32_t *plen);
+int JS_GetUint8FFPtr (JSValueConst val, uint8_t  **puint8,  uint32_t *plen);
+int JS_GetInt16FFPtr (JSValueConst val, int16_t  **pint16,  uint32_t *plen);
+int JS_GetUint16FFPtr(JSValueConst val, uint16_t **puint16, uint32_t *plen);
+int JS_GetInt32FFPtr (JSValueConst val, int32_t  **pint32,  uint32_t *plen);
+int JS_GetUint32FFPtr(JSValueConst val, uint32_t **puint32, uint32_t *plen);
+int JS_GetInt64FFPtr (JSValueConst val, int64_t  **pint64,  uint32_t *plen);
+int JS_GetUint64FFPtr(JSValueConst val, uint64_t **puint64, uint32_t *plen);
 
 JSValue JS_GetPropertyInternal(JSContext *ctx, JSValueConst obj,
                                JSAtom prop, JSValueConst receiver,
