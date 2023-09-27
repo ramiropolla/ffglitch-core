@@ -465,7 +465,7 @@ static void record_block(MpegEncContext *s, int16_t *block, int n)
 void ff_mjpeg_encode_block(
         PutBitContext *pb,
         MJpegContext *m,
-        ScanTable *scantable,
+        uint8_t permutated_scantable[64],
         int *last_dc,
         int *block_last_index,
         int16_t *block,
@@ -496,7 +496,7 @@ void ff_mjpeg_encode_block(
     run = 0;
     last_index = block_last_index[n];
     for(i=1;i<=last_index;i++) {
-        j = scantable->permutated[i];
+        j = permutated_scantable[i];
         val = block[j];
         if (val == 0) {
             run++;
@@ -528,7 +528,7 @@ void ff_mjpeg_encode_block(
 
 static void encode_block(MpegEncContext *s, int16_t *block, int n)
 {
-    ff_mjpeg_encode_block(&s->pb, s->mjpeg_ctx, &s->intra_scantable,
+    ff_mjpeg_encode_block(&s->pb, s->mjpeg_ctx, s->intra_scantable.permutated,
                           s->last_dc, s->block_last_index, block, n);
 }
 

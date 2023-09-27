@@ -41,6 +41,7 @@
 #include "idctdsp.h"
 #include "ffedit_xp.h"
 
+#include "mjpegenc_common.h"
 #include "mjpegenc.h"
 
 #undef near /* This file uses struct member 'near' which in windows.h is defined as empty. */
