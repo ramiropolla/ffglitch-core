@@ -83,7 +83,8 @@ enum {
     JS_TAG_UNINITIALIZED = 4,
     JS_TAG_CATCH_OFFSET = 5,
     JS_TAG_EXCEPTION   = 6,
-    JS_TAG_FLOAT64     = 7,
+    JS_TAG_MV          = 7,
+    JS_TAG_FLOAT64     = 8,
     /* any larger tag is FLOAT64 if JS_NAN_BOXING */
 };
 
@@ -196,6 +197,7 @@ static inline JS_BOOL JS_VALUE_IS_NAN(JSValue v)
 
 typedef union JSValueUnion {
     int32_t int32;
+    int32_t mv[2];
     int64_t int64;
     double float64;
     void *ptr;
@@ -215,11 +217,15 @@ typedef struct JSValue {
 #define JS_VALUE_GET_BOOL(v) ((v).u.int32)
 #define JS_VALUE_GET_FLOAT64(v) ((v).u.float64)
 #define JS_VALUE_GET_PTR(v) ((v).u.ptr)
+#define JS_VALUE_GET_MV0(v) ((v).u.mv[0])
+#define JS_VALUE_GET_MV1(v) ((v).u.mv[1])
+#define JS_VALUE_GET_MV(v) ((v).u.mv)
 
 /* ffedit: write int64_t instead of int32_t (even if the value is just
  *         an int32_t) so that there is no 32-bit hole, and a movsxd
  *         can be used. 11% speedup in general. */
 #define JS_MKVAL(tag, val) (JSValue){ (JSValueUnion){ .int64 = (int32_t) val }, tag }
+#define JS_MKMV(tag, mv0, mv1) (JSValue){ (JSValueUnion){ .mv = { (int32_t) mv0, (int32_t) mv1 } }, tag }
 #define JS_MKPTR(tag, p) (JSValue){ (JSValueUnion){ .ptr = p }, tag }
 
 #define JS_TAG_IS_FLOAT64(tag) ((unsigned)(tag) == JS_TAG_FLOAT64)
@@ -377,6 +383,7 @@ void JS_AddIntrinsicProxy(JSContext *ctx);
 void JS_AddIntrinsicMapSet(JSContext *ctx);
 void JS_AddIntrinsicTypedArrays(JSContext *ctx);
 void JS_AddIntrinsicFFArrays(JSContext *ctx);
+void JS_AddIntrinsicMVs(JSContext *ctx);
 void JS_AddIntrinsicPromise(JSContext *ctx);
 void JS_AddIntrinsicBigInt(JSContext *ctx);
 void JS_AddIntrinsicBigFloat(JSContext *ctx);
@@ -520,6 +527,11 @@ static js_force_inline JSValue JS_NewBool(JSContext *ctx, JS_BOOL val)
 static js_force_inline JSValue JS_NewInt32(JSContext *ctx, int32_t val)
 {
     return JS_MKVAL(JS_TAG_INT, val);
+}
+
+static js_force_inline JSValue JS_MV(JSContext *ctx, int32_t mv0, int32_t mv1)
+{
+    return JS_MKMV(JS_TAG_MV, mv0, mv1);
 }
 
 static js_force_inline JSValue JS_NewCatchOffset(JSContext *ctx, int32_t val)
@@ -798,6 +810,27 @@ int JS_GetInt32FFPtr (JSValueConst val, int32_t  **pint32,  uint32_t *plen);
 int JS_GetUint32FFPtr(JSValueConst val, uint32_t **puint32, uint32_t *plen);
 int JS_GetInt64FFPtr (JSValueConst val, int64_t  **pint64,  uint32_t *plen);
 int JS_GetUint64FFPtr(JSValueConst val, uint64_t **puint64, uint32_t *plen);
+
+JSValue JS_NewMV(JSContext *ctx, int32_t x, int32_t y);
+int JS_IsMV(JSValueConst val);
+int JS_GetMV(JSValueConst val, int32_t *px, int32_t *py);
+
+JSValue JS_NewMVArray(JSContext *ctx, int32_t **pint32, uint32_t len, int set_zero);
+int JS_IsMVArray(JSValueConst val);
+int JS_GetMVArray(JSValueConst val, int32_t **pint32, uint32_t *plen);
+
+JSValue JS_NewMVPtr(JSContext *ctx, int32_t *pint32, uint32_t len);
+int JS_IsMVPtr(JSValueConst val);
+int JS_GetMVPtr(JSValueConst val, int32_t **pint32, uint32_t *plen);
+
+JSValue JS_NewMVMask(JSContext *ctx, int64_t **pint64, uint32_t len, int set_zero);
+JSValue JS_NewMVMaskPtr(JSContext *ctx, int64_t *pint64, uint32_t len);
+
+JSValue JS_NewMV2DArray(JSContext *ctx, int32_t **pint32, uint32_t width, uint32_t height, int set_zero);
+int JS_IsMV2DArray(JSValueConst val);
+int JS_GetMV2DArray(JSValueConst val, JSValue **pvalues, uint32_t *pwidth, uint32_t *pheight);
+
+JSValue JS_NewMV2DMask(JSContext *ctx, int64_t **pint64, uint32_t width, uint32_t height, int set_zero);
 
 JSValue JS_GetPropertyInternal(JSContext *ctx, JSValueConst obj,
                                JSAtom prop, JSValueConst receiver,

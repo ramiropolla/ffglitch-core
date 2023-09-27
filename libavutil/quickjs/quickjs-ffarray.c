@@ -123,6 +123,8 @@ static force_inline
 void ffarray_join_internal(StringBuffer *b, JSObject *p, int c, JSString *str_p)
 {
     uint32_t len = p->u.array.count;
+    if ( p->class_id == JS_CLASS_MV || p->class_id == JS_CLASS_MVREF )
+        len = 1;
     /* string_buffer_putc8(b, '['); */
     for ( size_t i = 0; i < len; i++ )
     {
@@ -167,6 +169,31 @@ void ffarray_join_internal(StringBuffer *b, JSObject *p, int c, JSString *str_p)
         case JS_CLASS_UINT64_FFARRAY:
         case JS_CLASS_UINT64_FFPTR:
             sprintf(buf, "%" PRIu64, p->u.array.u.uint64_ptr[i]);
+            break;
+        case JS_CLASS_MV:
+        case JS_CLASS_MVREF:
+        case JS_CLASS_MVARRAY:
+        case JS_CLASS_MVPTR:
+            print_mv(buf, &p->u.array.u.int32_ptr[i << 1]);
+            break;
+        case JS_CLASS_MVMASK:
+            if ( p->u.array.u.int64_ptr[i] == 0 )
+            {
+                buf[0] = 'f';
+                buf[1] = 'a';
+                buf[2] = 'l';
+                buf[3] = 's';
+                buf[4] = 'e';
+                buf[5] = '\0';
+            }
+            else
+            {
+                buf[0] = 't';
+                buf[1] = 'r';
+                buf[2] = 'u';
+                buf[3] = 'e';
+                buf[4] = '\0';
+            }
             break;
         }
         string_buffer_puts8(b, buf);
@@ -284,6 +311,11 @@ static JSValue js_ffarray_subarray(JSContext *ctx, JSValueConst this_val,
     case JS_CLASS_UINT64_FFARRAY:
     case JS_CLASS_UINT64_FFPTR:
         return JS_NewUint64FFPtr(ctx, p->u.array.u.uint64_ptr + idx, length);
+    case JS_CLASS_MVARRAY:
+    case JS_CLASS_MVPTR:
+        return JS_NewMVPtr(ctx, p->u.array.u.int32_ptr + (idx << 1), length);
+    case JS_CLASS_MVMASK:
+        return JS_NewMVMaskPtr(ctx, p->u.array.u.int64_ptr + (idx << 1), length);
     }
 
     return JS_UNDEFINED;
@@ -295,6 +327,8 @@ static int normalized_class(int class_id)
         return class_id - JS_CLASS_INT8_FFARRAY;
     if ( class_id >= JS_CLASS_INT8_FFPTR && class_id <= JS_CLASS_UINT64_FFPTR )
         return class_id - JS_CLASS_INT8_FFPTR;
+    if ( class_id == JS_CLASS_MVARRAY )
+        return JS_CLASS_MVPTR;
     return class_id;
 }
 
@@ -413,6 +447,11 @@ static JSValue js_ffarray_new(JSContext *ctx, void **dst_ptr, uint32_t length, i
     case JS_CLASS_UINT64_FFARRAY:
     case JS_CLASS_UINT64_FFPTR:
         return JS_NewUint64FFArray(ctx, (uint64_t **) dst_ptr, length, 0);
+    case JS_CLASS_MVARRAY:
+    case JS_CLASS_MVPTR:
+        return JS_NewMVArray(ctx, (int32_t **) dst_ptr, length, 0);
+    case JS_CLASS_MVMASK:
+        return JS_NewMVMask(ctx, (int64_t **) dst_ptr, length, 0);
     }
     return JS_EXCEPTION;
 }

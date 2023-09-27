@@ -79,6 +79,8 @@ DEF(await, "await")
 DEF(empty_string, "")
 /* identifiers */
 DEF(length, "length")
+DEF(width, "width") /* mv2darray */
+DEF(height, "height") /* mv2darray */
 DEF(fileName, "fileName")
 DEF(lineNumber, "lineNumber")
 DEF(message, "message")
@@ -233,6 +235,15 @@ DEF(Int32FFPtr, "Int32FFPtr")
 DEF(Uint32FFPtr, "Uint32FFPtr")
 DEF(Int64FFPtr, "Int64FFPtr")
 DEF(Uint64FFPtr, "Uint64FFPtr")
+/* motion vectors */
+DEF(MV, "MV")
+DEF(MVRef, "MVRef")
+DEF(MVArray, "MVArray")
+DEF(MVPtr, "MVPtr")
+DEF(MVMask, "MVMask")
+DEF(MV2DArray, "MV2DArray")
+DEF(MV2DPtr, "MV2DPtr")
+DEF(MV2DMask, "MV2DMask")
 DEF(DataView, "DataView")
 DEF(BigInt, "BigInt")
 #ifdef CONFIG_BIGNUM
