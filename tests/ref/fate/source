@@ -117,8 +117,10 @@ libavformat/golomb_tab.c
 libavformat/log2_tab.c
 libavformat/rangecoder_dec.c
 libavutil/quickjs/libunicode-table.h
+libavutil/quickjs/qjscalc.c
 libavutil/quickjs/quickjs-ffarray.c
 libavutil/quickjs/quickjs-mv.c
+libavutil/quickjs/repl.c
 libavutil/quickjs/unicode_gen_def.h
 libswresample/log2_tab.c
 libswscale/log2_tab.c

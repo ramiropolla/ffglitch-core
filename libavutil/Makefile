@@ -218,6 +218,10 @@ QUICKJS_OBJS += quickjs/libunicode.o
 QUICKJS_OBJS += quickjs/quickjs-libc.o
 QUICKJS_OBJS += quickjs/quickjs.o
 
+QUICKJS_QJS_OBJS += quickjs/qjs.o
+QUICKJS_QJS_OBJS += quickjs/qjscalc.o
+QUICKJS_QJS_OBJS += quickjs/repl.o
+
 QUICKJS_CONFIG_VERSION := $(shell cat $(SRC_PATH)/libavutil/quickjs/VERSION)
 
 $(SUBDIR)quickjs/cutils.o:       CFLAGS += -D_GNU_SOURCE -DCONFIG_VERSION=\"$(QUICKJS_CONFIG_VERSION)\" -DCONFIG_BIGNUM
@@ -235,6 +239,9 @@ QUICKJS_LIBS=-lm -lpthread
 ifneq ($(EXESUF),.exe)
 QUICKJS_LIBS+=-ldl
 endif
+
+qjs$(EXESUF): $(addprefix $(SUBDIR), $(QUICKJS_OBJS) $(QUICKJS_QJS_OBJS))
+	$(CC) -o $@ $^ $(QUICKJS_LIBS)
 
 OBJS += $(QUICKJS_OBJS)
 
