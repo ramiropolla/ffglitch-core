@@ -1066,6 +1066,13 @@ int JS_SetModuleExport(JSContext *ctx, JSModuleDef *m, const char *export_name,
 int JS_SetModuleExportList(JSContext *ctx, JSModuleDef *m,
                            const JSCFunctionListEntry *tab, int len);
 
+/* Helpers for print() and console.log() */
+int JS_SetWriteFunc(
+        JSContext *ctx,
+        size_t (*write_func)(const void *ptr, size_t size, size_t nmemb, void *stream),
+        void *write_arg);
+size_t JS_Write(JSContext *ctx, const void *ptr, size_t size);
+
 #undef js_unlikely
 #undef js_force_inline
 

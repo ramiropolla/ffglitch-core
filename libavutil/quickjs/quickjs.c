@@ -447,6 +447,10 @@ struct JSContext {
 
     struct list_head loaded_modules; /* list of JSModuleDef.link */
 
+    /* Helpers for print() and console.log() */
+    size_t (*write_func)(const void *ptr, size_t size, size_t nmemb, void *stream);
+    void *write_arg;
+
     /* if NULL, RegExp compilation is not supported */
     JSValue (*compile_regexp)(JSContext *ctx, JSValueConst pattern,
                               JSValueConst flags);
@@ -2147,6 +2151,7 @@ JSContext *JS_NewContextRaw(JSRuntime *rt)
     ctx->promise_ctor = JS_NULL;
     init_list_head(&ctx->loaded_modules);
 
+    JS_SetWriteFunc(ctx, (size_t (*)(const void *, size_t, size_t, void *)) fwrite, stdout);
     JS_AddIntrinsicBasicObjects(ctx);
     return ctx;
 }
@@ -36851,6 +36856,22 @@ int JS_SetModuleExportList(JSContext *ctx, JSModuleDef *m,
             return -1;
     }
     return 0;
+}
+
+/* Helpers for print() and console.log() */
+int JS_SetWriteFunc(
+        JSContext *ctx,
+        size_t (*write_func)(const void *ptr, size_t size, size_t nmemb, void *stream),
+        void *write_arg)
+{
+    ctx->write_func = write_func;
+    ctx->write_arg = write_arg;
+    return 0;
+}
+
+size_t JS_Write(JSContext *ctx, const void *ptr, size_t size)
+{
+    return ctx->write_func(ptr, size, 1, ctx->write_arg);
 }
 
 /* Note: 'func_obj' is not necessarily a constructor */

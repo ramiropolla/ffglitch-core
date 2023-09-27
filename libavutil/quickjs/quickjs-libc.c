@@ -3796,14 +3796,14 @@ static JSValue js_print(JSContext *ctx, JSValueConst this_val,
 
     for(i = 0; i < argc; i++) {
         if (i != 0)
-            putchar(' ');
+            JS_Write(ctx, " ", 1);
         str = JS_ToCStringLen(ctx, &len, argv[i]);
         if (!str)
             return JS_EXCEPTION;
-        fwrite(str, 1, len, stdout);
+        JS_Write(ctx, str, len);
         JS_FreeCString(ctx, str);
     }
-    putchar('\n');
+    JS_Write(ctx, "\n", 1);
     return JS_UNDEFINED;
 }
 
