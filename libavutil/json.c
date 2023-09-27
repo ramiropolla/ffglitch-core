@@ -290,3 +290,51 @@ int json_dynamic_array_done(json_ctx_t *jctx, json_t *jso)
     }
     return 0;
 }
+
+//---------------------------------------------------------------------
+// mv2darray
+json_t *json_mv2darray_new(
+        json_ctx_t *jctx,
+        int16_t width,
+        int16_t height,
+        int max_nb_blocks,
+        int set_zero)
+{
+    json_t *jso = alloc_json_t(jctx);
+    json_mv2darray_t *jmv2d = json_allocator_get0(jctx, sizeof(json_mv2darray_t));
+    for ( size_t i = 0; i < max_nb_blocks; i++ )
+    {
+        int32_t *mvs = json_allocator_get(jctx, (sizeof(int32_t) * width * height) << 1);
+        if ( set_zero == 1 )
+        {
+            memset(mvs, 0, (sizeof(int32_t) * width * height) << 1);
+        }
+        else if ( set_zero == -1 )
+        {
+            for ( size_t j = 0; j < (width * height * 2); j++ )
+                mvs[j] = MV_NULL;
+        }
+        jmv2d->mvs[i] = mvs;
+    }
+    jmv2d->nb_blocks_array = json_allocator_get0(jctx, width * height);
+    jmv2d->width = width;
+    jmv2d->height = height;
+    jmv2d->max_nb_blocks = max_nb_blocks;
+    jso->mv2darray = jmv2d;
+    jso->flags = JSON_TYPE_MV_2DARRAY;
+    return jso;
+}
+
+void json_mv2darray_done(json_ctx_t *jctx, json_t *jso)
+{
+    json_mv2darray_t *jmv2d = jso->mv2darray;
+    const uint8_t *nb_blocks_array = jmv2d->nb_blocks_array;
+    const size_t width = jmv2d->width;
+    const size_t height = jmv2d->height;
+    int max_nb_blocks = 0;
+    for ( size_t i = 0; i < height; i++ )
+        for ( size_t j = 0; j < width; j++ )
+            if ( max_nb_blocks < nb_blocks_array[i * width + j] )
+                max_nb_blocks = nb_blocks_array[i * width + j];
+    jmv2d->max_nb_blocks = max_nb_blocks;
+}

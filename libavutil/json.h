@@ -38,6 +38,16 @@ typedef struct {
     void *userdata;
 } json_obj_t;
 
+#define MAX_MV2DARRAY_NBLOCKS 4
+#define MV_NULL 0x80000000
+typedef struct {
+    int32_t *mvs[MAX_MV2DARRAY_NBLOCKS];
+    uint8_t *nb_blocks_array;
+    uint16_t width;
+    uint16_t height;
+    int max_nb_blocks;
+} json_mv2darray_t;
+
 #define JSON_NULL 0x8000000000000000ULL
 
 struct json_t {
@@ -47,6 +57,7 @@ struct json_t {
 #define JSON_TYPE_STRING        0x00080000
 #define JSON_TYPE_NUMBER        0x00100000
 #define JSON_TYPE_BOOL          0x00200000
+#define JSON_TYPE_MV_2DARRAY    0x00400000 /* 2d array of mvs, if mv[x][y][0] is 0x80000000, the mv is JSON_NULL */
 #define JSON_PFLAGS_NO_LF       0x01000000
 #define JSON_PFLAGS_NO_SPACE    0x02000000
 #define JSON_PFLAGS_SPLIT8      0x04000000
@@ -56,6 +67,7 @@ struct json_t {
     union {
         char *str;
         int64_t val;
+        json_mv2darray_t *mv2darray;
         json_t **array;
         int32_t *array_of_ints;
         json_obj_t *obj;
@@ -210,6 +222,17 @@ json_t *json_array_of_ints_new(json_ctx_t *jctx, size_t len)
     json_make_array_of_ints(jctx, jso, len);
     return jso;
 }
+
+//---------------------------------------------------------------------
+// mv2darray
+json_t *json_mv2darray_new(
+        json_ctx_t *jctx,
+        int16_t width,
+        int16_t height,
+        int max_nb_blocks,
+        int set_zero);
+
+void json_mv2darray_done(json_ctx_t *jctx, json_t *jso);
 
 //---------------------------------------------------------------------
 // object

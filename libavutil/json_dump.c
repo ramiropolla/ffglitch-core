@@ -180,6 +180,25 @@ static void output_string(sbuf *ctx, const char *str)
     sbuf_fputc(ctx, '"');
 }
 
+static void output_mv(sbuf *ctx, int32_t *mv)
+{
+    sbuf_fputc(ctx, '[');
+    output_num_32(ctx, mv[0]);
+    sbuf_fputc(ctx, ',');
+    output_num_32(ctx, mv[1]);
+    sbuf_fputc(ctx, ']');
+}
+
+static void output_mv_or_null(sbuf *ctx, int32_t *mv)
+{
+    if ( mv[0] == MV_NULL )
+    {
+        sbuf_fputs(ctx, "null");
+        return;
+    }
+    output_mv(ctx, mv);
+}
+
 static void json_print_element(sbuf *ctx, json_t *jso, int level)
 {
     size_t len;
@@ -230,6 +249,79 @@ static void json_print_element(sbuf *ctx, json_t *jso, int level)
         }
         output_lf(ctx, jso, level);
         sbuf_fputc(ctx, ']');
+        break;
+    case JSON_TYPE_MV_2DARRAY:
+        {
+            json_mv2darray_t *mv2d = jso->mv2darray;
+            const size_t width = mv2d->width;
+            const size_t height = mv2d->height;
+            sbuf_fputc(ctx, '[');
+            if ( mv2d->max_nb_blocks == 1 )
+            {
+                for ( size_t i = 0; i < height; i++ )
+                {
+                    if ( i != 0 )
+                        sbuf_fputc(ctx, ',');
+                    output_lf(ctx, jso, level+1);
+                    sbuf_fputc(ctx, '[');
+                    for ( size_t j = 0; j < width; j++ )
+                    {
+                        size_t idx = i * width + j;
+                        int32_t *mv = &mv2d->mvs[0][idx << 1];
+                        if ( j != 0 )
+                            sbuf_fputc(ctx, ',');
+                        sbuf_fputc(ctx, ' ');
+                        output_mv_or_null(ctx, mv);
+                    }
+                    sbuf_fputc(ctx, ' ');
+                    sbuf_fputc(ctx, ']');
+                }
+            }
+            else
+            {
+                const uint8_t *nb_blocks_array = mv2d->nb_blocks_array;
+                for ( size_t i = 0; i < height; i++ )
+                {
+                    if ( i != 0 )
+                        sbuf_fputc(ctx, ',');
+                    output_lf(ctx, jso, level+1);
+                    sbuf_fputc(ctx, '[');
+                    for ( size_t j = 0; j < width; j++ )
+                    {
+                        size_t idx = i * width + j;
+                        uint8_t nb_blocks = nb_blocks_array[idx];
+                        if ( j != 0 )
+                            sbuf_fputc(ctx, ',');
+                        sbuf_fputc(ctx, ' ');
+                        if ( nb_blocks == 0 )
+                        {
+                            sbuf_fputs(ctx, "null");
+                        }
+                        else if ( nb_blocks == 1 )
+                        {
+                            int32_t *mv = &mv2d->mvs[0][idx << 1];
+                            output_mv(ctx, mv);
+                        }
+                        else
+                        {
+                            sbuf_fputc(ctx, '[');
+                            for ( size_t k = 0; k < nb_blocks; k++ )
+                            {
+                                int32_t *mv = &mv2d->mvs[k][idx << 1];
+                                if ( k != 0 )
+                                    sbuf_fputc(ctx, ',');
+                                output_mv(ctx, mv);
+                            }
+                            sbuf_fputc(ctx, ']');
+                        }
+                    }
+                    sbuf_fputc(ctx, ' ');
+                    sbuf_fputc(ctx, ']');
+                }
+            }
+            output_lf(ctx, jso, level);
+            sbuf_fputc(ctx, ']');
+        }
         break;
     case JSON_TYPE_STRING:
         output_string(ctx, jso->str);
