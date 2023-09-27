@@ -61,8 +61,41 @@
 #include "ffplay_renderer.h"
 #include "opt_common.h"
 
+/* must come after cmdutils.h because of GROW_ARRAY() */
+#include "libavutil/script.h"
+
 const char program_name[] = "fflive";
 const int program_birth_year = 2003;
+
+#define THREAD_TYPE            SDL_Thread *
+#define THREAD_RET_TYPE        int
+#define THREAD_CREATE(thread, func, args) do { thread = SDL_CreateThread(func, #func, args); } while ( 0 )
+#define THREAD_JOIN(thread)    do { SDL_WaitThread(thread, NULL); } while ( 0 )
+#define THREAD_RET_OK          0
+#define MUTEX_TYPE             SDL_mutex *
+#define MUTEX_INIT(mutex)      do { mutex = SDL_CreateMutex(); } while ( 0 )
+#define MUTEX_LOCK(mutex)      do { SDL_LockMutex(mutex);      } while ( 0 )
+#define MUTEX_UNLOCK(mutex)    do { SDL_UnlockMutex(mutex);    } while ( 0 )
+#define MUTEX_DESTROY(mutex)   do { SDL_DestroyMutex(mutex);   } while ( 0 )
+#define COND_TYPE              SDL_cond *
+#define COND_INIT(cond)        do { cond = SDL_CreateCond();   } while ( 0 )
+#define COND_SIGNAL(cond)      do { SDL_CondSignal(cond);      } while ( 0 )
+#define COND_WAIT(cond, mutex) do { SDL_CondWait(cond, mutex); } while ( 0 )
+#define COND_DESTROY(cond)     do { SDL_DestroyCond(cond);     } while ( 0 )
+
+#include "libavutil/json.h"
+#include "libavformat/ffedit.h"
+#include "libavcodec/ffedit.h"
+#include "libavutil/quickjs/quickjs-libc.h"
+#include "libavutil/quickjs-sdl.h"
+
+#include "ffedit_common.c"
+
+static FFEditScriptFuncContext *sfc;
+/* output context to keep track of fixups from file format */
+static FFEditOutputContext *ffo_fmt = NULL;
+/* output context to keep packets modified by decoder */
+static FFEditOutputContext *ffo_codec = NULL;
 
 #define MAX_QUEUE_SIZE (15 * 1024 * 1024)
 #define MIN_FRAMES 25
@@ -199,6 +232,15 @@ typedef struct Decoder {
     int64_t next_pts;
     AVRational next_pts_tb;
     SDL_Thread *decoder_tid;
+    int stream_index;
+
+    /* ffglitch */
+    int is_importing_script;
+    int is_exporting_script;
+    FFEditJSONQueue *jq_in;
+    FFEditJSONQueue *jq_out;
+    json_ctx_t *cur_jctx;
+    FFEditOutputContext *ectx;
 } Decoder;
 
 typedef struct VideoState {
@@ -227,6 +269,7 @@ typedef struct VideoState {
 
     Decoder auddec;
     Decoder viddec;
+    Decoder viddec_2;
     Decoder subdec;
 
     int audio_stream;
@@ -254,6 +297,7 @@ typedef struct VideoState {
     struct AudioParams audio_filter_src;
     struct AudioParams audio_tgt;
     struct SwrContext *swr_ctx;
+    int frame_drops_warning; /* ffedit */
     int frame_drops_early;
     int frame_drops_late;
 
@@ -284,6 +328,7 @@ typedef struct VideoState {
     int video_stream;
     AVStream *video_st;
     PacketQueue videoq;
+    PacketQueue videoq_2;
     double max_frame_duration;      // maximum duration of a frame - above this, we consider the jump a timestamp discontinuity
     struct SwsContext *sub_convert_ctx;
     int eof;
@@ -568,7 +613,13 @@ static int packet_queue_get(PacketQueue *q, AVPacket *pkt, int block, int *seria
     return ret;
 }
 
-static int decoder_init(Decoder *d, AVCodecContext *avctx, PacketQueue *queue, SDL_cond *empty_queue_cond) {
+static int decoder_init(
+        Decoder *d,
+        AVCodecContext *avctx,
+        PacketQueue *queue,
+        SDL_cond *empty_queue_cond,
+        int stream_index)
+{
     memset(d, 0, sizeof(Decoder));
     d->pkt = av_packet_alloc();
     if (!d->pkt)
@@ -578,6 +629,7 @@ static int decoder_init(Decoder *d, AVCodecContext *avctx, PacketQueue *queue, S
     d->empty_queue_cond = empty_queue_cond;
     d->start_pts = AV_NOPTS_VALUE;
     d->pkt_serial = -1;
+    d->stream_index = stream_index;
     return 0;
 }
 
@@ -616,13 +668,32 @@ static int decoder_decode_frame(Decoder *d, AVFrame *frame, AVSubtitle *sub) {
                         }
                         break;
                 }
+                if ( d->ectx != NULL && d->avctx->ffe_xp_packets )
+                {
+                    for ( size_t i = 0; i < d->avctx->nb_ffe_xp_packets; i++ )
+                    {
+                        FFEditTransplicatePacket *opkt = &d->avctx->ffe_xp_packets[i];
+                        ffe_output_packet(d->ectx,
+                                          opkt->i_pos,
+                                          opkt->i_size,
+                                          opkt->data,
+                                          opkt->o_size);
+                        av_freep(&opkt->data);
+                    }
+                    av_freep(&d->avctx->ffe_xp_packets);
+                    d->avctx->nb_ffe_xp_packets = 0;
+                }
                 if (ret == AVERROR_EOF) {
                     d->finished = d->pkt_serial;
                     avcodec_flush_buffers(d->avctx);
                     return 0;
                 }
                 if (ret >= 0)
+                {
+                    if ( d->is_exporting_script )
+                        add_frame_to_ffedit_json_queue(d->jq_in, frame, d->stream_index);
                     return 1;
+                }
             } while (ret != AVERROR(EAGAIN));
         }
 
@@ -668,6 +739,18 @@ static int decoder_decode_frame(Decoder *d, AVFrame *frame, AVSubtitle *sub) {
                     return AVERROR(ENOMEM);
                 fd = (FrameData*)d->pkt->opaque_ref->data;
                 fd->pkt_pos = d->pkt->pos;
+            }
+
+            if ( d->pkt->data != NULL )
+            {
+                memset(d->pkt->ffedit_sd, 0x00, sizeof(d->pkt->ffedit_sd));
+                if ( d->is_importing_script )
+                    get_from_ffedit_json_queue(d->jq_out, d->pkt);
+            }
+            if ( d->is_importing_script )
+            {
+                json_ctx_free(d->cur_jctx);
+                d->cur_jctx = d->pkt->jctx;
             }
 
             if (avcodec_send_packet(d->avctx, d->pkt) == AVERROR(EAGAIN)) {
@@ -726,6 +809,8 @@ static void frame_queue_destroy(FrameQueue *f)
 
 static void frame_queue_signal(FrameQueue *f)
 {
+    if ( f == NULL )
+        return;
     SDL_LockMutex(f->mutex);
     SDL_CondSignal(f->cond);
     SDL_UnlockMutex(f->mutex);
@@ -1241,6 +1326,16 @@ static void stream_component_close(VideoState *is, int stream_index)
     case AVMEDIA_TYPE_VIDEO:
         decoder_abort(&is->viddec, &is->pictq);
         decoder_destroy(&is->viddec);
+        if ( sfc != NULL )
+        {
+            flush_ffedit_json_queue(&sfc->jq_in);
+            flush_ffedit_json_queue(&sfc->jq_out);
+            if ( is->viddec_2.is_exporting_script != 0 )
+            {
+                decoder_abort(&is->viddec_2, NULL);
+                decoder_destroy(&is->viddec_2);
+            }
+        }
         break;
     case AVMEDIA_TYPE_SUBTITLE:
         decoder_abort(&is->subdec, &is->subpq);
@@ -1283,9 +1378,35 @@ static void stream_close(VideoState *is)
     if (is->subtitle_stream >= 0)
         stream_component_close(is, is->subtitle_stream);
 
+    if ( ffo_codec != NULL )
+    {
+        if ( ffo_fmt != NULL )
+        {
+            /* finish reading input to populate ffo_fmt */
+            AVPacket *pkt = av_packet_alloc();
+            while ( 42 )
+            {
+                int ret;
+                ret = av_read_frame(is->ic, pkt);
+                av_packet_unref(pkt);
+                if ( ret < 0 ) // EOF or TODO error
+                    break;
+            }
+            av_packet_free(&pkt);
+
+            ffe_output_merge(ffo_codec, ffo_fmt);
+            ffe_output_freep(&ffo_fmt);
+        }
+
+        /* write glitched file */
+        ffe_output_flush(ffo_codec, is->ic);
+        ffe_output_freep(&ffo_codec);
+    }
+
     avformat_close_input(&is->ic);
 
     packet_queue_destroy(&is->videoq);
+    packet_queue_destroy(&is->videoq_2);
     packet_queue_destroy(&is->audioq);
     packet_queue_destroy(&is->subtitleq);
 
@@ -1309,6 +1430,13 @@ static void do_exit(VideoState *is)
 {
     if (is) {
         stream_close(is);
+    }
+    if ( sfc != NULL )
+    {
+        sfc_destroy(sfc);
+        av_freep(&sfc);
+        av_freep(&script_fname);
+        av_freep(&output_fname);
     }
     if (renderer)
         SDL_DestroyRenderer(renderer);
@@ -1809,6 +1937,13 @@ static int get_video_frame(VideoState *is, AVFrame *frame)
                     is->viddec.pkt_serial == is->vidclk.serial &&
                     is->videoq.nb_packets) {
                     is->frame_drops_early++;
+                    if ( !is->frame_drops_warning && sfc != NULL && is->frame_drops_early > 30 )
+                    {
+                        av_log(ffe_class, AV_LOG_WARNING, "Too many dropped frames!\n");
+                        av_log(ffe_class, AV_LOG_WARNING, "Perhaps your script is too slow to play in realtime. Optimize it!\n");
+                        av_log(ffe_class, AV_LOG_WARNING, "Make sure it gives speeds at least 1.5x in ffedit while scripting.\n");
+                        is->frame_drops_warning = 1;
+                    }
                     av_frame_unref(frame);
                     got_picture = 0;
                 }
@@ -2260,6 +2395,29 @@ static int video_thread(void *arg)
     return 0;
 }
 
+static int video_thread_2(void *arg)
+{
+    VideoState *is = arg;
+    AVFrame *frame = av_frame_alloc();
+    int ret;
+
+    if (!frame)
+        return AVERROR(ENOMEM);
+
+    for (;;) {
+        ret = decoder_decode_frame(&is->viddec_2, frame, NULL);
+        if (ret < 0)
+            goto the_end;
+        if (!ret)
+            continue;
+
+        av_frame_unref(frame);
+    }
+ the_end:
+    av_frame_free(&frame);
+    return 0;
+}
+
 static int subtitle_thread(void *arg)
 {
     VideoState *is = arg;
@@ -2627,6 +2785,7 @@ static int stream_component_open(VideoState *is, int stream_index)
 {
     AVFormatContext *ic = is->ic;
     AVCodecContext *avctx;
+    AVCodecContext *avctx_2 = NULL;
     const AVCodec *codec;
     const char *forced_codec_name = NULL;
     AVDictionary *opts = NULL;
@@ -2695,6 +2854,55 @@ static int stream_component_open(VideoState *is, int stream_index)
             goto fail;
     }
 
+    /* disable frame-based multithreading. it causes all sorts of
+     * hard-to-debug issues (many seen with mpeg4).
+     * It can also introduce latency in the pipeline, which
+     * we don't really want. */
+    av_dict_set(&opts, "thread_type", "slice", 0);
+
+    while ( sfc != NULL )
+    {
+        int is_applying = (output_fname != NULL);
+
+        if ( avctx->codec_type != AVMEDIA_TYPE_VIDEO )
+        {
+            av_log(ffe_class, AV_LOG_ERROR, "Skipping non-video codec '%s'\n", codec->long_name);
+            break;
+        }
+
+        if ( (codec->capabilities & AV_CODEC_CAP_FFEDIT_BITSTREAM) == 0 )
+        {
+            av_log(ffe_class, AV_LOG_ERROR, "Codec '%s' not supported by ffedit. Skipping\n", codec->long_name);
+            break;
+        }
+
+        avctx_2 = avcodec_alloc_context3(NULL);
+
+        /* select features */
+        for ( size_t j = 0; j < FFEDIT_FEAT_LAST; j++ )
+        {
+            if ( selected_features[j] != 0
+              && (selected_features_idx[j] == stream_index
+               || selected_features_idx[j] == -1) )
+            {
+                avctx_2->ffedit_export |= (1 << j);
+                avctx_2->ffedit_flags |= FFEDIT_FLAGS_PARSE_ONLY;
+                avctx->ffedit_import |= (1 << j);
+                if ( is_applying )
+                    avctx->ffedit_apply |= (1 << j);
+            }
+        }
+        /* enable bitstream transplication */
+        if ( is_applying )
+            avctx->ffedit_apply |= (1 << FFEDIT_FEAT_LAST);
+
+        if ((ret = avcodec_open2(avctx_2, codec, &opts)) < 0) {
+            goto fail;
+        }
+
+        break;
+    }
+
     if ((ret = avcodec_open2(avctx, codec, &opts)) < 0) {
         goto fail;
     }
@@ -2743,7 +2951,7 @@ static int stream_component_open(VideoState *is, int stream_index)
         is->audio_stream = stream_index;
         is->audio_st = ic->streams[stream_index];
 
-        if ((ret = decoder_init(&is->auddec, avctx, &is->audioq, is->continue_read_thread)) < 0)
+        if ((ret = decoder_init(&is->auddec, avctx, &is->audioq, is->continue_read_thread, stream_index)) < 0)
             goto fail;
         if (is->ic->iformat->flags & AVFMT_NOTIMESTAMPS) {
             is->auddec.start_pts = is->audio_st->start_time;
@@ -2757,8 +2965,20 @@ static int stream_component_open(VideoState *is, int stream_index)
         is->video_stream = stream_index;
         is->video_st = ic->streams[stream_index];
 
-        if ((ret = decoder_init(&is->viddec, avctx, &is->videoq, is->continue_read_thread)) < 0)
+        if ((ret = decoder_init(&is->viddec, avctx, &is->videoq, is->continue_read_thread, stream_index)) < 0)
             goto fail;
+        if ( avctx_2 != NULL )
+        {
+            is->viddec.ectx = ffo_codec;
+            is->viddec.jq_out = &sfc->jq_out;
+            is->viddec.is_importing_script = 1;
+            if ((ret = decoder_init(&is->viddec_2, avctx_2, &is->videoq_2, is->continue_read_thread, stream_index)) < 0)
+                goto fail;
+            is->viddec_2.jq_in = &sfc->jq_in;
+            is->viddec_2.is_exporting_script = 1;
+            if ((ret = decoder_start(&is->viddec_2, video_thread_2, "video_decoder_2", is)) < 0)
+                goto out;
+        }
         if ((ret = decoder_start(&is->viddec, video_thread, "video_decoder", is)) < 0)
             goto out;
         is->queue_attachments_req = 1;
@@ -2767,7 +2987,7 @@ static int stream_component_open(VideoState *is, int stream_index)
         is->subtitle_stream = stream_index;
         is->subtitle_st = ic->streams[stream_index];
 
-        if ((ret = decoder_init(&is->subdec, avctx, &is->subtitleq, is->continue_read_thread)) < 0)
+        if ((ret = decoder_init(&is->subdec, avctx, &is->subtitleq, is->continue_read_thread, stream_index)) < 0)
             goto fail;
         if ((ret = decoder_start(&is->subdec, subtitle_thread, "subtitle_decoder", is)) < 0)
             goto out;
@@ -2786,11 +3006,13 @@ out:
     return ret;
 }
 
+#if 0
 static int decode_interrupt_cb(void *ctx)
 {
     VideoState *is = ctx;
     return is->abort_request;
 }
+#endif
 
 static int stream_has_enough_packets(AVStream *st, int stream_id, PacketQueue *queue) {
     return stream_id < 0 ||
@@ -2851,8 +3073,13 @@ static int read_thread(void *arg)
         ret = AVERROR(ENOMEM);
         goto fail;
     }
+    /* ectx must be set before avformat_open_input(), since it calls
+     * read_header() internally. */
+    ic->ectx = ffo_fmt;
+#if 0
     ic->interrupt_callback.callback = decode_interrupt_cb;
     ic->interrupt_callback.opaque = is;
+#endif
     if (!av_dict_get(format_opts, "scan_all_pmts", NULL, AV_DICT_MATCH_CASE)) {
         av_dict_set(&format_opts, "scan_all_pmts", "1", AV_DICT_DONT_OVERWRITE);
         scan_all_pmts_set = 1;
@@ -2865,6 +3092,10 @@ static int read_thread(void *arg)
     }
     if (scan_all_pmts_set)
         av_dict_set(&format_opts, "scan_all_pmts", NULL, AV_DICT_MATCH_CASE);
+
+    /* ffglitch */
+    if ( (ffo_codec != NULL) && (check_seekability(ic, &ffo_fmt, ffo_codec) < 0) )
+        exit(1);
 
     if ((t = av_dict_get(format_opts, "", NULL, AV_DICT_IGNORE_SUFFIX))) {
         av_log(NULL, AV_LOG_ERROR, "Option %s not found.\n", t->key);
@@ -3004,6 +3235,20 @@ static int read_thread(void *arg)
     if (infinite_buffer < 0 && is->realtime)
         infinite_buffer = 1;
 
+    /* resume is_applying_script thread */
+    if ( sfc != NULL )
+    {
+        /* prepare the arguments for each stream */
+        for ( size_t i = 0; i < ic->nb_streams; i++ )
+        {
+            const AVCodecParameters *par = ic->streams[i]->codecpar;
+            const AVCodec *dec = avcodec_find_decoder(par->codec_id);
+            GROW_ARRAY(sfc->decs, sfc->nb_decs);
+            sfc->decs[i] = dec;
+        }
+        sfc_resume(sfc);
+    }
+
     for (;;) {
         if (is->abort_request)
             break;
@@ -3042,6 +3287,8 @@ static int read_thread(void *arg)
                     packet_queue_flush(&is->subtitleq);
                 if (is->video_stream >= 0)
                     packet_queue_flush(&is->videoq);
+                if ( sfc != NULL )
+                    packet_queue_flush(&is->videoq_2);
                 if (is->seek_flags & AVSEEK_FLAG_BYTE) {
                    set_clock(&is->extclk, NAN, 0);
                 } else {
@@ -3067,6 +3314,7 @@ static int read_thread(void *arg)
         /* if the queue are full, no need to read more */
         if (infinite_buffer<1 &&
               (is->audioq.size + is->videoq.size + is->subtitleq.size > MAX_QUEUE_SIZE
+            || ( sfc != NULL && is->videoq.nb_packets > 1 ) /* ffglitch: buffer as little as possible */
             || (stream_has_enough_packets(is->audio_st, is->audio_stream, &is->audioq) &&
                 stream_has_enough_packets(is->video_st, is->video_stream, &is->videoq) &&
                 stream_has_enough_packets(is->subtitle_st, is->subtitle_stream, &is->subtitleq)))) {
@@ -3091,6 +3339,8 @@ static int read_thread(void *arg)
             if ((ret == AVERROR_EOF || avio_feof(ic->pb)) && !is->eof) {
                 if (is->video_stream >= 0)
                     packet_queue_put_nullpacket(&is->videoq, pkt, is->video_stream);
+                if ( sfc != NULL )
+                    packet_queue_put_nullpacket(&is->videoq_2, pkt, is->video_stream);
                 if (is->audio_stream >= 0)
                     packet_queue_put_nullpacket(&is->audioq, pkt, is->audio_stream);
                 if (is->subtitle_stream >= 0)
@@ -3122,6 +3372,12 @@ static int read_thread(void *arg)
             packet_queue_put(&is->audioq, pkt);
         } else if (pkt->stream_index == is->video_stream && pkt_in_play_range
                    && !(is->video_st->disposition & AV_DISPOSITION_ATTACHED_PIC)) {
+            if ( sfc != NULL )
+            {
+                AVPacket pkt_2;
+                av_packet_ref(&pkt_2, pkt);
+                packet_queue_put(&is->videoq_2, &pkt_2);
+            }
             packet_queue_put(&is->videoq, pkt);
         } else if (pkt->stream_index == is->subtitle_stream && pkt_in_play_range) {
             packet_queue_put(&is->subtitleq, pkt);
@@ -3174,6 +3430,7 @@ static VideoState *stream_open(const char *filename,
         goto fail;
 
     if (packet_queue_init(&is->videoq) < 0 ||
+        packet_queue_init(&is->videoq_2) < 0 ||
         packet_queue_init(&is->audioq) < 0 ||
         packet_queue_init(&is->subtitleq) < 0)
         goto fail;
@@ -3363,6 +3620,24 @@ static void event_loop(VideoState *cur_stream)
     for (;;) {
         double x;
         refresh_loop_wait_event(cur_stream, &event);
+        if ( ff_quickjs_sdl_do_events() )
+        {
+            switch ( event.type )
+            {
+            case SDL_KEYDOWN:
+            case SDL_KEYUP:
+            case SDL_JOYAXISMOTION:
+            case SDL_JOYBALLMOTION:
+            case SDL_JOYHATMOTION:
+            case SDL_JOYBUTTONDOWN:
+            case SDL_JOYBUTTONUP:
+            case SDL_CONTROLLERAXISMOTION:
+            case SDL_CONTROLLERBUTTONDOWN:
+            case SDL_CONTROLLERBUTTONUP:
+                ff_quickjs_sdl_event_add(&event);
+                break;
+            }
+        }
         switch (event.type) {
         case SDL_KEYDOWN:
             if (exit_on_keydown || event.key.keysym.sym == SDLK_ESCAPE || event.key.keysym.sym == SDLK_q) {
@@ -3714,6 +3989,8 @@ static const OptionDef options[] = {
     { "enable_vulkan",      OPT_TYPE_BOOL,            0, { &enable_vulkan }, "enable vulkan renderer" },
     { "vulkan_params",      OPT_TYPE_STRING, OPT_EXPERT, { &vulkan_params }, "vulkan configuration using a list of key=value pairs separated by ':'" },
     { "hwaccel",            OPT_TYPE_STRING, OPT_EXPERT, { &hwaccel }, "use HW accelerated decoding" },
+    { "s",                  OPT_TYPE_STRING,          0, { &script_fname }, "ffglitch script", "javascript or python3 file" },
+    { "sp",                 OPT_TYPE_STRING,          0, { &script_params }, "ffglitch script setup() parameters", "JSON string" },
     { NULL, },
 };
 
@@ -3805,6 +4082,7 @@ int main(int argc, char **argv)
     }
     if (display_disable)
         flags &= ~SDL_INIT_VIDEO;
+    flags |= SDL_INIT_GAMECONTROLLER; /* ffglitch */
     if (SDL_Init (flags)) {
         av_log(NULL, AV_LOG_FATAL, "Could not initialize SDL - %s\n", SDL_GetError());
         av_log(NULL, AV_LOG_FATAL, "(Did you set the DISPLAY variable?)\n");
@@ -3879,6 +4157,32 @@ int main(int argc, char **argv)
                 av_log(NULL, AV_LOG_FATAL, "Failed to create window or renderer: %s", SDL_GetError());
                 do_exit(NULL);
             }
+        }
+    }
+
+    if ( script_fname != NULL )
+    {
+        sfc = av_mallocz(sizeof(FFEditScriptFuncContext));
+
+        /* init script func context */
+        sfc_init(sfc, script_fname);
+
+        /* start is_applying_script thread */
+        sfc_setup(sfc, script_func);
+
+        if ( features_selected == 0 )
+        {
+            av_log(ffe_class, AV_LOG_FATAL, "At least one feature must be selected!\n");
+            av_log(ffe_class, AV_LOG_FATAL, "Select features by adding them to args[\"features\"] in your script's setup().\n");
+            exit(1);
+        }
+
+        /* open output file */
+        if ( output_fname != NULL )
+        {
+            ffe_output_open(&ffo_fmt, NULL);
+            if ( ffe_output_open(&ffo_codec, output_fname) < 0 )
+                exit(1);
         }
     }
 
