@@ -4937,6 +4937,53 @@ JSValue JS_NewArray(JSContext *ctx)
                                  JS_CLASS_ARRAY);
 }
 
+JSValue JS_NewFastArray(JSContext *ctx, JSValue **parray, uint32_t len, int set_null)
+{
+    JSValue *new_array_prop = NULL;
+    JSObject *p;
+
+    /* create new array */
+    JSValue val = JS_NewArray(ctx);
+    if ( unlikely(JS_IsException(val)) )
+        return val;
+    p = JS_VALUE_GET_OBJ(val);
+
+    /* allocate array values */
+    if ( len > 0 )
+    {
+        new_array_prop = js_malloc_rt(ctx->rt, sizeof(JSValue) * len);
+        if ( unlikely(!new_array_prop) )
+        {
+            JS_FreeValue(ctx, val);
+            return JS_EXCEPTION;
+        }
+        if ( set_null )
+        {
+            for ( size_t i = 0; i < len; i++ )
+                new_array_prop[i] = JS_NULL;
+        }
+    }
+
+    p->prop[0].u.value = JS_NewInt32(ctx, len);
+    p->u.array.u.values = new_array_prop;
+    p->u.array.u1.size = len;
+    p->u.array.count = len;
+
+    *parray = p->u.array.u.values;
+
+    return val;
+}
+
+int JS_GetFastArray(JSValueConst val, JSValue **parray, uint32_t *plen)
+{
+    JSObject *p = JS_VALUE_GET_OBJ(val);
+    if ( !p->fast_array )
+        return 0;
+    *parray = p->u.array.u.values;
+    *plen = p->u.array.count;
+    return 1;
+}
+
 JSValue JS_NewObject(JSContext *ctx)
 {
     /* inline JS_NewObjectClass(ctx, JS_CLASS_OBJECT); */
