@@ -456,6 +456,7 @@ struct JSContext {
                               JSValueConst flags);
     /* if NULL, eval is not supported */
     JSValue (*eval_internal)(JSContext *ctx, JSValueConst this_obj,
+                             JSModuleDef **pm,
                              const char *input, size_t input_len,
                              const char *filename, int flags, int scope_idx);
     void *user_opaque;
@@ -1213,6 +1214,7 @@ static void js_async_function_resolve_finalizer(JSRuntime *rt, JSValue val);
 static void js_async_function_resolve_mark(JSRuntime *rt, JSValueConst val,
                                            JS_MarkFunc *mark_func);
 static JSValue JS_EvalInternal(JSContext *ctx, JSValueConst this_obj,
+                               JSModuleDef **pm,
                                const char *input, size_t input_len,
                                const char *filename, int flags, int scope_idx);
 static void js_free_module_def(JSContext *ctx, JSModuleDef *m);
@@ -27354,6 +27356,19 @@ int JS_SetModuleExport(JSContext *ctx, JSModuleDef *m, const char *export_name,
     return -1;
 }
 
+JSValue JS_GetModuleExport(JSContext *ctx, JSModuleDef *m, const char *export_name)
+{
+    JSExportEntry *me;
+    JSAtom name = JS_NewAtom(ctx, export_name);
+    if ( name == JS_ATOM_NULL )
+        return JS_UNDEFINED;
+    me = find_export_entry(ctx, m, name);
+    JS_FreeAtom(ctx, name);
+    if ( !me )
+        return JS_UNDEFINED;
+    return JS_DupValue(ctx, *me->u.local.var_ref->pvalue);
+}
+
 void JS_SetModuleLoaderFunc(JSRuntime *rt,
                             JSModuleNormalizeFunc *module_normalize,
                             JSModuleLoaderFunc *module_loader, void *opaque)
@@ -34254,6 +34269,7 @@ JSValue JS_EvalFunction(JSContext *ctx, JSValue fun_obj)
 
 /* 'input' must be zero terminated i.e. input[input_len] = '\0'. */
 static JSValue __JS_EvalInternal(JSContext *ctx, JSValueConst this_obj,
+                                 JSModuleDef **pm,
                                  const char *input, size_t input_len,
                                  const char *filename, int flags, int scope_idx)
 {
@@ -34356,6 +34372,8 @@ static JSValue __JS_EvalInternal(JSContext *ctx, JSValueConst this_obj,
         if (js_resolve_module(ctx, m) < 0)
             goto fail1;
         fun_obj = JS_NewModuleValue(ctx, m);
+        if ( pm != NULL )
+            *pm = m;
     }
     if (flags & JS_EVAL_FLAG_COMPILE_ONLY) {
         ret_val = fun_obj;
@@ -34372,13 +34390,14 @@ static JSValue __JS_EvalInternal(JSContext *ctx, JSValueConst this_obj,
 
 /* the indirection is needed to make 'eval' optional */
 static JSValue JS_EvalInternal(JSContext *ctx, JSValueConst this_obj,
+                               JSModuleDef **pm,
                                const char *input, size_t input_len,
                                const char *filename, int flags, int scope_idx)
 {
     if (unlikely(!ctx->eval_internal)) {
         return JS_ThrowTypeError(ctx, "eval is not supported");
     }
-    return ctx->eval_internal(ctx, this_obj, input, input_len, filename,
+    return ctx->eval_internal(ctx, this_obj, pm, input, input_len, filename,
                               flags, scope_idx);
 }
 
@@ -34394,13 +34413,14 @@ static JSValue JS_EvalObject(JSContext *ctx, JSValueConst this_obj,
     str = JS_ToCStringLen(ctx, &len, val);
     if (!str)
         return JS_EXCEPTION;
-    ret = JS_EvalInternal(ctx, this_obj, str, len, "<input>", flags, scope_idx);
+    ret = JS_EvalInternal(ctx, this_obj, NULL, str, len, "<input>", flags, scope_idx);
     JS_FreeCString(ctx, str);
     return ret;
 
 }
 
 JSValue JS_EvalThis(JSContext *ctx, JSValueConst this_obj,
+                    JSModuleDef **pm,
                     const char *input, size_t input_len,
                     const char *filename, int eval_flags)
 {
@@ -34409,7 +34429,7 @@ JSValue JS_EvalThis(JSContext *ctx, JSValueConst this_obj,
 
     assert(eval_type == JS_EVAL_TYPE_GLOBAL ||
            eval_type == JS_EVAL_TYPE_MODULE);
-    ret = JS_EvalInternal(ctx, this_obj, input, input_len, filename,
+    ret = JS_EvalInternal(ctx, this_obj, pm, input, input_len, filename,
                           eval_flags, -1);
     return ret;
 }
@@ -34417,8 +34437,15 @@ JSValue JS_EvalThis(JSContext *ctx, JSValueConst this_obj,
 JSValue JS_Eval(JSContext *ctx, const char *input, size_t input_len,
                 const char *filename, int eval_flags)
 {
-    return JS_EvalThis(ctx, ctx->global_obj, input, input_len, filename,
+    return JS_EvalThis(ctx, ctx->global_obj, NULL, input, input_len, filename,
                        eval_flags);
+}
+
+JSValue JS_EvalModule(JSContext *ctx, const char *input, size_t input_len,
+                      const char *filename, JSModuleDef **pm)
+{
+    return JS_EvalThis(ctx, ctx->global_obj, pm, input, input_len, filename,
+                       JS_EVAL_TYPE_MODULE);
 }
 
 int JS_ResolveModule(JSContext *ctx, JSValueConst obj)

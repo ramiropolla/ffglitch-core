@@ -503,6 +503,8 @@ typedef struct JSClassDef {
     JSClassExoticMethods *exotic;
 } JSClassDef;
 
+typedef struct JSModuleDef JSModuleDef;
+
 JSClassID JS_NewClassID(JSClassID *pclass_id);
 int JS_NewClass(JSRuntime *rt, JSClassID class_id, const JSClassDef *class_def);
 int JS_IsRegisteredClass(JSRuntime *rt, JSClassID class_id);
@@ -801,6 +803,7 @@ JSValue JS_Eval(JSContext *ctx, const char *input, size_t input_len,
                 const char *filename, int eval_flags);
 /* same as JS_Eval() but with an explicit 'this_obj' parameter */
 JSValue JS_EvalThis(JSContext *ctx, JSValueConst this_obj,
+                    JSModuleDef **pm,
                     const char *input, size_t input_len,
                     const char *filename, int eval_flags);
 JSValue JS_GetGlobalObject(JSContext *ctx);
@@ -874,7 +877,8 @@ void JS_SetCanBlock(JSRuntime *rt, JS_BOOL can_block);
 /* set the [IsHTMLDDA] internal slot */
 void JS_SetIsHTMLDDA(JSContext *ctx, JSValueConst obj);
 
-typedef struct JSModuleDef JSModuleDef;
+JSValue JS_EvalModule(JSContext *ctx, const char *input, size_t input_len,
+                      const char *filename, JSModuleDef **pm);
 
 /* return the module specifier (allocated with js_malloc()) or NULL if
    exception */
@@ -1065,6 +1069,8 @@ int JS_SetModuleExport(JSContext *ctx, JSModuleDef *m, const char *export_name,
                        JSValue val);
 int JS_SetModuleExportList(JSContext *ctx, JSModuleDef *m,
                            const JSCFunctionListEntry *tab, int len);
+
+JSValue JS_GetModuleExport(JSContext *ctx, JSModuleDef *m, const char *export_name);
 
 /* Helpers for print() and console.log() */
 int JS_SetWriteFunc(
