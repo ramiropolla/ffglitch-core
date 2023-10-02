@@ -3750,6 +3750,8 @@ int main(int argc, char **argv)
     int flags, ret;
     VideoState *is;
 
+    hack_musl_pthread_stack_size();
+
     init_dynload();
 
     av_log_set_flags(AV_LOG_SKIP_REPEATED);
