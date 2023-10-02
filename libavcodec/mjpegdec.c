@@ -841,8 +841,10 @@ static int decode_block(MJpegDecodeContext *s, int16_t *block, int component,
         av_log(s->avctx, AV_LOG_ERROR, "error dc\n");
         return AVERROR_INVALIDDATA;
     }
-    val = val * (unsigned)quant_matrix[0] + s->last_dc[component];
-    s->last_dc[component] = val;
+    val += s->last_q_dc[component];
+    s->last_q_dc[component] = val;
+    val *= (unsigned) quant_matrix[0];
+    val += s->dc_shift[component];
     block[0] = av_clip_int16(val);
     /* AC coefs */
     i = 0;
@@ -889,8 +891,10 @@ static int decode_dc_progressive(MJpegDecodeContext *s, int16_t *block,
         av_log(s->avctx, AV_LOG_ERROR, "error dc\n");
         return AVERROR_INVALIDDATA;
     }
-    val = (val * (quant_matrix[0] << Al)) + s->last_dc[component];
-    s->last_dc[component] = val;
+    val += s->last_q_dc[component];
+    s->last_q_dc[component] = val;
+    val *= (quant_matrix[0] << Al);
+    val += s->dc_shift[component];
     block[0] = val;
     return 0;
 }
@@ -1070,7 +1074,7 @@ static int handle_rstn(MJpegDecodeContext *s, int nb_components)
         if(s->restart_count == 0 && s->avctx->codec_id == AV_CODEC_ID_THP){
             align_get_bits(&s->gb);
             for (i = 0; i < nb_components; i++) /* reset dc */
-                s->last_dc[i] = (4 << s->bits);
+                s->last_q_dc[i] = 0;
         }
 
         i = 8 + ((-get_bits_count(&s->gb)) & 7);
@@ -1084,7 +1088,7 @@ static int handle_rstn(MJpegDecodeContext *s, int nb_components)
                     skip_bits(&s->gb, 8);
                 if (get_bits_left(&s->gb) >= 8 && (get_bits(&s->gb, 8) & 0xF8) == 0xD0) {
                     for (i = 0; i < nb_components; i++) /* reset dc */
-                        s->last_dc[i] = (4 << s->bits);
+                        s->last_q_dc[i] = 0;
                     reset = 1;
                 } else
                     skip_bits_long(&s->gb, pos - get_bits_count(&s->gb));
@@ -1768,7 +1772,10 @@ int ff_mjpeg_decode_sos(MJpegDecodeContext *s, const uint8_t *mb_bitmask,
 
 next_field:
     for (i = 0; i < nb_components; i++)
-        s->last_dc[i] = (4 << s->bits);
+    {
+        s->dc_shift[i] = (4 << s->bits);
+        s->last_q_dc[i] = 0;
+    }
 
     if (s->avctx->hwaccel) {
         int bytes_to_start = get_bits_count(&s->gb) / 8;

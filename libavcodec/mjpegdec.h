@@ -104,7 +104,14 @@ typedef struct MJpegDecodeContext {
     int quant_sindex[MAX_COMPONENTS];
     int h_max, v_max; /* maximum h and v counts */
     int quant_index[4];   /* quant table index for each component */
-    int last_dc[MAX_COMPONENTS]; /* last DEQUANTIZED dc (XXX: am I right to do that ?) */
+    int last_q_dc[MAX_COMPONENTS]; /* last quantized dc */
+    int dc_shift[MAX_COMPONENTS]; /* FFedit: the JPEG standard specifies that the input data
+                                   *         should be level-shifted by (1 << (bits - 1))
+                                   *         before being FDCT'd. Instead of doing this, we adjust
+                                   *         the DC coefficient AFTER dequantization by an amount
+                                   *         equivalent to ((64 * (1 << (bits - 1))) / 8). The
+                                   *         factor 8 comes from the standard's definition of the
+                                   *         FDCT for the DC coefficient. */
     AVFrame *picture; /* picture structure */
     AVFrame *picture_ptr; /* pointer to picture structure */
     int got_picture;                                ///< we found a SOF and picture is valid, too.
