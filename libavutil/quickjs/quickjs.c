@@ -4760,6 +4760,7 @@ static JSValue JS_NewObjectFromShape(JSContext *ctx, JSShape *sh, JSClassID clas
 
     switch(class_id) {
     case JS_CLASS_OBJECT:
+        p->u.array.count = 0;
         break;
     case JS_CLASS_ARRAY:
         {
