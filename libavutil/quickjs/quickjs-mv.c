@@ -1832,16 +1832,34 @@ static JSValue js_mv2darray_constructor(JSContext *ctx,
                                         JSValueConst new_target,
                                         int argc, JSValueConst *argv)
 {
+    uint8_t *buf = NULL;
+    uint32_t buflen;
     uint64_t width;
     uint64_t height;
     JSValue val;
     int32_t *ptr32;
 
-    /* check arguments */
-    if ( JS_ToIndex(ctx, &width, argv[0]) || width <= 0 || width >= 0x10000
-      || JS_ToIndex(ctx, &height, argv[1]) || height <= 0 || height >= 0x10000 )
+    /* first check for deserialization */
+    if ( JS_GetUint8FFArray(argv[0], &buf, &buflen) && buflen >= 8 )
     {
-        return JS_ThrowTypeError(ctx, "error parsing width/height arguments");
+        /* TODO endianness!!! */
+        width = ((uint32_t *)buf)[0];
+        height = ((uint32_t *)buf)[1];
+        buf += 4 + 4;
+        buflen -= 4 + 4;
+
+        /* check that buflen is the correct size */
+        if ( buflen != (width * height * 2 * sizeof(int32_t)) )
+            return JS_ThrowTypeError(ctx, "MV2DArray(Uint8FFArray[le32 width, le32 height, width * height * 2 * 4 data])");
+    }
+    else
+    {
+        /* check arguments */
+        if ( JS_ToIndex(ctx, &width, argv[0]) || width <= 0 || width >= 0x10000
+          || JS_ToIndex(ctx, &height, argv[1]) || height <= 0 || height >= 0x10000 )
+        {
+            return JS_ThrowTypeError(ctx, "error parsing width/height arguments");
+        }
     }
 
     /* create new mv2darray */
@@ -1851,6 +1869,15 @@ static JSValue js_mv2darray_constructor(JSContext *ctx,
         val = js_create_from_ctor(ctx, new_target, JS_CLASS_MV2DARRAY);
     if ( unlikely(JS_IsException(val)) )
         return val;
+
+    if ( buf != NULL )
+    {
+        val = JS_InitMV2D(ctx, val, (void **) &ptr32, width, height, 0, JS_CLASS_MV2DARRAY);
+        if ( unlikely(JS_IsException(val)) )
+            return val;
+        memcpy(ptr32, buf, buflen);
+        return val;
+    }
 
     return JS_InitMV2D(ctx, val, (void **) &ptr32, width, height, 1, JS_CLASS_MV2DARRAY);
 }
@@ -2621,6 +2648,41 @@ exception:
     return ret;
 }
 
+
+static JSValue js_mv2darray_serialize(JSContext *ctx, JSValueConst this_val,
+                                      int argc, JSValueConst *argv)
+{
+    JSObject *p = JS_VALUE_GET_OBJ(this_val);
+    struct JSMV2DArray *mv2d = p->u.array.u1.mv2darray;
+    JSValue *values = p->u.array.u.values;
+    uint32_t width = mv2d->width;
+    uint32_t height = mv2d->height;
+    uint32_t stride = width * 2 * sizeof(int32_t);
+    uint32_t buflen = 4 + 4 + (height * stride);
+    uint8_t *buf;
+    JSValue ret;
+
+    /* allocate output buffer */
+    ret = JS_NewUint8FFArray(ctx, &buf, buflen, 0);
+    if ( unlikely(JS_IsException(ret)) )
+        return ret;
+
+    /* TODO endianness!!! */
+    ((uint32_t *)buf)[0] = width;
+    ((uint32_t *)buf)[1] = height;
+    buf += 4 + 4;
+
+    for ( size_t i = 0; i < height; i++ )
+    {
+        JSObject *pline = JS_VALUE_GET_OBJ(values[i]);
+        int32_t *src = pline->u.array.u.int32_ptr;
+        memcpy(buf, src, stride);
+        buf += stride;
+    }
+
+    return ret;
+}
+
 static const JSCFunctionListEntry js_mv2darray_proto_funcs[] = {
     JS_CFUNC_DEF("toString", 0, js_mv2darray_toString ),
     /* join */
@@ -2688,6 +2750,7 @@ static const JSCFunctionListEntry js_mv2darray_proto_funcs[] = {
     JS_CFUNC_MAGIC_DEF("compare_gte_v", 1, js_mv2darray_compare, mv_cmp_op_gte | mv_op_v ),
     JS_CFUNC_MAGIC_DEF("compare_lt_v", 1, js_mv2darray_compare, mv_cmp_op__lt | mv_op_v ),
     JS_CFUNC_MAGIC_DEF("compare_lte_v", 1, js_mv2darray_compare, mv_cmp_op_lte | mv_op_v ),
+    JS_CFUNC_DEF("serialize", 0, js_mv2darray_serialize ),
 };
 
 /*********************************************************************/

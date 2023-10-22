@@ -267,6 +267,8 @@ rtmidi-repeater$(EXESUF): $(addprefix $(SUBDIR), $(RTMIDI_OBJS) $(RTMIDI-REPEATE
 
 OBJS-$(CONFIG_SDL2) += quickjs-sdl.o
 
+OBJS-$(CONFIG_LIBZMQ) += quickjs-zmq.o
+
 # Windows resource file
 SHLIBOBJS-$(HAVE_GNU_WINDRES)           += avutilres.o
 
