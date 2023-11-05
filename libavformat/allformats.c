@@ -93,6 +93,8 @@ extern const FFOutputFormat ff_avi_muxer;
 extern const FFOutputFormat ff_avif_muxer;
 extern const FFInputFormat  ff_avisynth_demuxer;
 extern const FFOutputFormat ff_avm2_muxer;
+extern const FFInputFormat  ff_avpipe_demuxer;
+extern const FFOutputFormat ff_avpipe_muxer;
 extern const FFInputFormat  ff_avr_demuxer;
 extern const FFInputFormat  ff_avs_demuxer;
 extern const FFInputFormat  ff_avs2_demuxer;
