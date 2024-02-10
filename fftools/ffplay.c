@@ -354,6 +354,7 @@ static int filter_nbthreads = 0;
 static int enable_vulkan = 0;
 static char *vulkan_params = NULL;
 static const char *hwaccel = NULL;
+static const char *scaling_quality = NULL;
 
 /* current context */
 static int is_full_screen;
@@ -3685,6 +3686,7 @@ static const OptionDef options[] = {
     { "framedrop",          OPT_TYPE_BOOL,   OPT_EXPERT, { &framedrop }, "drop frames when cpu is too slow", "" },
     { "infbuf",             OPT_TYPE_BOOL,   OPT_EXPERT, { &infinite_buffer }, "don't limit the input buffer size (useful with realtime streams)", "" },
     { "window_title",       OPT_TYPE_STRING,          0, { &window_title }, "set window title", "window title" },
+    { "scaling_quality",    OPT_TYPE_STRING,          0, { &scaling_quality }, "set SDL scaling quality (\"linear\", \"nearest\", or \"best\")", "value" },
     { "left",               OPT_TYPE_INT,    OPT_EXPERT, { &screen_left }, "set the x position for the left of the window", "x pos" },
     { "top",                OPT_TYPE_INT,    OPT_EXPERT, { &screen_top }, "set the y position for the top of the window", "y pos" },
     { "vf",                 OPT_TYPE_FUNC, OPT_FUNC_ARG | OPT_EXPERT, { .func_arg = opt_add_vfilter }, "set video filters", "filter_graph" },
@@ -3835,7 +3837,9 @@ int main(int argc, char **argv)
             }
         }
         window = SDL_CreateWindow(program_name, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, default_width, default_height, flags);
-        SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
+        if ( scaling_quality == NULL )
+            scaling_quality = "linear";
+        SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, scaling_quality);
         if (!window) {
             av_log(NULL, AV_LOG_FATAL, "Failed to create window: %s", SDL_GetError());
             do_exit(NULL);
