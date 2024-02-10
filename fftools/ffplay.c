@@ -355,6 +355,7 @@ static int enable_vulkan = 0;
 static char *vulkan_params = NULL;
 static const char *hwaccel = NULL;
 static const char *scaling_quality = NULL;
+static int asap = 0;
 
 /* current context */
 static int is_full_screen;
@@ -1634,7 +1635,7 @@ retry:
             delay = compute_target_delay(last_duration, is);
 
             time= av_gettime_relative()/1000000.0;
-            if (time < is->frame_timer + delay) {
+            if (!asap && (time < is->frame_timer + delay)) {
                 *remaining_time = FFMIN(is->frame_timer + delay - time, *remaining_time);
                 goto display;
             }
@@ -3687,6 +3688,7 @@ static const OptionDef options[] = {
     { "infbuf",             OPT_TYPE_BOOL,   OPT_EXPERT, { &infinite_buffer }, "don't limit the input buffer size (useful with realtime streams)", "" },
     { "window_title",       OPT_TYPE_STRING,          0, { &window_title }, "set window title", "window title" },
     { "scaling_quality",    OPT_TYPE_STRING,          0, { &scaling_quality }, "set SDL scaling quality (\"linear\", \"nearest\", or \"best\")", "value" },
+    { "asap",               OPT_TYPE_BOOL,   OPT_EXPERT, { &asap }, "playback as fast as possible (no duration, useful with realtime streams)", "" },
     { "left",               OPT_TYPE_INT,    OPT_EXPERT, { &screen_left }, "set the x position for the left of the window", "x pos" },
     { "top",                OPT_TYPE_INT,    OPT_EXPERT, { &screen_top }, "set the y position for the top of the window", "y pos" },
     { "vf",                 OPT_TYPE_FUNC, OPT_FUNC_ARG | OPT_EXPERT, { .func_arg = opt_add_vfilter }, "set video filters", "filter_graph" },
