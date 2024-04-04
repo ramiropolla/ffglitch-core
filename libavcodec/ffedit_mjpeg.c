@@ -23,6 +23,8 @@ e_which_dct_feat(MJpegDecodeContext *s)
 {
     return (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_Q_DCT))       != 0 ? FFEDIT_FEAT_Q_DCT
          : (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_Q_DCT_DELTA)) != 0 ? FFEDIT_FEAT_Q_DCT_DELTA
+         : (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_Q_DC))        != 0 ? FFEDIT_FEAT_Q_DC
+         : (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_Q_DC_DELTA))  != 0 ? FFEDIT_FEAT_Q_DC_DELTA
          :                                                                   FFEDIT_FEAT_LAST;
 }
 
@@ -32,6 +34,8 @@ i_which_dct_feat(MJpegDecodeContext *s)
 {
     return (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_Q_DCT))       != 0 ? FFEDIT_FEAT_Q_DCT
          : (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_Q_DCT_DELTA)) != 0 ? FFEDIT_FEAT_Q_DCT_DELTA
+         : (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_Q_DC))        != 0 ? FFEDIT_FEAT_Q_DC
+         : (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_Q_DC_DELTA))  != 0 ? FFEDIT_FEAT_Q_DC_DELTA
          :                                                                   FFEDIT_FEAT_LAST;
 }
 
@@ -41,6 +45,8 @@ a_which_dct_feat(MJpegDecodeContext *s)
 {
     return (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_Q_DCT))       != 0 ? FFEDIT_FEAT_Q_DCT
          : (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_Q_DCT_DELTA)) != 0 ? FFEDIT_FEAT_Q_DCT_DELTA
+         : (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_Q_DC))        != 0 ? FFEDIT_FEAT_Q_DC
+         : (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_Q_DC_DELTA))  != 0 ? FFEDIT_FEAT_Q_DC_DELTA
          :                                                                  FFEDIT_FEAT_LAST;
 }
 
@@ -59,6 +65,12 @@ ffe_dct_scan_new(MJpegDecodeContext *s)
     enum FFEditFeature e_dct_feat = e_which_dct_feat(s);
     json_t *jscan;
     int pflags = 0;
+
+    if ( e_dct_feat == FFEDIT_FEAT_Q_DC
+      || e_dct_feat == FFEDIT_FEAT_Q_DC_DELTA )
+    {
+        pflags = JSON_PFLAGS_NO_LF;
+    }
 
     jscan = ffe_jmb_new(s->jctx,
                         s->mb_width, s->mb_height,
@@ -129,11 +141,18 @@ ffe_dct_get(
     json_t *jframe = f->ffedit_sd[i_dct_feat];
     json_t *jso = jframe;
     int val;
+    if ( i_dct_feat == FFEDIT_FEAT_Q_DC
+      || i_dct_feat == FFEDIT_FEAT_Q_DC_DELTA )
+    {
+        val = ffe_jmb_array_of_ints_get(jso, component, mb_y, mb_x, block);
+    }
+    else
     {
         val = ffe_jmb_get(jso, component, mb_y, mb_x, block)->array_of_ints[i];
     }
     if ( (i == 0)
-      && i_dct_feat == FFEDIT_FEAT_Q_DCT )
+      && (i_dct_feat == FFEDIT_FEAT_Q_DCT
+       || i_dct_feat == FFEDIT_FEAT_Q_DC) )
     {
         val -= qctx->last_q_dc_component;
     }
@@ -157,7 +176,8 @@ ffe_dct_set(
     json_t *jframe = f->ffedit_sd[e_dct_feat];
     json_t *jso = jframe;
     if ( (i == 0)
-      && e_dct_feat == FFEDIT_FEAT_Q_DCT )
+      && (e_dct_feat == FFEDIT_FEAT_Q_DCT
+       || e_dct_feat == FFEDIT_FEAT_Q_DC) )
     {
         code += qctx->last_q_dc_component;
     }
@@ -178,6 +198,55 @@ ffe_dct_set(
         json_t *jval = json_int_new(s->jctx, code);
         ffe_jmb_set(jso, component, mb_y, mb_x, block, jval);
     }
+}
+
+//---------------------------------------------------------------------
+static inline int mjpeg_decode_dc(MJpegDecodeContext *s, int dc_index);
+static inline int ffe_mjpeg_decode_dc(
+        MJpegDecodeContext *s,
+        ffe_q_dct_ctx_t *qctx,
+        int dc_index,
+        int component,
+        int mb_y,
+        int mb_x,
+        int block)
+{
+    enum FFEditFeature e_dct_feat = e_which_dct_feat(s);
+    enum FFEditFeature i_dct_feat = i_which_dct_feat(s);
+    enum FFEditFeature a_dct_feat = a_which_dct_feat(s);
+
+    PutBitContext *saved = NULL;
+    int code;
+
+    if ( a_dct_feat == FFEDIT_FEAT_Q_DC
+      || a_dct_feat == FFEDIT_FEAT_Q_DC_DELTA )
+    {
+        saved = ffe_transplicate_save(&s->ffe_xp);
+    }
+
+    code = mjpeg_decode_dc(s, dc_index);
+
+    if ( e_dct_feat == FFEDIT_FEAT_Q_DC
+      || e_dct_feat == FFEDIT_FEAT_Q_DC_DELTA )
+    {
+        ffe_dct_set(s, qctx, component, mb_y, mb_x, block, 0, code);
+    }
+    else if ( i_dct_feat == FFEDIT_FEAT_Q_DC
+           || i_dct_feat == FFEDIT_FEAT_Q_DC_DELTA )
+    {
+        code = ffe_dct_get(s, qctx, component, mb_y, mb_x, block, 0);
+    }
+    if ( a_dct_feat == FFEDIT_FEAT_Q_DC
+      || a_dct_feat == FFEDIT_FEAT_Q_DC_DELTA )
+    {
+        if ( dc_index == 0 )
+            ff_mjpeg_encode_dc(saved, code, s->m.huff_size_dc_luminance, s->m.huff_code_dc_luminance);
+        else
+            ff_mjpeg_encode_dc(saved, code, s->m.huff_size_dc_chrominance, s->m.huff_code_dc_chrominance);
+        ffe_transplicate_restore(&s->ffe_xp, saved);
+    }
+
+    return code;
 }
 
 /* cleanup */
