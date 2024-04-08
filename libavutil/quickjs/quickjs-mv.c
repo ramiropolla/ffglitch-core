@@ -1839,20 +1839,34 @@ static JSValue js_mv2darray_constructor(JSContext *ctx,
     JSValue val;
     int32_t *ptr32;
 
-    /* first check for deserialization */
-    if ( JS_GetUint8FFArray(argv[0], &buf, &buflen) && buflen >= 8 )
+    /* first check for Uint8FFArray */
+    if ( JS_GetUint8FFArray(argv[0], &buf, &buflen) )
     {
-        /* TODO endianness!!! */
-        width = ((uint32_t *)buf)[0];
-        height = ((uint32_t *)buf)[1];
-        buf += 4 + 4;
-        buflen -= 4 + 4;
-
-        /* check that buflen is the correct size */
-        if ( buflen != (width * height * 2 * sizeof(int32_t)) )
+        const char *name = "MV2DArray";
+        uint32_t name_len = strlen(name);
+        int ok = (buflen >= (name_len + 1 + 4 + 4));
+        if ( ok )
+        {
+            ok = (strncmp(buf, name, name_len) == 0);
+            buf += name_len + 1;
+            buflen -= name_len + 1;
+        }
+        if ( ok )
+        {
+            /* TODO endianness!!! */
+            width = ((uint32_t *)buf)[0];
+            height = ((uint32_t *)buf)[1];
+            buf += 4 + 4;
+            buflen -= 4 + 4;
+            /* check that buflen is the correct size */
+            ok = (buflen == (width * height * 2 * sizeof(int32_t)));
+        }
+        if ( !ok )
             return JS_ThrowTypeError(ctx, "MV2DArray(Uint8FFArray[le32 width, le32 height, width * height * 2 * 4 data])");
     }
-    else
+
+    /* now check normal constructor */
+    if ( buf == NULL )
     {
         /* check arguments */
         if ( JS_ToIndex(ctx, &width, argv[0]) || width <= 0 || width >= 0x10000
@@ -1870,6 +1884,7 @@ static JSValue js_mv2darray_constructor(JSContext *ctx,
     if ( unlikely(JS_IsException(val)) )
         return val;
 
+    /* copy from Uint8FFArray */
     if ( buf != NULL )
     {
         val = JS_InitMV2D(ctx, val, (void **) &ptr32, width, height, 0, JS_CLASS_MV2DARRAY);
@@ -2649,16 +2664,18 @@ exception:
 }
 
 
-static JSValue js_mv2darray_serialize(JSContext *ctx, JSValueConst this_val,
-                                      int argc, JSValueConst *argv)
+static JSValue js_mv2darray_toUint8FFArray(JSContext *ctx, JSValueConst this_val,
+                                           int argc, JSValueConst *argv)
 {
     JSObject *p = JS_VALUE_GET_OBJ(this_val);
     struct JSMV2DArray *mv2d = p->u.array.u1.mv2darray;
     JSValue *values = p->u.array.u.values;
+    const char *name = "MV2DArray";
+    uint32_t name_len = strlen(name);
     uint32_t width = mv2d->width;
     uint32_t height = mv2d->height;
     uint32_t stride = width * 2 * sizeof(int32_t);
-    uint32_t buflen = 4 + 4 + (height * stride);
+    uint32_t buflen = name_len + 1 + 4 + 4 + (height * stride);
     uint8_t *buf;
     JSValue ret;
 
@@ -2666,6 +2683,11 @@ static JSValue js_mv2darray_serialize(JSContext *ctx, JSValueConst this_val,
     ret = JS_NewUint8FFArray(ctx, &buf, buflen, 0);
     if ( unlikely(JS_IsException(ret)) )
         return ret;
+
+    /* Copy name */
+    memcpy(buf, name, name_len);
+    buf[name_len] = '\0';
+    buf += name_len + 1;
 
     /* TODO endianness!!! */
     ((uint32_t *)buf)[0] = width;
@@ -2684,6 +2706,7 @@ static JSValue js_mv2darray_serialize(JSContext *ctx, JSValueConst this_val,
 }
 
 static const JSCFunctionListEntry js_mv2darray_proto_funcs[] = {
+    JS_CFUNC_DEF("toUint8FFArray", 0, js_mv2darray_toUint8FFArray ),
     JS_CFUNC_DEF("toString", 0, js_mv2darray_toString ),
     /* join */
     /* copyWithin */
@@ -2750,7 +2773,6 @@ static const JSCFunctionListEntry js_mv2darray_proto_funcs[] = {
     JS_CFUNC_MAGIC_DEF("compare_gte_v", 1, js_mv2darray_compare, mv_cmp_op_gte | mv_op_v ),
     JS_CFUNC_MAGIC_DEF("compare_lt_v", 1, js_mv2darray_compare, mv_cmp_op__lt | mv_op_v ),
     JS_CFUNC_MAGIC_DEF("compare_lte_v", 1, js_mv2darray_compare, mv_cmp_op_lte | mv_op_v ),
-    JS_CFUNC_DEF("serialize", 0, js_mv2darray_serialize ),
 };
 
 /*********************************************************************/
