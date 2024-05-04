@@ -88,6 +88,9 @@ static int encode_picture(MpegEncContext *s);
 static int dct_quantize_refine(MpegEncContext *s, int16_t *block, int16_t *weight, int16_t *orig, int n, int qscale);
 static int sse_mb(MpegEncContext *s);
 static void denoise_dct_c(MpegEncContext *s, int16_t *block);
+static int dct_quantize_c(MpegEncContext *s,
+                          int16_t *block, int n,
+                          int qscale, int *overflow);
 static int dct_quantize_trellis_c(MpegEncContext *s, int16_t *block, int n, int qscale, int *overflow);
 
 static uint8_t default_mv_penalty[MAX_FCODE + 1][MAX_DMV * 2 + 1];
@@ -325,7 +328,7 @@ av_cold int ff_dct_encode_init(MpegEncContext *s)
     if (CONFIG_H263_ENCODER)
         ff_h263dsp_init(&s->h263dsp);
     if (!s->dct_quantize)
-        s->dct_quantize = ff_dct_quantize_c;
+        s->dct_quantize = dct_quantize_c;
     if (!s->denoise_dct)
         s->denoise_dct  = denoise_dct_c;
     s->fast_dct_quantize = s->dct_quantize;
@@ -2596,7 +2599,7 @@ static av_always_inline void encode_mb_internal(MpegEncContext *s,
     }
 
     // non c quantize code returns incorrect block_last_index FIXME
-    if (s->alternate_scan && s->dct_quantize != ff_dct_quantize_c) {
+    if (s->alternate_scan && s->dct_quantize != dct_quantize_c) {
         for (i = 0; i < mb_block_count; i++) {
             int j;
             if (s->block_last_index[i] > 0) {
@@ -4892,9 +4895,9 @@ void ff_block_permute(int16_t *block, uint8_t *permutation,
     }
 }
 
-int ff_dct_quantize_c(MpegEncContext *s,
-                        int16_t *block, int n,
-                        int qscale, int *overflow)
+static int dct_quantize_c(MpegEncContext *s,
+                          int16_t *block, int n,
+                          int qscale, int *overflow)
 {
     int i, j, level, last_non_zero, q, start_i;
     const int *qmat;
