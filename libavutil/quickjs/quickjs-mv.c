@@ -40,6 +40,23 @@ static inline int js_mv_parse_args(JSContext *ctx, int32_t *mv, int argc, JSValu
         JSObject *p = JS_VALUE_GET_OBJ(argv[0]);
         switch ( p->class_id )
         {
+        case JS_CLASS_ARRAY:
+            {
+                uint32_t length;
+                if ( JS_ToUint32Free(ctx, &length, JS_GetPropertyStr(ctx, argv[0], "length"))
+                  || length != 2
+                  || JS_ToInt32Free(ctx, &mv[0], JS_GetPropertyUint32(ctx, argv[0], 0))
+                  || JS_ToInt32Free(ctx, &mv[1], JS_GetPropertyUint32(ctx, argv[0], 1)) )
+                {
+                    break;
+                }
+                return 1;
+            }
+            break;
+        case JS_CLASS_INT32_FFARRAY:
+            if ( p->u.array.count != 2 )
+                break;
+            // fall-through
         case JS_CLASS_MV:
         case JS_CLASS_MVREF:
             mv[0] = p->u.array.u.int32_ptr[0];
