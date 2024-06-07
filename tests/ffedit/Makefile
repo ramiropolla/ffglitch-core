@@ -8,6 +8,7 @@ FFEDIT_JSON=$(SRC_PATH)/tests/ffedit/json
 include $(SRC_PATH)/tests/ffedit/mpeg12.mak
 include $(SRC_PATH)/tests/ffedit/mpeg4.mak
 include $(SRC_PATH)/tests/ffedit/mjpeg.mak
+include $(SRC_PATH)/tests/ffedit/png.mak
 
 .PHONY: $(FFEDIT_TESTS)
 ffedit-tests: $(FFEDIT_TESTS)
