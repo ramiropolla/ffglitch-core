@@ -30,21 +30,16 @@
 #include "libavutil/common.h"
 #include "libavutil/intreadwrite.h"
 
-typedef struct GetByteContext {
-    const uint8_t *buffer, *buffer_end, *buffer_start;
-} GetByteContext;
-
 typedef struct PutByteContext {
     uint8_t *buffer, *buffer_end, *buffer_start;
     int eof;
 } PutByteContext;
 
+typedef struct GetByteContext {
+    const uint8_t *buffer, *buffer_end, *buffer_start;
+} GetByteContext;
+
 #define DEF(type, name, bytes, read, write)                                  \
-static av_always_inline type bytestream_get_ ## name(const uint8_t **b)        \
-{                                                                              \
-    (*b) += bytes;                                                             \
-    return read(*b - bytes);                                                   \
-}                                                                              \
 static av_always_inline void bytestream_put_ ## name(uint8_t **b,              \
                                                      const type value)         \
 {                                                                              \
@@ -64,6 +59,11 @@ static av_always_inline void bytestream2_put_ ## name(PutByteContext *p,       \
         p->buffer += bytes;                                                    \
     } else                                                                     \
         p->eof = 1;                                                            \
+}                                                                              \
+static av_always_inline type bytestream_get_ ## name(const uint8_t **b)        \
+{                                                                              \
+    (*b) += bytes;                                                             \
+    return read(*b - bytes);                                                   \
 }                                                                              \
 static av_always_inline type bytestream2_get_ ## name ## u(GetByteContext *g)  \
 {                                                                              \
@@ -165,18 +165,6 @@ static av_always_inline int bytestream2_get_bytes_left_p(PutByteContext *p)
     return p->buffer_end - p->buffer;
 }
 
-static av_always_inline void bytestream2_skip(GetByteContext *g,
-                                              unsigned int size)
-{
-    g->buffer += FFMIN(g->buffer_end - g->buffer, size);
-}
-
-static av_always_inline void bytestream2_skipu(GetByteContext *g,
-                                               unsigned int size)
-{
-    g->buffer += size;
-}
-
 static av_always_inline void bytestream2_skip_p(PutByteContext *p,
                                                 unsigned int size)
 {
@@ -264,25 +252,6 @@ static av_always_inline int bytestream2_seek_p(PutByteContext *p,
     return bytestream2_tell_p(p);
 }
 
-static av_always_inline unsigned int bytestream2_get_buffer(GetByteContext *g,
-                                                            uint8_t *dst,
-                                                            unsigned int size)
-{
-    unsigned int size2 = FFMIN(g->buffer_end - g->buffer, size);
-    memcpy(dst, g->buffer, size2);
-    g->buffer += size2;
-    return size2;
-}
-
-static av_always_inline unsigned int bytestream2_get_bufferu(GetByteContext *g,
-                                                             uint8_t *dst,
-                                                             unsigned int size)
-{
-    memcpy(dst, g->buffer, size);
-    g->buffer += size;
-    return size;
-}
-
 static av_always_inline unsigned int bytestream2_put_buffer(PutByteContext *p,
                                                             const uint8_t *src,
                                                             unsigned int size)
@@ -304,6 +273,25 @@ static av_always_inline unsigned int bytestream2_put_bufferu(PutByteContext *p,
 {
     memcpy(p->buffer, src, size);
     p->buffer += size;
+    return size;
+}
+
+static av_always_inline unsigned int bytestream2_get_buffer(GetByteContext *g,
+                                                            uint8_t *dst,
+                                                            unsigned int size)
+{
+    unsigned int size2 = FFMIN(g->buffer_end - g->buffer, size);
+    memcpy(dst, g->buffer, size2);
+    g->buffer += size2;
+    return size2;
+}
+
+static av_always_inline unsigned int bytestream2_get_bufferu(GetByteContext *g,
+                                                             uint8_t *dst,
+                                                             unsigned int size)
+{
+    memcpy(dst, g->buffer, size);
+    g->buffer += size;
     return size;
 }
 
@@ -360,6 +348,14 @@ static av_always_inline unsigned int bytestream2_copy_buffer(PutByteContext *p,
     return bytestream2_copy_bufferu(p, g, size2);
 }
 
+static av_always_inline void bytestream_put_buffer(uint8_t **b,
+                                                   const uint8_t *src,
+                                                   unsigned int size)
+{
+    memcpy(*b, src, size);
+    (*b) += size;
+}
+
 static av_always_inline unsigned int bytestream_get_buffer(const uint8_t **b,
                                                            uint8_t *dst,
                                                            unsigned int size)
@@ -369,12 +365,16 @@ static av_always_inline unsigned int bytestream_get_buffer(const uint8_t **b,
     return size;
 }
 
-static av_always_inline void bytestream_put_buffer(uint8_t **b,
-                                                   const uint8_t *src,
-                                                   unsigned int size)
+static av_always_inline void bytestream2_skip(GetByteContext *g,
+                                              unsigned int size)
 {
-    memcpy(*b, src, size);
-    (*b) += size;
+    g->buffer += FFMIN(g->buffer_end - g->buffer, size);
+}
+
+static av_always_inline void bytestream2_skipu(GetByteContext *g,
+                                               unsigned int size)
+{
+    g->buffer += size;
 }
 
 #endif /* AVCODEC_BYTESTREAM_H */
