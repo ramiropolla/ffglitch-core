@@ -586,18 +586,20 @@ ffe_mjpeg_dht_export(
 {
     if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_DHT)) != 0 )
     {
-        json_t *jtable = json_object_new(s->jctx);
         json_t *jclass = json_int_new(s->jctx, class);
         json_t *jindex = json_int_new(s->jctx, index);
         json_t *jbits = json_array_new(s->jctx, 16);
+        json_kvp_t kvps[] = {
+            { "class", jclass },
+            { "index", jindex },
+            { "bits", jbits },
+            { NULL },
+        };
+        json_t *jtable = json_const_object_from(s->jctx, kvps);
         int val_idx = 0;
 
         json_dynamic_array_add(dctx->jtables, jtable);
         dctx->table_count++;
-        json_object_add(jtable, "class", jclass);
-        json_object_add(jtable, "index", jindex);
-        json_object_add(jtable, "bits", jbits);
-        json_object_done(s->jctx, jtable);
 
         for ( size_t i = 0; i < 16; i++ )
         {
