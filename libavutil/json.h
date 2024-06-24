@@ -33,7 +33,7 @@
 typedef struct json_t json_t;
 
 typedef struct {
-    char **names;
+    char **keys;
     json_t **values;
     void *userdata;
 } json_obj_t;
@@ -247,9 +247,9 @@ size_t json_object_length(json_t *jso)
     return JSON_LEN(jso->flags);
 }
 json_t *json_object_new(json_ctx_t *jctx);
-int json_object_del(json_t *jso, const char *str);
-int json_object_add(json_t *jso, const char *str, json_t *jval);
-json_t *json_object_get(json_t *jso, const char *str);
+int json_object_del(json_t *jso, const char *key);
+int json_object_add(json_t *jso, const char *key, json_t *jval);
+json_t *json_object_get(json_t *jso, const char *key);
 int json_object_done(json_ctx_t *jctx, json_t *jso);
 
 //---------------------------------------------------------------------

@@ -455,7 +455,7 @@ static PyObject *python_from_json(FFPythonContext *py_ctx, json_t *jso)
         for ( size_t i = 0; i < len; i++ )
         {
             PyObject *val_i = python_from_json(py_ctx, jso->obj->values[i]);
-            pyfuncs->PyDict_SetItemString(val, jso->obj->names[i], val_i);
+            pyfuncs->PyDict_SetItemString(val, jso->obj->keys[i], val_i);
             pyfuncs->Py_DecRef(val_i);
         }
         break;

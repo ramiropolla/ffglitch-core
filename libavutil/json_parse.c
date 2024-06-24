@@ -207,7 +207,7 @@ static const char *json_parse_true(json_parse_ctx_t *jpctx, json_t *jso, const c
 
 static const char *json_parse_object(json_parse_ctx_t *jpctx, json_t *jso, const char *buf)
 {
-    char **names;
+    char **keys;
     json_t **values;
     size_t orig_object_len;
     size_t len;
@@ -217,7 +217,7 @@ static const char *json_parse_object(json_parse_ctx_t *jpctx, json_t *jso, const
         // Empty object.
         jso->flags = JSON_TYPE_OBJECT;
         jso->obj = json_allocator_get(&jpctx->jctx, sizeof(json_obj_t));
-        jso->obj->names = NULL;
+        jso->obj->keys = NULL;
         jso->obj->values = NULL;
         buf++;
         return buf;
@@ -226,14 +226,14 @@ static const char *json_parse_object(json_parse_ctx_t *jpctx, json_t *jso, const
     while ( 42 )
     {
         json_t *jval = alloc_json_t(&jpctx->jctx);
-        char *name;
+        char *key;
 
         if ( unlikely(*buf != '"') )
             return NULL;
         buf = parse_string(jpctx, buf+1);
         if ( unlikely(buf == NULL) )
             return NULL;
-        name = json_allocator_strndup(&jpctx->jctx, jpctx->str, jpctx->str_len+1);
+        key = json_allocator_strndup(&jpctx->jctx, jpctx->str, jpctx->str_len+1);
         buf = skip_whitespace(buf);
         if ( unlikely(*buf != ':') )
             return NULL;
@@ -242,8 +242,8 @@ static const char *json_parse_object(json_parse_ctx_t *jpctx, json_t *jso, const
         if ( unlikely(buf == NULL) )
             return NULL;
 
-        grow_parse_mem(&jpctx->object, (void *) &names, (void *) &values, sizeof(char *), sizeof(json_t *), 1);
-        *names = name;
+        grow_parse_mem(&jpctx->object, (void *) &keys, (void *) &values, sizeof(char *), sizeof(json_t *), 1);
+        *keys = key;
         *values = jval;
 
         buf = skip_whitespace(buf);
@@ -262,12 +262,12 @@ static const char *json_parse_object(json_parse_ctx_t *jpctx, json_t *jso, const
             return NULL;
         }
     }
-    names = (char **) jpctx->object.ptr + orig_object_len;
+    keys = (char **) jpctx->object.ptr + orig_object_len;
     values = (json_t **) jpctx->object.ptr2 + orig_object_len;
     len = jpctx->object.len - orig_object_len;
     jso->flags = JSON_TYPE_OBJECT | len;
     jso->obj = json_allocator_get(&jpctx->jctx, sizeof(json_obj_t));
-    jso->obj->names = json_allocator_dup(&jpctx->jctx, names, len * sizeof(char *));
+    jso->obj->keys = json_allocator_dup(&jpctx->jctx, keys, len * sizeof(char *));
     jso->obj->values = json_allocator_dup(&jpctx->jctx, values, len * sizeof(json_t *));
     jpctx->object.len = orig_object_len;
     return buf;

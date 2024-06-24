@@ -160,53 +160,53 @@ json_t *alloc_json_t(json_ctx_t *jctx)
 // json_object_done(); // MUST be called to copy data to json_ctx_t.
 // note: len contains the size of the array;
 //       deleted elements have name == NULL;
-//       names are strdup'd (free'd on del and done()).
+//       keys are strdup'd (free'd on del and done()).
 
 json_t *json_object_new(json_ctx_t *jctx)
 {
     json_t *jso = alloc_json_t(jctx);
     jso->flags = JSON_TYPE_OBJECT;
     jso->obj = json_allocator_get(jctx, sizeof(json_obj_t));
-    jso->obj->names = NULL;
+    jso->obj->keys = NULL;
     jso->obj->values = NULL;
     return jso;
 }
 
-int json_object_add(json_t *jso, const char *str, json_t *jval)
+int json_object_add(json_t *jso, const char *key, json_t *jval)
 {
     size_t len = json_object_length(jso);
     size_t cur_i = len++;
-    jso->obj->names = realloc(jso->obj->names, len * sizeof(char *));
+    jso->obj->keys = realloc(jso->obj->keys, len * sizeof(char *));
     jso->obj->values = realloc(jso->obj->values, len * sizeof(json_t *));
-    jso->obj->names[cur_i] = strdup(str);
+    jso->obj->keys[cur_i] = strdup(key);
     jso->obj->values[cur_i] = jval;
     json_set_len(jso, len);
     return 0;
 }
 
-int json_object_del(json_t *jso, const char *str)
+int json_object_del(json_t *jso, const char *key)
 {
     size_t len = json_object_length(jso);
     for ( size_t i = 0; i < len; i++ )
     {
-        char *name = jso->obj->names[i];
-        if ( name != NULL && strcmp(name, str) == 0 )
+        char *cur_key = jso->obj->keys[i];
+        if ( cur_key != NULL && strcmp(cur_key, key) == 0 )
         {
-            free(name);
-            jso->obj->names[i] = NULL;
+            free(cur_key);
+            jso->obj->keys[i] = NULL;
             return 0;
         }
     }
     return -1;
 }
 
-json_t *json_object_get(json_t *jso, const char *str)
+json_t *json_object_get(json_t *jso, const char *key)
 {
     size_t len = json_object_length(jso);
     for ( size_t i = 0; i < len; i++ )
     {
-        char *name = jso->obj->names[i];
-        if ( name != NULL && strcmp(name, str) == 0 )
+        char *cur_key = jso->obj->keys[i];
+        if ( cur_key != NULL && strcmp(cur_key, key) == 0 )
             return jso->obj->values[i];
     }
     return NULL;
@@ -215,44 +215,44 @@ json_t *json_object_get(json_t *jso, const char *str)
 int json_object_done(json_ctx_t *jctx, json_t *jso)
 {
     size_t len = json_object_length(jso);
-    char **orig_names = jso->obj->names;
+    char **orig_keys = jso->obj->keys;
     json_t **orig_values = jso->obj->values;
-    char **names = NULL;
+    char **keys = NULL;
     json_t **values = NULL;
     size_t real_len = 0;
 
     // Calculate real length.
     for ( size_t i = 0; i < len; i++ )
-        if ( orig_names[i] != NULL )
+        if ( orig_keys[i] != NULL )
             real_len++;
 
     // Populate new arrays if object is not empty.
     if ( real_len != 0 )
     {
         size_t real_i = 0;
-        names = json_allocator_get(jctx, real_len * sizeof(char *));
+        keys = json_allocator_get(jctx, real_len * sizeof(char *));
         values = json_allocator_get(jctx, real_len * sizeof(json_t *));
 
         for ( size_t i = 0; i < len; i++ )
         {
-            char *name = orig_names[i];
-            if ( name == NULL )
+            char *cur_key = orig_keys[i];
+            if ( cur_key == NULL )
                 continue;
-            names[real_i] = json_allocator_strdup(jctx, name);
-            free(name);
+            keys[real_i] = json_allocator_strdup(jctx, cur_key);
+            free(cur_key);
             values[real_i] = orig_values[i];
             real_i++;
         }
     }
 
     // Free old arrays.
-    if ( orig_names != NULL )
-        free(orig_names);
+    if ( orig_keys != NULL )
+        free(orig_keys);
     if ( orig_values != NULL )
         free(orig_values);
 
     // Update object struct with new arrays (or NULL if empty).
-    jso->obj->names = names;
+    jso->obj->keys = keys;
     jso->obj->values = values;
     json_set_len(jso, real_len);
 

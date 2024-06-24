@@ -217,7 +217,7 @@ static void json_print_element(sbuf *ctx, json_t *jso, int level)
             if ( i != 0 )
                 sbuf_fputc(ctx, ',');
             output_lf(ctx, jso, level+1);
-            output_string(ctx, jso->obj->names[i]);
+            output_string(ctx, jso->obj->keys[i]);
             sbuf_fputc(ctx, ':');
             json_print_element(ctx, jso->obj->values[i], level+1);
         }
