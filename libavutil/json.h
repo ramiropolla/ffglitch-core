@@ -256,6 +256,10 @@ int json_object_add(json_t *jso, const char *key, json_t *jval);
 json_t *json_object_get(json_t *jso, const char *key);
 int json_object_done(json_ctx_t *jctx, json_t *jso);
 
+// const object
+json_t *json_const_object_from_len(json_ctx_t *jctx, const json_kvp_t *_kvps, size_t real_len);
+json_t *json_const_object_from(json_ctx_t *jctx, const json_kvp_t *kvps);
+
 //---------------------------------------------------------------------
 // string
 static inline

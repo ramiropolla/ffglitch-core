@@ -251,6 +251,40 @@ int json_object_done(json_ctx_t *jctx, json_t *jso)
     return 0;
 }
 
+json_t *json_const_object_from_len(json_ctx_t *jctx, const json_kvp_t *_kvps, size_t real_len)
+{
+    json_t *jso = json_object_new(jctx);
+
+    // Populate new kvps if object is not empty.
+    if ( real_len != 0 )
+    {
+        json_kvp_t *kvps = json_allocator_get(jctx, real_len * sizeof(json_kvp_t));
+
+        for ( size_t i = 0; i < real_len; i++ )
+        {
+            kvps[i].key = json_allocator_strdup(jctx, _kvps[i].key);
+            kvps[i].value = _kvps[i].value;
+        }
+
+        // Update object struct with new kvps.
+        jso->obj->kvps = kvps;
+        json_set_len(jso, real_len);
+    }
+
+    return jso;
+}
+
+json_t *json_const_object_from(json_ctx_t *jctx, const json_kvp_t *_kvps)
+{
+    size_t real_len = 0;
+
+    // Calculate real length.
+    while ( _kvps[real_len].key != NULL )
+        real_len++;
+
+    return json_const_object_from_len(jctx, _kvps, real_len);
+}
+
 //---------------------------------------------------------------------
 // array (dynamic)
 json_t *json_dynamic_array_new(json_ctx_t *jctx)
