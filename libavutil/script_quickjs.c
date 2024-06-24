@@ -76,7 +76,7 @@ static JSValue quickjs_from_json(FFQuickJSContext *js_ctx, json_t *jso)
         len = json_object_length(jso);
         val = JS_NewObject(ctx);
         for ( size_t i = 0; i < len; i++ )
-            JS_SetPropertyStr(ctx, val, jso->obj->keys[i], quickjs_from_json(js_ctx, jso->obj->values[i]));
+            JS_SetPropertyStr(ctx, val, jso->obj->kvps[i].key, quickjs_from_json(js_ctx, jso->obj->kvps[i].value));
         break;
     case JSON_TYPE_ARRAY:
         len = json_array_length(jso);

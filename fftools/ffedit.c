@@ -365,7 +365,7 @@ static json_t *match_packet_and_frame_in_ffedit_json_file(
         json_t *jframe = json_array_get(jframes, idx);
         /* NOTE: the first object in jframe is "pkt_pos", created in
          *       add_packet_to_ffedit_json_file() */
-        json_t *jpkt_pos = jframe->obj->values[0];
+        json_t *jpkt_pos = jframe->obj->kvps[0].value;
         if ( pkt_pos == json_int_val(jpkt_pos) )
             return jframe;
     }

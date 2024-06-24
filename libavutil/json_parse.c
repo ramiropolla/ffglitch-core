@@ -32,16 +32,14 @@
 #define MEM_CHUNK 4096
 struct json_parse_mem_t {
     void *ptr;
-    void *ptr2;
     size_t alloc;
     size_t len;
 };
 typedef struct json_parse_mem_t json_parse_mem_t;
 
-static inline void grow_parse_mem(json_parse_mem_t *__mem, void **ptr, void **ptr2, size_t sz_ptr, size_t sz_ptr2, size_t len)
+static inline void grow_parse_mem(json_parse_mem_t *__mem, void **ptr, size_t sz_ptr, size_t len)
 {
     uint8_t *__ptr = __mem->ptr;
-    uint8_t *__ptr2 = __mem->ptr2;
     size_t __alloc = __mem->alloc;
     size_t __idx = __mem->len;
     __mem->len += len;
@@ -54,20 +52,10 @@ static inline void grow_parse_mem(json_parse_mem_t *__mem, void **ptr, void **pt
                 __alloc += MEM_CHUNK;
         __ptr = realloc(__ptr, __alloc * sz_ptr);
         __mem->ptr = __ptr;
-        if ( ptr2 != NULL )
-        {
-            __ptr2 = realloc(__ptr2, __alloc * sz_ptr2);
-            __mem->ptr2 = __ptr2;
-        }
         __mem->alloc = __alloc;
     }
     __ptr += __idx * sz_ptr;
     *ptr = __ptr;
-    if ( ptr2 != NULL )
-    {
-        __ptr2 += __idx * sz_ptr2;
-        *ptr2 = __ptr2;
-    }
 }
 
 struct json_parse_ctx_t {
@@ -207,8 +195,7 @@ static const char *json_parse_true(json_parse_ctx_t *jpctx, json_t *jso, const c
 
 static const char *json_parse_object(json_parse_ctx_t *jpctx, json_t *jso, const char *buf)
 {
-    char **keys;
-    json_t **values;
+    json_kvp_t *kvps;
     size_t orig_object_len;
     size_t len;
     buf = skip_whitespace(buf);
@@ -217,8 +204,7 @@ static const char *json_parse_object(json_parse_ctx_t *jpctx, json_t *jso, const
         // Empty object.
         jso->flags = JSON_TYPE_OBJECT;
         jso->obj = json_allocator_get(&jpctx->jctx, sizeof(json_obj_t));
-        jso->obj->keys = NULL;
-        jso->obj->values = NULL;
+        jso->obj->kvps = NULL;
         buf++;
         return buf;
     }
@@ -242,9 +228,9 @@ static const char *json_parse_object(json_parse_ctx_t *jpctx, json_t *jso, const
         if ( unlikely(buf == NULL) )
             return NULL;
 
-        grow_parse_mem(&jpctx->object, (void *) &keys, (void *) &values, sizeof(char *), sizeof(json_t *), 1);
-        *keys = key;
-        *values = jval;
+        grow_parse_mem(&jpctx->object, (void *) &kvps, sizeof(json_kvp_t), 1);
+        kvps->key = key;
+        kvps->value = jval;
 
         buf = skip_whitespace(buf);
         if ( likely(*buf == '}') )
@@ -262,13 +248,11 @@ static const char *json_parse_object(json_parse_ctx_t *jpctx, json_t *jso, const
             return NULL;
         }
     }
-    keys = (char **) jpctx->object.ptr + orig_object_len;
-    values = (json_t **) jpctx->object.ptr2 + orig_object_len;
+    kvps = (json_kvp_t *) jpctx->object.ptr + orig_object_len;
     len = jpctx->object.len - orig_object_len;
     jso->flags = JSON_TYPE_OBJECT | len;
     jso->obj = json_allocator_get(&jpctx->jctx, sizeof(json_obj_t));
-    jso->obj->keys = json_allocator_dup(&jpctx->jctx, keys, len * sizeof(char *));
-    jso->obj->values = json_allocator_dup(&jpctx->jctx, values, len * sizeof(json_t *));
+    jso->obj->kvps = json_allocator_dup(&jpctx->jctx, kvps, len * sizeof(json_kvp_t));
     jpctx->object.len = orig_object_len;
     return buf;
 }
@@ -329,7 +313,7 @@ static const char *json_parse_array(json_parse_ctx_t *jpctx, json_t *jso, const 
             goto switch_to_normal_array;
         }
 
-        grow_parse_mem(&jpctx->array_of_ints, (void *) &array_of_ints, NULL, sizeof(int32_t), 0, 1);
+        grow_parse_mem(&jpctx->array_of_ints, (void *) &array_of_ints, sizeof(int32_t), 1);
         *array_of_ints = jint.val;
 
         PARSE_ARRAY_END();
@@ -348,7 +332,7 @@ switch_to_normal_array:
     if ( len > 0 )
     {
         json_t jint;
-        grow_parse_mem(&jpctx->array, (void *) &array, NULL, sizeof(json_t *), 0, len);
+        grow_parse_mem(&jpctx->array, (void *) &array, sizeof(json_t *), len);
         array_of_ints = (int32_t *) jpctx->array_of_ints.ptr + orig_array_of_ints_len;
         jint.flags = JSON_TYPE_NUMBER;
         for ( size_t i = 0; i < len; i++ )
@@ -365,7 +349,7 @@ switch_to_normal_array:
         PARSE_ARRAY_ELEMENT(jval);
 
 headstart:
-        grow_parse_mem(&jpctx->array, (void *) &array, NULL, sizeof(json_t *), 0, 1);
+        grow_parse_mem(&jpctx->array, (void *) &array, sizeof(json_t *), 1);
         *array = jval;
 
         PARSE_ARRAY_END();
@@ -422,7 +406,6 @@ json_t *json_parse(json_ctx_t *jctx, const char *buf)
     jpctx.array_of_ints.alloc = 0;
     jpctx.array_of_ints.len = 0;
     jpctx.object.ptr = NULL;
-    jpctx.object.ptr2 = NULL;
     jpctx.object.alloc = 0;
     jpctx.object.len = 0;
     jpctx.str_alloc = MEM_CHUNK;
@@ -433,7 +416,6 @@ json_t *json_parse(json_ctx_t *jctx, const char *buf)
     free(jpctx.array.ptr);
     free(jpctx.array_of_ints.ptr);
     free(jpctx.object.ptr);
-    free(jpctx.object.ptr2);
     free(jpctx.str);
 
     if ( buf == NULL )

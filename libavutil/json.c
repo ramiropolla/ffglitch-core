@@ -167,8 +167,7 @@ json_t *json_object_new(json_ctx_t *jctx)
     json_t *jso = alloc_json_t(jctx);
     jso->flags = JSON_TYPE_OBJECT;
     jso->obj = json_allocator_get(jctx, sizeof(json_obj_t));
-    jso->obj->keys = NULL;
-    jso->obj->values = NULL;
+    jso->obj->kvps = NULL;
     return jso;
 }
 
@@ -176,10 +175,9 @@ int json_object_add(json_t *jso, const char *key, json_t *jval)
 {
     size_t len = json_object_length(jso);
     size_t cur_i = len++;
-    jso->obj->keys = realloc(jso->obj->keys, len * sizeof(char *));
-    jso->obj->values = realloc(jso->obj->values, len * sizeof(json_t *));
-    jso->obj->keys[cur_i] = strdup(key);
-    jso->obj->values[cur_i] = jval;
+    jso->obj->kvps = realloc(jso->obj->kvps, len * sizeof(json_kvp_t));
+    jso->obj->kvps[cur_i].key = strdup(key);
+    jso->obj->kvps[cur_i].value = jval;
     json_set_len(jso, len);
     return 0;
 }
@@ -189,11 +187,11 @@ int json_object_del(json_t *jso, const char *key)
     size_t len = json_object_length(jso);
     for ( size_t i = 0; i < len; i++ )
     {
-        char *cur_key = jso->obj->keys[i];
+        const char *cur_key = jso->obj->kvps[i].key;
         if ( cur_key != NULL && strcmp(cur_key, key) == 0 )
         {
-            free(cur_key);
-            jso->obj->keys[i] = NULL;
+            free((void *)cur_key);
+            jso->obj->kvps[i].key = NULL;
             return 0;
         }
     }
@@ -205,9 +203,9 @@ json_t *json_object_get(json_t *jso, const char *key)
     size_t len = json_object_length(jso);
     for ( size_t i = 0; i < len; i++ )
     {
-        char *cur_key = jso->obj->keys[i];
+        const char *cur_key = jso->obj->kvps[i].key;
         if ( cur_key != NULL && strcmp(cur_key, key) == 0 )
-            return jso->obj->values[i];
+            return jso->obj->kvps[i].value;
     }
     return NULL;
 }
@@ -215,45 +213,39 @@ json_t *json_object_get(json_t *jso, const char *key)
 int json_object_done(json_ctx_t *jctx, json_t *jso)
 {
     size_t len = json_object_length(jso);
-    char **orig_keys = jso->obj->keys;
-    json_t **orig_values = jso->obj->values;
-    char **keys = NULL;
-    json_t **values = NULL;
+    json_kvp_t *orig_kvps = jso->obj->kvps;
+    json_kvp_t *kvps = NULL;
     size_t real_len = 0;
 
     // Calculate real length.
     for ( size_t i = 0; i < len; i++ )
-        if ( orig_keys[i] != NULL )
+        if ( orig_kvps[i].key != NULL )
             real_len++;
 
     // Populate new arrays if object is not empty.
     if ( real_len != 0 )
     {
         size_t real_i = 0;
-        keys = json_allocator_get(jctx, real_len * sizeof(char *));
-        values = json_allocator_get(jctx, real_len * sizeof(json_t *));
+        kvps = json_allocator_get(jctx, real_len * sizeof(json_kvp_t));
 
         for ( size_t i = 0; i < len; i++ )
         {
-            char *cur_key = orig_keys[i];
+            const char *cur_key = orig_kvps[i].key;
             if ( cur_key == NULL )
                 continue;
-            keys[real_i] = json_allocator_strdup(jctx, cur_key);
-            free(cur_key);
-            values[real_i] = orig_values[i];
+            kvps[real_i].key = json_allocator_strdup(jctx, cur_key);
+            free((void *) cur_key);
+            kvps[real_i].value = orig_kvps[i].value;
             real_i++;
         }
     }
 
-    // Free old arrays.
-    if ( orig_keys != NULL )
-        free(orig_keys);
-    if ( orig_values != NULL )
-        free(orig_values);
+    // Free old kvps.
+    if ( orig_kvps != NULL )
+        free(orig_kvps);
 
-    // Update object struct with new arrays (or NULL if empty).
-    jso->obj->keys = keys;
-    jso->obj->values = values;
+    // Update object struct with new kvps (or NULL if empty).
+    jso->obj->kvps = kvps;
     json_set_len(jso, real_len);
 
     return 0;

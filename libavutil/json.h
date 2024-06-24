@@ -33,8 +33,12 @@
 typedef struct json_t json_t;
 
 typedef struct {
-    char **keys;
-    json_t **values;
+    const char *key;
+    json_t *value;
+} json_kvp_t;
+
+typedef struct {
+    json_kvp_t *kvps;
     void *userdata;
 } json_obj_t;
 
