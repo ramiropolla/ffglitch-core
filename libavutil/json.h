@@ -116,7 +116,12 @@ void *json_allocator_get(json_ctx_t *jctx, size_t len);
 void *json_allocator_get0(json_ctx_t *jctx, size_t len);
 void *json_allocator_dup(json_ctx_t *jctx, const void *src, size_t len);
 void *json_allocator_strget(json_ctx_t *jctx, size_t len);
-void *json_allocator_strdup(json_ctx_t *jctx, const void *src, size_t len);
+void *json_allocator_strndup(json_ctx_t *jctx, const void *src, size_t len);
+static inline
+void *json_allocator_strdup(json_ctx_t *jctx, const void *src)
+{
+    return json_allocator_strndup(jctx, src, strlen(src)+1);
+}
 void json_ctx_free(json_ctx_t *jctx);
 json_t *alloc_json_t(json_ctx_t *jctx);
 
@@ -254,7 +259,7 @@ json_t *json_string_new(json_ctx_t *jctx, const char *str)
 {
     json_t *jso = alloc_json_t(jctx);
     jso->flags = JSON_TYPE_STRING;
-    jso->str = json_allocator_strdup(jctx, str, strlen(str)+1);
+    jso->str = json_allocator_strdup(jctx, str);
     return jso;
 }
 

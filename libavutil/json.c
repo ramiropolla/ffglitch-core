@@ -113,7 +113,7 @@ void *json_allocator_strget(json_ctx_t *jctx, size_t len)
     return json_allocator_get_internal(&jctx->str, jctx->str_chunk, len);
 }
 
-void *json_allocator_strdup(json_ctx_t *jctx, const void *src, size_t len)
+void *json_allocator_strndup(json_ctx_t *jctx, const void *src, size_t len)
 {
     void *ptr = json_allocator_strget(jctx, len);
     memcpy(ptr, src, len);
@@ -238,7 +238,7 @@ int json_object_done(json_ctx_t *jctx, json_t *jso)
             char *name = orig_names[i];
             if ( name == NULL )
                 continue;
-            names[real_i] = json_allocator_strdup(jctx, name, strlen(name)+1);
+            names[real_i] = json_allocator_strdup(jctx, name);
             free(name);
             values[real_i] = orig_values[i];
             real_i++;

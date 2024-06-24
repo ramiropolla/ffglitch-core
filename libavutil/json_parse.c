@@ -155,7 +155,7 @@ static const char *json_parse_string(json_parse_ctx_t *jpctx, json_t *jso, const
     jso->flags = JSON_TYPE_STRING;
     buf = parse_string(jpctx, buf);
     if ( buf != NULL )
-        jso->str = json_allocator_strdup(&jpctx->jctx, jpctx->str, jpctx->str_len+1);
+        jso->str = json_allocator_strndup(&jpctx->jctx, jpctx->str, jpctx->str_len+1);
     return buf;
 }
 
@@ -233,7 +233,7 @@ static const char *json_parse_object(json_parse_ctx_t *jpctx, json_t *jso, const
         buf = parse_string(jpctx, buf+1);
         if ( unlikely(buf == NULL) )
             return NULL;
-        name = json_allocator_strdup(&jpctx->jctx, jpctx->str, jpctx->str_len+1);
+        name = json_allocator_strndup(&jpctx->jctx, jpctx->str, jpctx->str_len+1);
         buf = skip_whitespace(buf);
         if ( unlikely(*buf != ':') )
             return NULL;
