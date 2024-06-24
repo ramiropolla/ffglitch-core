@@ -344,9 +344,13 @@ ffe_mjpeg_dqt_init(MJpegDecodeContext *s, ffe_dqt_ctx_t *dctx)
         //            [ ] # dqt
         // }
         AVFrame *f = s->picture_ptr;
-        json_t *jframe = json_object_new(s->jctx);
-        dctx->jdata = json_array_new(s->jctx, 4);
-        json_object_add(jframe, "tables", dctx->jdata);
+        json_t *jdata = json_array_new(s->jctx, 4);
+        json_kvp_t kvps[] = {
+            { "tables", jdata },
+            { NULL }
+        };
+        json_t *jframe = json_const_object_from(s->jctx, kvps);
+        dctx->jdata = jdata;
         f->ffedit_sd[FFEDIT_FEAT_DQT] = jframe;
     }
     else if ( (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_DQT)) != 0 )
