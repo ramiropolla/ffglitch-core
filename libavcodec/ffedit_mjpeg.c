@@ -615,6 +615,8 @@ ffe_mjpeg_dht_term(
         MJpegDecodeContext *s,
         ffe_dht_ctx_t *dctx)
 {
+    if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_DHT)) != 0 )
+        json_dynamic_array_done(s->jctx, dctx->jtables);
     if ( (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_DHT)) != 0 )
         ffe_transplicate_restore(&s->ffe_xp, dctx->saved);
 }
