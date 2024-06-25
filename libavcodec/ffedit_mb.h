@@ -63,14 +63,14 @@ void ffe_mb_import_init_mb(
         ffe_mb_mb_ctx *mbctx,
         AVFrame *f,
         GetBitContext *gb,
-        FFEditTransplicateContext *xp,
+        FFEditTransplicateBitsContext *xp,
         int mb_y,
         int mb_x);
 void ffe_mb_import_flush_mb(
         ffe_mb_mb_ctx *mbctx,
         AVFrame *f,
         GetBitContext *gb,
-        FFEditTransplicateContext *xp,
+        FFEditTransplicateBitsContext *xp,
         int mb_y,
         int mb_x);
 

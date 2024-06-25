@@ -1113,8 +1113,8 @@ FF_ENABLE_DEPRECATION_WARNINGS
     return 0;
 }
 
-static void ffe_transplicate_bytes(
-        FFEditTransplicateContext *xp,
+static void ffe_transplicate_bits_bytes(
+        FFEditTransplicateBitsContext *xp,
         const uint8_t *buf,
         size_t len)
 {
@@ -1125,8 +1125,8 @@ static void ffe_transplicate_bytes(
     }
 }
 
-static int ffe_transplicate_init_get_bits(
-        FFEditTransplicateContext *xp,
+static int ffe_transplicate_bits_init_get_bits(
+        FFEditTransplicateBitsContext *xp,
         GetBitContext *gb,
         const uint8_t *buf,
         int bit_size)
@@ -1138,17 +1138,17 @@ static int ffe_transplicate_init_get_bits(
 
 /* Transplicate start_code and init get_bits */
 static int ffe_mpeg12_init_get_bits8(
-        FFEditTransplicateContext *xp,
+        FFEditTransplicateBitsContext *xp,
         GetBitContext *gb,
         const uint8_t *buf,
         int bit_size8)
 {
-    ffe_transplicate_bytes(xp, buf - 4, 4);
-    return ffe_transplicate_init_get_bits(xp, gb, buf, bit_size8 * 8);
+    ffe_transplicate_bits_bytes(xp, buf - 4, 4);
+    return ffe_transplicate_bits_init_get_bits(xp, gb, buf, bit_size8 * 8);
 }
 
 static void ffe_mpeg12_flush_get_bits(
-        FFEditTransplicateContext *xp)
+        FFEditTransplicateBitsContext *xp)
 {
     if ( xp->pb != NULL )
         flush_put_bits(xp->pb);
@@ -2217,13 +2217,13 @@ static void mpeg_decode_user_data(AVCodecContext *avctx,
     MpegEncContext *s2 = &s->mpeg_enc_ctx;
 
     /* FFedit: transplicate one chunk (except start_code) */
-    if ( ffe_transplicate_pb(&s2->ffe_xp) != NULL )
+    if ( ffe_transplicate_bits_pb(&s2->ffe_xp) != NULL )
     {
         uint32_t start_code = -1;
         const uint8_t *next_chunk = avpriv_find_start_code(p, buf_end, &start_code);
         next_chunk -= 4;
-        ffe_transplicate_bytes(&s2->ffe_xp, p - 4, 4);
-        ffe_transplicate_bytes(&s2->ffe_xp, p, next_chunk - p);
+        ffe_transplicate_bits_bytes(&s2->ffe_xp, p - 4, 4);
+        ffe_transplicate_bits_bytes(&s2->ffe_xp, p, next_chunk - p);
     }
 
 #if 0
@@ -2355,7 +2355,7 @@ static int decode_chunks(AVCodecContext *avctx, AVFrame *picture,
                     s2->er.error_count = 0;
                     for (i = 0; i < s->slice_count; i++)
                     {
-                        ffe_transplicate_merge(avctx, &s2->ffe_xp, &s2->thread_context[i]->ffe_xp);
+                        ffe_transplicate_bits_merge(avctx, &s2->ffe_xp, &s2->thread_context[i]->ffe_xp);
                         s2->er.error_count += s2->thread_context[i]->er.error_count;
                     }
                 }
@@ -2432,7 +2432,7 @@ static int decode_chunks(AVCodecContext *avctx, AVFrame *picture,
                 s2->er.error_count = 0;
                 for (i = 0; i < s->slice_count; i++)
                 {
-                    ffe_transplicate_merge(avctx, &s2->ffe_xp, &s2->thread_context[i]->ffe_xp);
+                    ffe_transplicate_bits_merge(avctx, &s2->ffe_xp, &s2->thread_context[i]->ffe_xp);
                     s2->er.error_count += s2->thread_context[i]->er.error_count;
                 }
                 s->slice_count = 0;
@@ -2646,12 +2646,12 @@ static int decode_chunks(AVCodecContext *avctx, AVFrame *picture,
                             return ret;
                         if ( (avctx->ffedit_apply & (1 << FFEDIT_FEAT_LAST)) != 0 )
                         {
-                            ffe_transplicate_free(&thread_context->ffe_xp);
-                            ret = ffe_transplicate_init(avctx, &thread_context->ffe_xp, buf_size);
+                            ffe_transplicate_bits_free(&thread_context->ffe_xp);
+                            ret = ffe_transplicate_bits_init(avctx, &thread_context->ffe_xp, buf_size);
                             if ( ret < 0 )
                                 return ret;
                         }
-                        ret = ffe_transplicate_init_get_bits(&thread_context->ffe_xp, &thread_context->gb, buf_ptr, input_size * 8);
+                        ret = ffe_transplicate_bits_init_get_bits(&thread_context->ffe_xp, &thread_context->gb, buf_ptr, input_size * 8);
                         if (ret < 0)
                             return ret;
                         s->slice_count++;
@@ -2730,7 +2730,7 @@ static int mpeg_decode_frame(AVCodecContext *avctx, AVFrame *picture,
 
     if ( (avctx->ffedit_apply & (1 << FFEDIT_FEAT_LAST)) != 0 )
     {
-        ret = ffe_transplicate_init(avctx, &s2->ffe_xp, buf_size);
+        ret = ffe_transplicate_bits_init(avctx, &s2->ffe_xp, buf_size);
         if ( ret < 0 )
             return ret;
     }
@@ -2757,7 +2757,7 @@ static int mpeg_decode_frame(AVCodecContext *avctx, AVFrame *picture,
 
 the_end:
     if ( (avctx->ffedit_apply & (1 << FFEDIT_FEAT_LAST)) != 0 )
-        ffe_transplicate_flush(avctx, &s2->ffe_xp, avpkt);
+        ffe_transplicate_bits_flush(avctx, &s2->ffe_xp, avpkt);
 
     if ( *got_output )
         ffe_mpeg12_export_cleanup(s2, picture);
@@ -2785,7 +2785,7 @@ static av_cold int mpeg_decode_end(AVCodecContext *avctx)
         ff_mpv_common_end(&s->mpeg_enc_ctx);
     av_buffer_unref(&s->a53_buf_ref);
 
-    ffe_transplicate_free(&s2->ffe_xp);
+    ffe_transplicate_bits_free(&s2->ffe_xp);
 
     return 0;
 }

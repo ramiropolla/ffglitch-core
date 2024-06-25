@@ -557,7 +557,7 @@ typedef struct MpegEncContext {
     FFScriptObject *pict_type_func;
 
     /* ffedit bitstream */
-    FFEditTransplicateContext ffe_xp;
+    FFEditTransplicateBitsContext ffe_xp;
 
     /* ffedit JSON context */
     void *jctx_header;

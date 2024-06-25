@@ -510,7 +510,7 @@ static int mpeg4_decode_sprite_trajectory(Mpeg4DecContext *ctx, GetBitContext *g
         return AVERROR_INVALIDDATA;
 
     if ( (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_GMC)) != 0 )
-        saved = ffe_transplicate_save(&s->ffe_xp);
+        saved = ffe_transplicate_bits_save(&s->ffe_xp);
 
     for (i = 0; i < ctx->num_sprite_warping_points; i++) {
         int length;
@@ -557,7 +557,7 @@ static int mpeg4_decode_sprite_trajectory(Mpeg4DecContext *ctx, GetBitContext *g
         av_log(ffe_class, AV_LOG_FATAL, "GPL must be enabled to glitch GMC in MPEG-4\n");
         exit(1);
 #endif
-        ffe_transplicate_restore(&s->ffe_xp, saved);
+        ffe_transplicate_bits_restore(&s->ffe_xp, saved);
     }
     if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_GMC)) != 0 )
     {

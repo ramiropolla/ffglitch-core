@@ -2411,7 +2411,7 @@ int ff_mjpeg_decode_frame_from_buf(AVCodecContext *avctx, AVFrame *frame,
 
     if ( (avctx->ffedit_apply & (1 << FFEDIT_FEAT_LAST)) != 0 )
     {
-        ret = ffe_transplicate_init(avctx, &s->ffe_xp, avpkt->size);
+        ret = ffe_transplicate_bits_init(avctx, &s->ffe_xp, avpkt->size);
         if ( ret < 0 )
             return ret;
     }
@@ -2447,7 +2447,7 @@ redo_for_pal8:
 
         if ( (avctx->ffedit_apply & (1 << FFEDIT_FEAT_LAST)) != 0 )
         {
-            PutBitContext *opb = ffe_transplicate_pb(&s->ffe_xp);
+            PutBitContext *opb = ffe_transplicate_bits_pb(&s->ffe_xp);
             flush_put_bits(opb);
             put_bits(opb, 8, 0xff);
             put_bits(opb, 8, start_code);
@@ -2642,7 +2642,7 @@ skip:
         if ( start_code == SOS
           && (avctx->ffedit_apply & (1 << FFEDIT_FEAT_LAST)) != 0 )
         {
-            PutBitContext *opb = ffe_transplicate_pb(&s->ffe_xp);
+            PutBitContext *opb = ffe_transplicate_bits_pb(&s->ffe_xp);
             ff_mjpeg_escape_FF(opb, start_escape);
         }
         /* eof process start code */
@@ -2663,7 +2663,7 @@ fail:
 the_end:
 
     if ( (avctx->ffedit_apply & (1 << FFEDIT_FEAT_LAST)) != 0 )
-        ffe_transplicate_flush(avctx, &s->ffe_xp, avpkt);
+        ffe_transplicate_bits_flush(avctx, &s->ffe_xp, avpkt);
 
     is16bit = av_pix_fmt_desc_get(avctx->pix_fmt)->comp[0].step > 1;
 
@@ -3014,7 +3014,7 @@ av_cold int ff_mjpeg_decode_end(AVCodecContext *avctx)
     av_freep(&s->hwaccel_picture_private);
     av_freep(&s->jls_state);
 
-    ffe_transplicate_free(&s->ffe_xp);
+    ffe_transplicate_bits_free(&s->ffe_xp);
 
     return 0;
 }

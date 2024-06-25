@@ -161,7 +161,7 @@ ffe_mpeg4_decode_motion(
     if ( (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_MV)) != 0
       || (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_MV_DELTA)) != 0 )
     {
-        s->pb = *ffe_transplicate_save(&s->ffe_xp);
+        s->pb = *ffe_transplicate_bits_save(&s->ffe_xp);
     }
 
     delta = ff_h263_decode_motion_delta(s, f_code);
@@ -191,7 +191,7 @@ ffe_mpeg4_decode_motion(
       || (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_MV_DELTA)) != 0 )
     {
         ff_h263_encode_motion(&s->pb, delta, f_code);
-        ffe_transplicate_restore(&s->ffe_xp, &s->pb);
+        ffe_transplicate_bits_restore(&s->ffe_xp, &s->pb);
     }
     if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_MV)) != 0 )
         ffe_mv_set(mbctx, x_or_y, val);
@@ -226,7 +226,7 @@ static int
 ffe_mpeg4_decode_mb(MpegEncContext *s, int16_t block[12][64])
 {
     AVFrame *f = s->current_picture_ptr->f;
-    FFEditTransplicateContext *xp = NULL;
+    FFEditTransplicateBitsContext *xp = NULL;
     ffe_mb_mb_ctx mbctx;
     int ret;
 

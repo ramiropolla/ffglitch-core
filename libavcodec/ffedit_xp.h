@@ -25,38 +25,38 @@
 #include "put_bits.h"
 #include "get_bits.h"
 
-typedef struct FFEditTransplicateContext {
+typedef struct FFEditTransplicateBitsContext {
     const AVClass *av_class;
 
     uint8_t *data;
     PutBitContext *pb;
 
     PutBitContext saved; /* saved */
-} FFEditTransplicateContext;
+} FFEditTransplicateBitsContext;
 
-int ffe_transplicate_init(
+int ffe_transplicate_bits_init(
         AVCodecContext *avctx,
-        FFEditTransplicateContext *xp,
+        FFEditTransplicateBitsContext *xp,
         size_t pkt_size);
 
-void ffe_transplicate_merge(
+void ffe_transplicate_bits_merge(
         AVCodecContext *avctx,
-        FFEditTransplicateContext *dst_xp,
-        FFEditTransplicateContext *src_xp);
+        FFEditTransplicateBitsContext *dst_xp,
+        FFEditTransplicateBitsContext *src_xp);
 
-void ffe_transplicate_flush(
+void ffe_transplicate_bits_flush(
         AVCodecContext *avctx,
-        FFEditTransplicateContext *xp,
+        FFEditTransplicateBitsContext *xp,
         const AVPacket *pkt);
 
-void ffe_transplicate_free(FFEditTransplicateContext *xp);
+void ffe_transplicate_bits_free(FFEditTransplicateBitsContext *xp);
 
-PutBitContext *ffe_transplicate_pb(FFEditTransplicateContext *xp);
+PutBitContext *ffe_transplicate_bits_pb(FFEditTransplicateBitsContext *xp);
 
-PutBitContext *ffe_transplicate_save(FFEditTransplicateContext *xp);
+PutBitContext *ffe_transplicate_bits_save(FFEditTransplicateBitsContext *xp);
 
-void ffe_transplicate_restore(
-        FFEditTransplicateContext *xp,
+void ffe_transplicate_bits_restore(
+        FFEditTransplicateBitsContext *xp,
         PutBitContext *saved);
 
 #endif /* AVCODEC_FFEDIT_XP_H */

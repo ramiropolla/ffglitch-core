@@ -119,7 +119,7 @@ ffe_mjpeg_dct_init(
     if ( a_dct_feat == FFEDIT_FEAT_Q_DCT
       || a_dct_feat == FFEDIT_FEAT_Q_DCT_DELTA )
     {
-        qctx->saved = ffe_transplicate_save(&s->ffe_xp);
+        qctx->saved = ffe_transplicate_bits_save(&s->ffe_xp);
     }
 }
 
@@ -221,7 +221,7 @@ static inline int ffe_mjpeg_decode_dc(
     if ( a_dct_feat == FFEDIT_FEAT_Q_DC
       || a_dct_feat == FFEDIT_FEAT_Q_DC_DELTA )
     {
-        saved = ffe_transplicate_save(&s->ffe_xp);
+        saved = ffe_transplicate_bits_save(&s->ffe_xp);
     }
 
     code = mjpeg_decode_dc(s, dc_index);
@@ -243,7 +243,7 @@ static inline int ffe_mjpeg_decode_dc(
             ff_mjpeg_encode_dc(saved, code, s->m.huff_size_dc_luminance, s->m.huff_code_dc_luminance);
         else
             ff_mjpeg_encode_dc(saved, code, s->m.huff_size_dc_chrominance, s->m.huff_code_dc_chrominance);
-        ffe_transplicate_restore(&s->ffe_xp, saved);
+        ffe_transplicate_bits_restore(&s->ffe_xp, saved);
     }
 
     return code;
@@ -311,7 +311,7 @@ ffe_mjpeg_dct_term(
         block_last_index[n] = last_index;
         ff_mjpeg_encode_block(s, qctx->saved, &s->m, s->permutated_scantable,
                               last_dc, block_last_index, qblock, n);
-        ffe_transplicate_restore(&s->ffe_xp, qctx->saved);
+        ffe_transplicate_bits_restore(&s->ffe_xp, qctx->saved);
     }
 }
 
@@ -382,7 +382,7 @@ ffe_mjpeg_dqt_table(MJpegDecodeContext *s, ffe_dqt_ctx_t *dctx, int index)
     }
 
     if ( (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_DQT)) != 0 )
-        dctx->saved = ffe_transplicate_save(&s->ffe_xp);
+        dctx->saved = ffe_transplicate_bits_save(&s->ffe_xp);
 }
 
 //---------------------------------------------------------------------
@@ -415,7 +415,7 @@ ffe_mjpeg_dqt_term(
         ffe_dqt_ctx_t *dctx)
 {
     if ( (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_DQT)) != 0 )
-        ffe_transplicate_restore(&s->ffe_xp, dctx->saved);
+        ffe_transplicate_bits_restore(&s->ffe_xp, dctx->saved);
     if ( dctx->max_index >= 0 )
         json_set_len(dctx->jdata, dctx->max_index+1);
 }
@@ -473,7 +473,7 @@ ffe_mjpeg_dht_init(MJpegDecodeContext *s, ffe_dht_ctx_t *dctx)
     }
 
     if ( (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_DHT)) != 0 )
-        dctx->saved = ffe_transplicate_save(&s->ffe_xp);
+        dctx->saved = ffe_transplicate_bits_save(&s->ffe_xp);
 }
 
 /* export */
@@ -628,7 +628,7 @@ ffe_mjpeg_dht_term(
     if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_DHT)) != 0 )
         json_dynamic_array_done(s->jctx, dctx->jtables);
     if ( (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_DHT)) != 0 )
-        ffe_transplicate_restore(&s->ffe_xp, dctx->saved);
+        ffe_transplicate_bits_restore(&s->ffe_xp, dctx->saved);
 }
 
 /*-------------------------------------------------------------------*/

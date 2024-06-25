@@ -146,7 +146,7 @@ void ffe_mb_import_init_mb(
         ffe_mb_mb_ctx *mbctx,
         AVFrame *f,
         GetBitContext *gb,
-        FFEditTransplicateContext *xp,
+        FFEditTransplicateBitsContext *xp,
         int mb_y,
         int mb_x)
 {
@@ -171,7 +171,7 @@ void ffe_mb_import_init_mb(
     init_get_bits(gb, mbctx->data, (size + 4) * 8);
 
     if ( xp != NULL )
-        gb->pb = ffe_transplicate_pb(xp);
+        gb->pb = ffe_transplicate_bits_pb(xp);
 }
 
 /*-------------------------------------------------------------------*/
@@ -179,7 +179,7 @@ void ffe_mb_import_flush_mb(
         ffe_mb_mb_ctx *mbctx,
         AVFrame *f,
         GetBitContext *gb,
-        FFEditTransplicateContext *xp,
+        FFEditTransplicateBitsContext *xp,
         int mb_y,
         int mb_x)
 {
@@ -203,5 +203,5 @@ void ffe_mb_import_flush_mb(
         skip_bits_long(gb, size);
 
     if ( xp != NULL )
-        gb->pb = ffe_transplicate_pb(xp);
+        gb->pb = ffe_transplicate_bits_pb(xp);
 }

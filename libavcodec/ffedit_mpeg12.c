@@ -258,7 +258,7 @@ static int ffe_decode_mpegmv(
     if ( (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_MV)) != 0
       || (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_MV_DELTA)) != 0 )
     {
-        s->pb = *ffe_transplicate_save(&s->ffe_xp);
+        s->pb = *ffe_transplicate_bits_save(&s->ffe_xp);
     }
 
     delta = mpeg_decode_motion_delta(s, fcode);
@@ -288,7 +288,7 @@ static int ffe_decode_mpegmv(
       || (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_MV_DELTA)) != 0 )
     {
         ff_mpeg1_encode_motion(s, delta, fcode);
-        ffe_transplicate_restore(&s->ffe_xp, &s->pb);
+        ffe_transplicate_bits_restore(&s->ffe_xp, &s->pb);
     }
     if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_MV)) != 0 )
         ffe_mv_set(mbctx, x_or_y, val);
@@ -443,7 +443,7 @@ static int ffe_get_qscale(MpegEncContext *s, int mb_y, int is_mb)
     int qscale;
 
     if ( (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_QSCALE)) != 0 )
-        saved = ffe_transplicate_save(&s->ffe_xp);
+        saved = ffe_transplicate_bits_save(&s->ffe_xp);
 
     // mpeg_get_qscale
     orig_qscale = get_bits(&s->gb, 5);
@@ -458,7 +458,7 @@ static int ffe_get_qscale(MpegEncContext *s, int mb_y, int is_mb)
     if ( (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_QSCALE)) != 0 )
     {
         put_bits(saved, 5, orig_qscale);
-        ffe_transplicate_restore(&s->ffe_xp, saved);
+        ffe_transplicate_bits_restore(&s->ffe_xp, saved);
     }
     if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_QSCALE)) != 0 )
     {
@@ -569,7 +569,7 @@ static void ffe_mpeg12_init_block(
     memset(ctx->qblock, 0x00, sizeof(ctx->qblock));
     memcpy(ctx->last_dc, s->last_dc, sizeof(ctx->last_dc));
     if ( a_which_dct_feat(s) != FFEDIT_FEAT_LAST )
-        s->pb = *ffe_transplicate_save(&s->ffe_xp);
+        s->pb = *ffe_transplicate_bits_save(&s->ffe_xp);
 }
 
 static void ffe_mpeg12_use_block(
@@ -665,7 +665,7 @@ static void ffe_mpeg12_use_block(
     {
         memcpy(s->last_dc, ctx->last_dc, sizeof(s->last_dc));
         ffe_mpeg1_encode_block(s, ctx->qblock, i);
-        ffe_transplicate_restore(&s->ffe_xp, &s->pb);
+        ffe_transplicate_bits_restore(&s->ffe_xp, &s->pb);
     }
 }
 
@@ -764,7 +764,7 @@ static int
 ffe_mpeg_decode_mb(MpegEncContext *s, int16_t block[12][64])
 {
     AVFrame *f = s->current_picture_ptr->f;
-    FFEditTransplicateContext *xp = NULL;
+    FFEditTransplicateBitsContext *xp = NULL;
     ffe_mb_mb_ctx mbctx;
     int ret;
 

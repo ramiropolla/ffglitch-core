@@ -171,7 +171,7 @@ av_cold int ff_h263_decode_end(AVCodecContext *avctx)
 
     ff_mpv_common_end(s);
 
-    ffe_transplicate_free(&s->ffe_xp);
+    ffe_transplicate_bits_free(&s->ffe_xp);
 
     return 0;
 }
@@ -515,14 +515,14 @@ retry:
 
     if ( (avctx->ffedit_apply & (1 << FFEDIT_FEAT_LAST)) != 0 )
     {
-        ret = ffe_transplicate_init(avctx, &s->ffe_xp, buf_size);
+        ret = ffe_transplicate_bits_init(avctx, &s->ffe_xp, buf_size);
         if ( ret < 0 )
             return ret;
-        s->gb.pb = ffe_transplicate_pb(&s->ffe_xp);
+        s->gb.pb = ffe_transplicate_bits_pb(&s->ffe_xp);
     }
 
     retry_pb.buf = NULL;
-    transplicate_pb = ffe_transplicate_pb(&s->ffe_xp);
+    transplicate_pb = ffe_transplicate_bits_pb(&s->ffe_xp);
     if ( transplicate_pb != NULL )
         retry_pb = *transplicate_pb;
 
@@ -587,7 +587,7 @@ retry:
         if (ff_mpeg4_workaround_bugs(avctx) == 1)
         {
             if ( retry_pb.buf != NULL )
-                ffe_transplicate_restore(&s->ffe_xp, &retry_pb);
+                ffe_transplicate_bits_restore(&s->ffe_xp, &retry_pb);
             goto retry;
         }
         if (s->studio_profile != (s->idsp.idct == NULL))
@@ -706,7 +706,7 @@ frame_end:
     if ( s->codec_id == AV_CODEC_ID_MPEG4
       && s->avctx->ffedit_apply != 0 )
     {
-        PutBitContext *opb = ffe_transplicate_pb(&s->ffe_xp);
+        PutBitContext *opb = ffe_transplicate_bits_pb(&s->ffe_xp);
         ff_mpeg4_stuffing(opb);
     }
     if (!s->studio_profile)
@@ -763,7 +763,7 @@ the_end:
         ffe_h263_export_cleanup(s, pict);
 
     if ( (avctx->ffedit_apply & (1 << FFEDIT_FEAT_LAST)) != 0 )
-        ffe_transplicate_flush(avctx, &s->ffe_xp, avpkt);
+        ffe_transplicate_bits_flush(avctx, &s->ffe_xp, avpkt);
 
     if ( s->jctx_header != NULL )
     {

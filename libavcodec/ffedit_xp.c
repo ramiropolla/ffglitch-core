@@ -23,22 +23,22 @@
 #include "internal.h"
 
 /*-------------------------------------------------------------------*/
-static const AVClass ffe_transplicate_class = {
-    .class_name = "FFEditTransplicate",
+static const AVClass ffe_transplicate_bits_class = {
+    .class_name = "FFEditTransplicateBits",
     .item_name  = av_default_item_name,
     .version    = LIBAVUTIL_VERSION_INT,
 };
 
 /*-------------------------------------------------------------------*/
-int ffe_transplicate_init(
+int ffe_transplicate_bits_init(
         AVCodecContext *avctx,
-        FFEditTransplicateContext *xp,
+        FFEditTransplicateBitsContext *xp,
         size_t pkt_size)
 {
     if ( xp->pb != NULL )
         return 0;
 
-    xp->av_class = &ffe_transplicate_class;
+    xp->av_class = &ffe_transplicate_bits_class;
 
     // allocate buffer at least 50% bigger than original packet size
     // and at least 3 MB.
@@ -62,17 +62,17 @@ int ffe_transplicate_init(
 }
 
 /*-------------------------------------------------------------------*/
-void ffe_transplicate_merge(
+void ffe_transplicate_bits_merge(
         AVCodecContext *avctx,
-        FFEditTransplicateContext *dst_xp,
-        FFEditTransplicateContext *src_xp)
+        FFEditTransplicateBitsContext *dst_xp,
+        FFEditTransplicateBitsContext *src_xp)
 {
     if ( dst_xp->pb != NULL && src_xp != NULL )
         ff_copy_bits(dst_xp->pb, src_xp->pb->buf, put_bits_count(src_xp->pb));
 }
 
 /*-------------------------------------------------------------------*/
-void ffe_transplicate_free(FFEditTransplicateContext *xp)
+void ffe_transplicate_bits_free(FFEditTransplicateBitsContext *xp)
 {
     if ( xp->pb == NULL )
         return;
@@ -81,9 +81,9 @@ void ffe_transplicate_free(FFEditTransplicateContext *xp)
 }
 
 /*-------------------------------------------------------------------*/
-void ffe_transplicate_flush(
+void ffe_transplicate_bits_flush(
         AVCodecContext *avctx,
-        FFEditTransplicateContext *xp,
+        FFEditTransplicateBitsContext *xp,
         const AVPacket *pkt)
 {
     FFEditTransplicatePacket *packet;
@@ -114,25 +114,25 @@ void ffe_transplicate_flush(
     packet->data = av_malloc(packet->o_size);
     memcpy(packet->data, xp->data, packet->o_size);
 
-    ffe_transplicate_free(xp);
+    ffe_transplicate_bits_free(xp);
 }
 
 /*-------------------------------------------------------------------*/
-PutBitContext *ffe_transplicate_pb(FFEditTransplicateContext *xp)
+PutBitContext *ffe_transplicate_bits_pb(FFEditTransplicateBitsContext *xp)
 {
     return xp->pb;
 }
 
 /*-------------------------------------------------------------------*/
-PutBitContext *ffe_transplicate_save(FFEditTransplicateContext *xp)
+PutBitContext *ffe_transplicate_bits_save(FFEditTransplicateBitsContext *xp)
 {
     xp->saved = *(xp->pb);
     return &xp->saved;
 }
 
 /*-------------------------------------------------------------------*/
-void ffe_transplicate_restore(
-        FFEditTransplicateContext *xp,
+void ffe_transplicate_bits_restore(
+        FFEditTransplicateBitsContext *xp,
         PutBitContext *saved)
 {
     *(xp->pb) = *saved;
