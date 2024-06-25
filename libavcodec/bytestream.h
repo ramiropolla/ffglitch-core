@@ -37,6 +37,7 @@ typedef struct PutByteContext {
 
 typedef struct GetByteContext {
     const uint8_t *buffer, *buffer_end, *buffer_start;
+    PutByteContext *pb;
 } GetByteContext;
 
 #define DEF(type, name, bytes, read, write)                                  \
@@ -67,7 +68,10 @@ static av_always_inline type bytestream_get_ ## name(const uint8_t **b)        \
 }                                                                              \
 static av_always_inline type bytestream2_get_ ## name ## u(GetByteContext *g)  \
 {                                                                              \
-    return bytestream_get_ ## name(&g->buffer);                                \
+    type ret = bytestream_get_ ## name(&g->buffer);                            \
+    if ( g->pb != NULL )                                                       \
+        bytestream2_put_ ## name ## u(g->pb, ret);                             \
+    return ret;                                                                \
 }                                                                              \
 static av_always_inline type bytestream2_get_ ## name(GetByteContext *g)       \
 {                                                                              \
@@ -142,6 +146,7 @@ static av_always_inline void bytestream2_init(GetByteContext *g,
     g->buffer       = buf;
     g->buffer_start = buf;
     g->buffer_end   = buf + buf_size;
+    g->pb           = NULL;
 }
 
 static av_always_inline void bytestream2_init_writer(PutByteContext *p,
@@ -368,12 +373,17 @@ static av_always_inline unsigned int bytestream_get_buffer(const uint8_t **b,
 static av_always_inline void bytestream2_skip(GetByteContext *g,
                                               unsigned int size)
 {
-    g->buffer += FFMIN(g->buffer_end - g->buffer, size);
+    size = FFMIN(g->buffer_end - g->buffer, size);
+    if ( g->pb != NULL )
+        bytestream2_put_bufferu(g->pb, g->buffer, size);
+    g->buffer += size;
 }
 
 static av_always_inline void bytestream2_skipu(GetByteContext *g,
                                                unsigned int size)
 {
+    if ( g->pb != NULL )
+        bytestream2_put_bufferu(g->pb, g->buffer, size);
     g->buffer += size;
 }
 
