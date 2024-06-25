@@ -530,10 +530,7 @@ retry:
     {
         /* pre-init jctx_header if needed */
         if ( s->jctx_header == NULL )
-        {
-            s->jctx_header = av_mallocz(sizeof(json_ctx_t));
-            json_ctx_start(s->jctx_header, 1);
-        }
+            s->jctx_header = json_ctx_new(1);
     }
     else if ( (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_GMC)) != 0 )
     {

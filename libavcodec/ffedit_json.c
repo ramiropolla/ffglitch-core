@@ -25,6 +25,14 @@
 
 #include "ffedit_json.h"
 
+/* helper */
+json_ctx_t *json_ctx_new(int large)
+{
+    json_ctx_t *jctx = av_mallocz(sizeof(json_ctx_t));
+    json_ctx_start(jctx, large);
+    return jctx;
+}
+
 /* 2d array of blocks */
 
 //---------------------------------------------------------------------

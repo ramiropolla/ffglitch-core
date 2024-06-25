@@ -23,6 +23,9 @@
 
 #include "libavutil/json.h"
 
+/* helper */
+json_ctx_t *json_ctx_new(int large);
+
 /* 2d array of blocks */
 json_t *
 ffe_jblock_new(
