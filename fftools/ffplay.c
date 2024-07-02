@@ -4064,7 +4064,7 @@ int main(int argc, char **argv)
         show_usage();
         av_log(NULL, AV_LOG_FATAL, "An input file must be specified\n");
         av_log(NULL, AV_LOG_FATAL,
-               "Use -h to get full help or, even better, run 'man %s'\n", program_name);
+               "Use -h to get full help\n");
         exit(1);
     }
 

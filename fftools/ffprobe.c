@@ -4737,7 +4737,7 @@ int main(int argc, char **argv)
              (!do_show_program_version && !do_show_library_versions && !do_show_pixel_formats))) {
             show_usage();
             av_log(NULL, AV_LOG_ERROR, "You have to specify one input file.\n");
-            av_log(NULL, AV_LOG_ERROR, "Use -h to get full help or, even better, run 'man %s'.\n", program_name);
+            av_log(NULL, AV_LOG_ERROR, "Use -h to get full help.\n");
             ret = AVERROR(EINVAL);
         } else if (input_filename) {
             ret = probe_file(wctx, input_filename, print_input_filename);
