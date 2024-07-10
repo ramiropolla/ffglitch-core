@@ -34,6 +34,8 @@ static const char *const feat_keys[] = {
     "dht",
     "mb",
     "gmc",
+    "headers",
+    "idat",
 };
 
 enum FFEditFeature ffe_str_to_feat(const char *str)
@@ -62,6 +64,8 @@ static const char *const feat_desc[] = {
     "huffman table",
     "macroblock",
     "global motion compensation",
+    "headers",
+    "image data",
 };
 
 const char *ffe_feat_desc(enum FFEditFeature feat)
@@ -114,6 +118,10 @@ static enum FFEditFeature const feat_excludes[][32] = {
       FFEDIT_FEAT_DHT,
       FFEDIT_FEAT_LAST },
     // FFEDIT_FEAT_GMC
+    { FFEDIT_FEAT_LAST },
+    // FFEDIT_FEAT_HEADERS
+    { FFEDIT_FEAT_LAST },
+    // FFEDIT_FEAT_IDAT
     { FFEDIT_FEAT_LAST },
 };
 
