@@ -203,10 +203,11 @@ static FFEditJSONFile *read_ffedit_json_file(const char *_apply_fname)
     {
         json_error_ctx_t jectx;
         json_error_parse(&jectx, buf);
+        const char *fname = (strcmp(_apply_fname, "-") == 0) ? "<stdin>" : _apply_fname;
         av_log(ffe_class, AV_LOG_FATAL, "%s:%d:%d: %s\n",
-               _apply_fname, (int) jectx.line, (int) jectx.offset, jectx.str);
-        av_log(ffe_class, AV_LOG_FATAL, "%s:%d:%s\n", _apply_fname, (int) jectx.line, jectx.buf);
-        av_log(ffe_class, AV_LOG_FATAL, "%s:%d:%s\n", _apply_fname, (int) jectx.line, jectx.column);
+               fname, (int) jectx.line, (int) jectx.offset, jectx.str);
+        av_log(ffe_class, AV_LOG_FATAL, "%s:%d:%s\n", fname, (int) jectx.line, jectx.buf);
+        av_log(ffe_class, AV_LOG_FATAL, "%s:%d:%s\n", fname, (int) jectx.line, jectx.column);
         json_error_free(&jectx);
         exit(1);
     }
@@ -269,8 +270,14 @@ static FFEditJSONFile *prepare_ffedit_json_file(
 
     jf = av_mallocz(sizeof(FFEditJSONFile));
 
-    // TODO check if file exists before overwritting
-    jf->export_fp = avpriv_fopen_utf8(_export_fname, "w");
+    if ( strcmp(_export_fname, "-") == 0 )
+        jf->export_fp = stdout;
+    if ( jf->export_fp == NULL )
+    {
+        // TODO check if file exists before overwritting
+        jf->export_fp = avpriv_fopen_utf8(_export_fname, "w");
+    }
+
     if ( jf->export_fp == NULL )
     {
         av_log(ffe_class, AV_LOG_FATAL, "Could not open json file %s\n", _export_fname);

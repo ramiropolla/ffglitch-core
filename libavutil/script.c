@@ -41,7 +41,7 @@ static struct {
 } script_log_ctx = { &script_class };
 
 /*********************************************************************/
-char *ff_script_read_file(const char *script_fname, size_t *psize)
+static char *read_file(const char *script_fname, size_t *psize)
 {
     size_t size;
     char *buf;
@@ -64,6 +64,56 @@ char *ff_script_read_file(const char *script_fname, size_t *psize)
     *psize = size;
 
     return buf;
+}
+
+/*********************************************************************/
+static char *read_pipe(size_t *psize)
+{
+#define CHUNK_SIZE (128*1024) // 128kB
+    size_t size = 0;
+    size_t buf_size = (CHUNK_SIZE >> 1);
+    char *buf = NULL;
+
+    while ( 1 )
+    {
+        size_t bytes_read;
+
+        if ( size + CHUNK_SIZE > buf_size )
+        {
+            buf_size <<= 1;
+            buf = realloc(buf, buf_size);
+        }
+
+        bytes_read = fread(buf + size, 1, CHUNK_SIZE, stdin);
+        size += bytes_read;
+        if ( bytes_read < CHUNK_SIZE )
+        {
+            if ( feof(stdin) )
+                break;
+            if ( ferror(stdin) )
+            {
+                free(buf);
+                return NULL;
+            }
+        }
+    }
+
+    // realloc down
+    buf = realloc(buf, size+1);
+    buf[size] = '\0';
+
+    *psize = size;
+
+    return buf;
+#undef CHUNK_SIZE
+}
+
+/*********************************************************************/
+char *ff_script_read_file(const char *script_fname, size_t *psize)
+{
+    if ( strcmp(script_fname, "-") == 0 )
+        return read_pipe(psize);
+    return read_file(script_fname, psize);
 }
 
 /*********************************************************************/
