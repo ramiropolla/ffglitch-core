@@ -946,6 +946,218 @@ ffe_png_headers_export_cleanup(PNGDecContext *s, AVFrame *f)
 }
 
 /*-------------------------------------------------------------------*/
+/* FFEDIT_FEAT_IDAT                                                  */
+/*-------------------------------------------------------------------*/
+
+/*-------------------------------------------------------------------*/
+static size_t interlaced_y(size_t y, int pass)
+{
+    static const uint8_t pass_ymin[]   = { 0, 0, 4, 0, 2, 0, 1, };
+    static const uint8_t pass_yshift[] = { 3, 3, 3, 2, 2, 1, 1, };
+    uint8_t ymin = pass_ymin[pass];
+    uint8_t yshift = pass_yshift[pass];
+    return ((y - ymin - 1) + (1 << yshift)) >> yshift;
+}
+
+/*-------------------------------------------------------------------*/
+static void
+ffe_png_idat_export_init(PNGDecContext *s, AVFrame *f)
+{
+    json_t *jframe = json_object_new(f->jctx);
+    json_t *jcompression_level = json_int_new(f->jctx, FF_COMPRESSION_DEFAULT);
+
+    if ( s->interlace_type == 1 )
+    {
+        json_t *jpasses = json_array_new(f->jctx, NB_PASSES);
+
+        json_object_add(jframe, "passes", jpasses);
+
+        for ( size_t p = 0; p < NB_PASSES; p++ )
+        {
+            size_t num_rows = interlaced_y(s->height, p);
+            json_t *jrows = json_array_new(f->jctx, num_rows);
+            int crow_size = 1 + ff_png_pass_row_size(p, s->bits_per_pixel, s->cur_w);
+            json_array_set(jpasses, p, jrows);
+            for ( size_t i = 0; i < num_rows; i++ )
+            {
+                json_t *jrow = json_array_of_ints_new(f->jctx, crow_size);
+                json_set_pflags(jrow, JSON_PFLAGS_NO_LF);
+                json_array_set(jrows, i, jrow);
+            }
+        }
+
+        json_object_userdata_set(jframe, jpasses);
+    }
+    else
+    {
+        json_t *jrows = json_array_new(f->jctx, s->height);
+
+        json_object_add(jframe, "rows", jrows);
+
+        for ( size_t i = 0; i < s->height; i++ )
+        {
+            json_t *jrow = json_array_of_ints_new(f->jctx, s->crow_size);
+            json_set_pflags(jrow, JSON_PFLAGS_NO_LF);
+            json_array_set(jrows, i, jrow);
+        }
+
+        json_object_userdata_set(jframe, jrows);
+    }
+
+    json_object_add(jframe, "compression_level", jcompression_level);
+    f->ffedit_sd[FFEDIT_FEAT_IDAT] = jframe;
+}
+
+/*-------------------------------------------------------------------*/
+static void
+ffe_png_idat_import_init(PNGDecContext *s, AVFrame *f)
+{
+    json_t *jframe = f->ffedit_sd[FFEDIT_FEAT_IDAT];
+    json_t *jcompression_level = json_object_get(jframe, "compression_level");
+    int compression_level = json_int_val(jcompression_level);
+    json_t *jdata;
+    if ( s->interlace_type == 1 )
+        jdata = json_object_get(jframe, "passes");
+    else
+        jdata = json_object_get(jframe, "rows");
+    json_object_userdata_set(jframe, jdata);
+    compression_level = compression_level == FF_COMPRESSION_DEFAULT
+                      ? Z_DEFAULT_COMPRESSION
+                      : av_clip(compression_level, 0, 9);
+    ff_deflate_init(&s->zstream_enc, compression_level, s->avctx);
+}
+
+/*-------------------------------------------------------------------*/
+static void
+ffe_png_idat_export(
+        PNGDecContext *s,
+        AVFrame *f,
+        size_t offset,
+        size_t length)
+{
+    json_t *jframe = f->ffedit_sd[FFEDIT_FEAT_IDAT];
+    json_t *jdata = json_object_userdata_get(jframe);
+    json_t *jrow;
+    uint8_t *crow_buf = s->crow_buf;
+    if ( s->interlace_type == 1 )
+    {
+        json_t *jpass = json_array_get(jdata, s->pass);
+        jrow = json_array_get(jpass, interlaced_y(s->y, s->pass));
+    }
+    else
+    {
+        jrow = json_array_get(jdata, s->y);
+    }
+    for ( size_t i = 0; i < length; i++ )
+        jrow->array_of_ints[offset + i] = crow_buf[offset + i];
+}
+
+/*-------------------------------------------------------------------*/
+static void
+ffe_png_idat_import(
+        PNGDecContext *s,
+        AVFrame *f,
+        size_t offset,
+        size_t length)
+{
+    json_t *jframe = f->ffedit_sd[FFEDIT_FEAT_IDAT];
+    json_t *jdata = json_object_userdata_get(jframe);
+    json_t *jrow;
+    uint8_t *crow_buf = s->crow_buf;
+    if ( s->interlace_type == 1 )
+    {
+        json_t *jpass = json_array_get(jdata, s->pass);
+        jrow = json_array_get(jpass, interlaced_y(s->y, s->pass));
+    }
+    else
+    {
+        jrow = json_array_get(jdata, s->y);
+    }
+    for ( size_t i = 0; i < length; i++ )
+        crow_buf[offset + i] = av_clip_uint8(jrow->array_of_ints[offset + i]);
+}
+
+/*-------------------------------------------------------------------*/
+static void
+ffe_png_idat_chunk(
+        PNGDecContext *s,
+        GetByteContext *gb,
+        AVFrame *f,
+        z_stream *const zstream,
+        z_stream *const orig_zstream)
+{
+    size_t out_offset = (s->crow_size - orig_zstream->avail_out);
+    size_t out_length = ((s->crow_size - zstream->avail_out) - out_offset);
+    if ( (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_IDAT)) != 0 )
+        ffe_png_idat_import(s, f, out_offset, out_length);
+    if ( gb->pb != NULL )
+    {
+        if ( (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_IDAT)) != 0 )
+            ffe_zstream_write(&s->zstream_enc.zstream, gb->pb, s->crow_buf + out_offset, out_length);
+        else
+            bytestream2_put_buffer(gb->pb, orig_zstream->next_in, (orig_zstream->avail_in - zstream->avail_in));
+    }
+    if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_IDAT)) != 0 )
+        ffe_png_idat_export(s, f, out_offset, out_length);
+}
+
+/*-------------------------------------------------------------------*/
+static void
+ffe_png_idat_chunk_flush(PNGDecContext *s, GetByteContext *gb, int ret)
+{
+    if ( (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_IDAT)) != 0 )
+    {
+        int flush = (ret == Z_STREAM_END) ? Z_FINISH : Z_SYNC_FLUSH;
+        int stop_at = (ret == Z_STREAM_END) ? Z_STREAM_END : Z_BUF_ERROR;
+        ffe_zstream_flush(&s->zstream_enc.zstream, gb->pb, flush, stop_at);
+    }
+}
+
+/*-------------------------------------------------------------------*/
+static void
+ffe_png_idat_init(PNGDecContext *s, AVFrame *f)
+{
+    AVCodecContext *avctx = s->avctx;
+
+    /* FFEDIT_FEAT_IDAT */
+    if ( (avctx->ffedit_export & (1 << FFEDIT_FEAT_IDAT)) != 0 )
+        ffe_png_idat_export_init(s, f);
+    else if ( (avctx->ffedit_import & (1 << FFEDIT_FEAT_IDAT)) != 0 )
+        ffe_png_idat_import_init(s, f);
+}
+
+/*-------------------------------------------------------------------*/
+static void
+ffe_png_idat_export_cleanup(PNGDecContext *s, AVFrame *f)
+{
+    json_t *jframe = f->ffedit_sd[FFEDIT_FEAT_IDAT];
+    json_object_done(f->jctx, jframe);
+}
+
+/*-------------------------------------------------------------------*/
+static void
+ffe_png_fdat(PNGDecContext *s, AVFrame *f, GetByteContext *gb)
+{
+    AVCodecContext *avctx = s->avctx;
+
+    /* FFEDIT_FEAT_IDAT */
+    if ( (avctx->ffedit_export & (1 << FFEDIT_FEAT_IDAT)) != 0 )
+    {
+        json_t *jframe = f->ffedit_sd[FFEDIT_FEAT_IDAT];
+        uint32_t sequence_number = AV_RB32(gb->buffer);
+        json_t *jsequence_number = json_int_new(f->jctx, sequence_number);
+        json_object_add(jframe, "sequence_number", jsequence_number);
+    }
+    else if ( (avctx->ffedit_import & (1 << FFEDIT_FEAT_IDAT)) != 0 )
+    {
+        json_t *jframe = f->ffedit_sd[FFEDIT_FEAT_IDAT];
+        json_t *jsequence_number = json_object_get(jframe, "sequence_number");
+        uint32_t sequence_number = json_int_val(jsequence_number);
+        AV_WB32(gb->buffer, sequence_number);
+    }
+}
+
+/*-------------------------------------------------------------------*/
 /* FFEDIT_FEAT_LAST                                                  */
 /*-------------------------------------------------------------------*/
 
@@ -1013,4 +1225,8 @@ ffe_png_cleanup_frame(PNGDecContext *s, AVFrame *f)
     /* FFEDIT_FEAT_HEADERS */
     if ( (avctx->ffedit_export & (1 << FFEDIT_FEAT_HEADERS)) != 0 )
         ffe_png_headers_export_cleanup(s, f);
+
+    /* FFEDIT_FEAT_IDAT */
+    if ( (avctx->ffedit_export & (1 << FFEDIT_FEAT_IDAT)) != 0 )
+        ffe_png_idat_export_cleanup(s, f);
 }

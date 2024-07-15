@@ -129,6 +129,7 @@ typedef struct PNGDecContext {
 
     /* ffedit bitstream */
     FFEditTransplicateBytesContext ffe_xp;
+    FFZStream zstream_enc;
     uint8_t *tmp_buf;
     unsigned int tmp_buf_size;
 } PNGDecContext;
@@ -461,10 +462,11 @@ the_end:;
 }
 
 static int png_decode_idat(PNGDecContext *s, GetByteContext *gb,
+                           AVFrame *f,
                            uint8_t *dst, ptrdiff_t dst_stride)
 {
     z_stream *const zstream = &s->zstream.zstream;
-    int ret;
+    int ret = Z_OK;
     zstream->avail_in = bytestream2_get_bytes_left(gb);
     zstream->next_in  = gb->buffer;
 
@@ -476,8 +478,7 @@ static int png_decode_idat(PNGDecContext *s, GetByteContext *gb,
             av_log(s->avctx, AV_LOG_ERROR, "inflate returned error %d\n", ret);
             return AVERROR_EXTERNAL;
         }
-        if ( gb->pb != NULL )
-            bytestream2_put_buffer(gb->pb, orig_zstream.next_in, (orig_zstream.avail_in - zstream->avail_in));
+        ffe_png_idat_chunk(s, gb, f, zstream, &orig_zstream);
         if (zstream->avail_out == 0) {
             if (!(s->pic_state & PNG_ALLIMAGE)) {
                 png_handle_row(s, dst, dst_stride);
@@ -488,9 +489,10 @@ static int png_decode_idat(PNGDecContext *s, GetByteContext *gb,
         if (ret == Z_STREAM_END && zstream->avail_in > 0) {
             av_log(s->avctx, AV_LOG_WARNING,
                    "%d undecompressed bytes left in buffer\n", zstream->avail_in);
-            return 0;
+            break;
         }
     }
+    ffe_png_idat_chunk_flush(s, gb, ret);
     return 0;
 }
 
@@ -971,10 +973,15 @@ static int decode_idat_chunk(AVCodecContext *avctx, PNGDecContext *s,
         s->crow_buf          = s->buffer + 15;
         s->zstream.zstream.avail_out = s->crow_size;
         s->zstream.zstream.next_out  = s->crow_buf;
+
+        ffe_png_idat_init(s, p);
     }
 
     if ( tag == MKTAG('f', 'd', 'A', 'T') )
+    {
+        ffe_png_fdat(s, p, gb);
         bytestream2_get_be32(gb);
+    }
 
     s->pic_state |= PNG_IDAT;
 
@@ -982,7 +989,7 @@ static int decode_idat_chunk(AVCodecContext *avctx, PNGDecContext *s,
     if (s->has_trns && s->color_type != PNG_COLOR_TYPE_PALETTE)
         s->bpp -= byte_depth;
 
-    ret = png_decode_idat(s, gb, p->data[0], p->linesize[0]);
+    ret = png_decode_idat(s, gb, p, p->data[0], p->linesize[0]);
 
     if (s->has_trns && s->color_type != PNG_COLOR_TYPE_PALETTE)
         s->bpp += byte_depth;
@@ -2041,6 +2048,7 @@ static av_cold int png_dec_end(AVCodecContext *avctx)
 
     av_freep(&s->iccp_data);
     av_dict_free(&s->frame_metadata);
+    ff_deflate_end(&s->zstream_enc);
     av_freep(&s->tmp_buf);
     ff_inflate_end(&s->zstream);
 
@@ -2063,6 +2071,7 @@ const FFCodec ff_apng_decoder = {
                       FF_CODEC_CAP_ALLOCATE_PROGRESS |
                       FF_CODEC_CAP_ICC_PROFILES,
     .p.ffedit_features = (1 << FFEDIT_FEAT_HEADERS)
+                       | (1 << FFEDIT_FEAT_IDAT)
 };
 #endif
 
@@ -2082,5 +2091,6 @@ const FFCodec ff_png_decoder = {
                       FF_CODEC_CAP_ALLOCATE_PROGRESS | FF_CODEC_CAP_INIT_CLEANUP |
                       FF_CODEC_CAP_ICC_PROFILES,
     .p.ffedit_features = (1 << FFEDIT_FEAT_HEADERS)
+                       | (1 << FFEDIT_FEAT_IDAT)
 };
 #endif
