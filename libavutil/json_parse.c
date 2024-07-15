@@ -143,7 +143,10 @@ static const char *json_parse_string(json_parse_ctx_t *jpctx, json_t *jso, const
     jso->flags = JSON_TYPE_STRING;
     buf = parse_string(jpctx, buf);
     if ( buf != NULL )
+    {
+        json_set_len(jso, jpctx->str_len);
         jso->str = json_allocator_strndup(&jpctx->jctx, jpctx->str, jpctx->str_len+1);
+    }
     return buf;
 }
 

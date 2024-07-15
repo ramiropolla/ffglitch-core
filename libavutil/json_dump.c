@@ -198,6 +198,14 @@ static void output_string(sbuf *ctx, const char *str)
     sbuf_fputc(ctx, '"');
 }
 
+static void output_string_len(sbuf *ctx, const char *str, size_t length)
+{
+    sbuf_fputc(ctx, '"');
+    while ( length-- )
+        output_char(ctx, *str++);
+    sbuf_fputc(ctx, '"');
+}
+
 static void output_mv(sbuf *ctx, int32_t *mv)
 {
     sbuf_fputc(ctx, '[');
@@ -342,7 +350,7 @@ static void json_print_element(sbuf *ctx, json_t *jso, int level)
         }
         break;
     case JSON_TYPE_STRING:
-        output_string(ctx, jso->str);
+        output_string_len(ctx, json_string_get(jso), json_string_length(jso));
         break;
     case JSON_TYPE_NUMBER:
         output_num_64(ctx, jso->val);

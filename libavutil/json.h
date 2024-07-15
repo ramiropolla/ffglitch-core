@@ -263,18 +263,34 @@ json_t *json_const_object_from(json_ctx_t *jctx, const json_kvp_t *kvps);
 //---------------------------------------------------------------------
 // string
 static inline
-json_t *json_string_new(json_ctx_t *jctx, const char *str)
+json_t *json_string_len_new(json_ctx_t *jctx, const char *str, size_t len)
 {
     json_t *jso = alloc_json_t(jctx);
+    char *ptr = json_allocator_strget(jctx, len+1);
+    memcpy(ptr, str, len);
+    ptr[len] = '\0';
     jso->flags = JSON_TYPE_STRING;
-    jso->str = json_allocator_strdup(jctx, str);
+    json_set_len(jso, len);
+    jso->str = ptr;
     return jso;
+}
+
+static inline
+json_t *json_string_new(json_ctx_t *jctx, const char *str)
+{
+    return json_string_len_new(jctx, str, strlen(str));
 }
 
 static inline
 const char *json_string_get(json_t *jso)
 {
     return jso->str;
+}
+
+static inline
+size_t json_string_length(json_t *jso)
+{
+    return JSON_LEN(jso->flags);
 }
 
 //---------------------------------------------------------------------
