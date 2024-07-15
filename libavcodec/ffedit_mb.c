@@ -23,7 +23,7 @@
 #include "ffedit.h"
 #include "ffedit_json.h"
 #include "ffedit_mb.h"
-#include "ffedit_xp.h"
+#include "ffedit_xp_bits.h"
 #include "internal.h"
 
 /*-------------------------------------------------------------------*/

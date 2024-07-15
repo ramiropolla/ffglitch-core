@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2022 Ramiro Polla
+ * Copyright (c) 2017-2024 Ramiro Polla
  *
  * This file is part of FFmpeg.
  *
@@ -19,7 +19,7 @@
  */
 
 #include "ffedit.h"
-#include "ffedit_xp.h"
+#include "ffedit_xp_bits.h"
 #include "internal.h"
 
 /*-------------------------------------------------------------------*/

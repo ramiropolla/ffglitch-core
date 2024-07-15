@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2022 Ramiro Polla
+ * Copyright (c) 2017-2024 Ramiro Polla
  *
  * This file is part of FFmpeg.
  *
@@ -18,8 +18,8 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#ifndef AVCODEC_FFEDIT_XP_H
-#define AVCODEC_FFEDIT_XP_H
+#ifndef AVCODEC_FFEDIT_XP_BITS_H
+#define AVCODEC_FFEDIT_XP_BITS_H
 
 #include "avcodec.h"
 #include "put_bits.h"
@@ -59,4 +59,4 @@ void ffe_transplicate_bits_restore(
         FFEditTransplicateBitsContext *xp,
         PutBitContext *saved);
 
-#endif /* AVCODEC_FFEDIT_XP_H */
+#endif /* AVCODEC_FFEDIT_XP_BITS_H */

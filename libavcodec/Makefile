@@ -63,7 +63,7 @@ OBJS = ac3_parser.o                                                     \
        xiph.o                                                           \
        ffedit.o                                                         \
        ffedit_json.o                                                    \
-       ffedit_xp.o                                                      \
+       ffedit_xp_bits.o                                                 \
        ffedit_mb.o                                                      \
        ffedit_mv.o                                                      \
 

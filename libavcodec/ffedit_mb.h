@@ -24,7 +24,7 @@
 #include "libavutil/json.h"
 
 #include "avcodec.h"
-#include "ffedit_xp.h"
+#include "ffedit_xp_bits.h"
 #include "put_bits.h"
 #include "get_bits.h"
 

@@ -39,7 +39,7 @@
 #include "get_bits.h"
 #include "hpeldsp.h"
 #include "idctdsp.h"
-#include "ffedit_xp.h"
+#include "ffedit_xp_bits.h"
 
 #include "mjpegenc_common.h"
 #include "mjpegenc.h"

@@ -49,7 +49,7 @@
 #include "videodsp.h"
 
 #include "libavutil/script.h"
-#include "ffedit_xp.h"
+#include "ffedit_xp_bits.h"
 
 #define MAX_THREADS 32
 
