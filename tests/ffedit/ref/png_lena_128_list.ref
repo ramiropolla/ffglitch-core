@@ -1,2 +1,3 @@
 
-FFEdit does not support codec 'PNG (Portable Network Graphics) image'.
+FFEdit support for codec 'PNG (Portable Network Graphics) image':
+	[headers     ]: headers

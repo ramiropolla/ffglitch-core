@@ -1,0 +1,33 @@
+{
+  "features":[
+    "headers"
+  ],
+  "streams":[
+    {
+      "codec":"png",
+      "frames":[
+        {
+          "pkt_pos":0,
+          "pts":0,
+          "dts":0,
+          "headers":{
+            "IHDR":{
+              "width":128,
+              "height":128,
+              "bit_depth":8,
+              "color_type":2,
+              "compression_type":0,
+              "filter_type":0,
+              "interlace_type":0
+            },
+            "pHYs":{
+              "pixels_per_unit_x":0,
+              "pixels_per_unit_y":1,
+              "unit_specifier":0
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

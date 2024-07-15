@@ -129,6 +129,8 @@ typedef struct PNGDecContext {
 
     /* ffedit bitstream */
     FFEditTransplicateBytesContext ffe_xp;
+    uint8_t *tmp_buf;
+    unsigned int tmp_buf_size;
 } PNGDecContext;
 
 #include "ffedit_png.c"
@@ -1495,14 +1497,17 @@ static int decode_frame_common(AVCodecContext *avctx, PNGDecContext *s,
 
         switch (tag) {
         case MKTAG('I', 'H', 'D', 'R'):
+            ffe_decode_png_chunk(s, p, &gb_chunk, tag, ihdr_fields);
             if ((ret = decode_ihdr_chunk(avctx, s, &gb_chunk)) < 0)
                 goto fail;
             break;
         case MKTAG('p', 'H', 'Y', 's'):
+            ffe_decode_png_chunk(s, p, &gb_chunk, tag, phys_fields);
             if ((ret = decode_phys_chunk(avctx, s, &gb_chunk)) < 0)
                 goto fail;
             break;
         case MKTAG('f', 'c', 'T', 'L'):
+            ffe_decode_png_chunk(s, p, &gb_chunk, tag, fctl_fields);
             if (!CONFIG_APNG_DECODER || avctx->codec_id != AV_CODEC_ID_APNG)
                 goto loop_continue;
             if ((ret = decode_fctl_chunk(avctx, s, &gb_chunk)) < 0)
@@ -1524,21 +1529,27 @@ static int decode_frame_common(AVCodecContext *avctx, PNGDecContext *s,
                 goto fail;
             break;
         case MKTAG('P', 'L', 'T', 'E'):
+            ffe_decode_plte_chunk(s, p, &gb_chunk, tag);
             decode_plte_chunk(avctx, s, &gb_chunk);
             break;
         case MKTAG('t', 'R', 'N', 'S'):
+            ffe_decode_trns_chunk(s, p, &gb_chunk, tag);
             decode_trns_chunk(avctx, s, &gb_chunk);
             break;
         case MKTAG('t', 'E', 'X', 't'):
+            ffe_decode_png_chunk_multiple(s, p, &gb_chunk, tag, text_fields);
             if (decode_text_chunk(s, &gb_chunk, 0) < 0)
                 av_log(avctx, AV_LOG_WARNING, "Broken tEXt chunk\n");
             goto copy_chunk;
         case MKTAG('z', 'T', 'X', 't'):
+            ffe_decode_png_chunk_multiple(s, p, &gb_chunk, tag, ztxt_fields);
             if (decode_text_chunk(s, &gb_chunk, 1) < 0)
                 av_log(avctx, AV_LOG_WARNING, "Broken zTXt chunk\n");
             goto copy_chunk;
         case MKTAG('s', 'T', 'E', 'R'): {
-            int mode = bytestream2_get_byte(&gb_chunk);
+            int mode;
+            ffe_decode_png_chunk(s, p, &gb_chunk, tag, ster_fields);
+            mode = bytestream2_get_byte(&gb_chunk);
 
             if (mode == 0 || mode == 1) {
                 s->stereo_mode = mode;
@@ -1549,6 +1560,7 @@ static int decode_frame_common(AVCodecContext *avctx, PNGDecContext *s,
             break;
         }
         case MKTAG('c', 'I', 'C', 'P'):
+            ffe_decode_png_chunk(s, p, &gb_chunk, tag, cicp_fields);
             s->cicp_primaries = bytestream2_get_byte(&gb_chunk);
             s->cicp_trc = bytestream2_get_byte(&gb_chunk);
             if (bytestream2_get_byte(&gb_chunk) != 0)
@@ -1559,16 +1571,19 @@ static int decode_frame_common(AVCodecContext *avctx, PNGDecContext *s,
             s->have_cicp = 1;
             break;
         case MKTAG('s', 'R', 'G', 'B'):
+            ffe_decode_png_chunk(s, p, &gb_chunk, tag, srgb_fields);
             /* skip rendering intent byte */
             bytestream2_skip(&gb_chunk, 1);
             s->have_srgb = 1;
             break;
         case MKTAG('i', 'C', 'C', 'P'): {
+            ffe_decode_png_chunk(s, p, &gb_chunk, tag, iccp_fields);
             if ((ret = decode_iccp_chunk(s, &gb_chunk)) < 0)
                 goto fail;
             goto copy_chunk;
         }
         case MKTAG('c', 'H', 'R', 'M'): {
+            ffe_decode_png_chunk(s, p, &gb_chunk, tag, chrm_fields);
             s->have_chrm = 1;
 
             s->white_point[0] = bytestream2_get_be32(&gb_chunk);
@@ -1583,12 +1598,14 @@ static int decode_frame_common(AVCodecContext *avctx, PNGDecContext *s,
             break;
         }
         case MKTAG('s', 'B', 'I', 'T'):
+            ffe_decode_sbit_chunk(s, p, &gb_chunk, tag);
             if ((ret = decode_sbit_chunk(avctx, s, &gb_chunk)) < 0)
                 goto fail;
             break;
         case MKTAG('g', 'A', 'M', 'A'): {
             AVBPrint bp;
             char *gamma_str;
+            ffe_decode_png_chunk(s, p, &gb_chunk, tag, gama_fields);
             s->gamma = bytestream2_get_be32(&gb_chunk);
 
             av_bprint_init(&bp, 0, AV_BPRINT_SIZE_UNLIMITED);
@@ -1602,6 +1619,7 @@ static int decode_frame_common(AVCodecContext *avctx, PNGDecContext *s,
             break;
         }
         case MKTAG('c', 'L', 'L', 'i'):
+            ffe_decode_png_chunk(s, p, &gb_chunk, tag, clli_fields);
             if (bytestream2_get_bytes_left(&gb_chunk) != 8) {
                 av_log(avctx, AV_LOG_WARNING, "Invalid cLLi chunk size: %d\n", bytestream2_get_bytes_left(&gb_chunk));
                 break;
@@ -1611,6 +1629,7 @@ static int decode_frame_common(AVCodecContext *avctx, PNGDecContext *s,
             s->clli_avg = bytestream2_get_be32u(&gb_chunk);
             break;
         case MKTAG('m', 'D', 'C', 'v'):
+            ffe_decode_png_chunk(s, p, &gb_chunk, tag, mdcv_fields);
             if (bytestream2_get_bytes_left(&gb_chunk) != 24) {
                 av_log(avctx, AV_LOG_WARNING, "Invalid mDCv chunk size: %d\n", bytestream2_get_bytes_left(&gb_chunk));
                 break;
@@ -1635,7 +1654,27 @@ static int decode_frame_common(AVCodecContext *avctx, PNGDecContext *s,
             iend_found = 1;
             break;
         /* FFEdit */
+        case MKTAG('b', 'K', 'G', 'D'):
+            ffe_decode_bkgd_chunk(s, p, &gb_chunk, tag);
+            goto copy_chunk;
+        case MKTAG('t', 'I', 'M', 'E'):
+            ffe_decode_png_chunk(s, p, &gb_chunk, tag, time_fields);
+            goto copy_chunk;
+        case MKTAG('h', 'I', 'S', 'T'):
+            ffe_decode_vararray_16(s, p, &gb_chunk, tag);
+            goto copy_chunk;
+        case MKTAG('s', 'P', 'L', 'T'):
+            ffe_decode_splt_chunk(s, p, &gb_chunk, tag);
+            goto copy_chunk;
+        case MKTAG('i', 'T', 'X', 't'):
+            ffe_decode_png_chunk_multiple(s, p, &gb_chunk, tag, itxt_fields);
+            goto copy_chunk;
+        case MKTAG('a', 'c', 'T', 'L'):
+            ffe_decode_png_chunk(s, p, &gb_chunk, tag, actl_fields);
+            goto copy_chunk;
         default:
+            if ( gb_chunk.pb != NULL )
+                av_log(avctx, AV_LOG_INFO, "FFEdit: unprocessed chunk '%s' of length %d\n", av_fourcc2str(tag), length);
 copy_chunk:
             if ( gb_chunk.pb != NULL )
                 bytestream2_put_buffer(gb_chunk.pb, gb_chunk.buffer, length);
@@ -2002,6 +2041,7 @@ static av_cold int png_dec_end(AVCodecContext *avctx)
 
     av_freep(&s->iccp_data);
     av_dict_free(&s->frame_metadata);
+    av_freep(&s->tmp_buf);
     ff_inflate_end(&s->zstream);
 
     return 0;
@@ -2022,6 +2062,7 @@ const FFCodec ff_apng_decoder = {
     .caps_internal  = FF_CODEC_CAP_INIT_CLEANUP |
                       FF_CODEC_CAP_ALLOCATE_PROGRESS |
                       FF_CODEC_CAP_ICC_PROFILES,
+    .p.ffedit_features = (1 << FFEDIT_FEAT_HEADERS)
 };
 #endif
 
@@ -2040,5 +2081,6 @@ const FFCodec ff_png_decoder = {
     .caps_internal  = FF_CODEC_CAP_SKIP_FRAME_FILL_PARAM |
                       FF_CODEC_CAP_ALLOCATE_PROGRESS | FF_CODEC_CAP_INIT_CLEANUP |
                       FF_CODEC_CAP_ICC_PROFILES,
+    .p.ffedit_features = (1 << FFEDIT_FEAT_HEADERS)
 };
 #endif
