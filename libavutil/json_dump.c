@@ -173,10 +173,28 @@ static void output_num_64(sbuf *ctx, int64_t val)
     }
 }
 
+static inline void output_char(sbuf *ctx, char c)
+{
+    switch ( c )
+    {
+        case '"':  sbuf_fputs(ctx, "\\\""); break;
+        case '\\': sbuf_fputs(ctx, "\\\\"); break;
+        case '/':  sbuf_fputs(ctx, "\\/");  break;
+        case '\b': sbuf_fputs(ctx, "\\b");  break;
+        case '\f': sbuf_fputs(ctx, "\\f");  break;
+        case '\n': sbuf_fputs(ctx, "\\n");  break;
+        case '\r': sbuf_fputs(ctx, "\\r");  break;
+        case '\t': sbuf_fputs(ctx, "\\t");  break;
+        // TODO unicode
+        default:   sbuf_fputc(ctx, c);      break;
+    }
+}
+
 static void output_string(sbuf *ctx, const char *str)
 {
     sbuf_fputc(ctx, '"');
-    sbuf_fputs(ctx, str);
+    while ( *str != '\0' )
+        output_char(ctx, *str++);
     sbuf_fputc(ctx, '"');
 }
 
