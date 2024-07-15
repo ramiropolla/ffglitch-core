@@ -380,8 +380,11 @@ static void png_handle_row(PNGDecContext *s, uint8_t *dst, ptrdiff_t dst_stride)
         else
             last_row = ptr - dst_stride;
 
-        ff_png_filter_row(&s->dsp, ptr, s->crow_buf[0], s->crow_buf + 1,
-                          last_row, s->row_size, s->bpp);
+        if ( (s->avctx->ffedit_flags & FFEDIT_FLAGS_PARSE_ONLY) == 0 )
+        {
+            ff_png_filter_row(&s->dsp, ptr, s->crow_buf[0], s->crow_buf + 1,
+                              last_row, s->row_size, s->bpp);
+        }
         /* loco lags by 1 row so that it doesn't interfere with top prediction */
         if (s->filter_type == PNG_FILTER_TYPE_LOCO && s->y > 0) {
             if (s->bit_depth == 16) {
@@ -414,15 +417,21 @@ static void png_handle_row(PNGDecContext *s, uint8_t *dst, ptrdiff_t dst_stride)
                  * wait for the next one */
                 if (got_line)
                     break;
-                ff_png_filter_row(&s->dsp, s->tmp_row, s->crow_buf[0], s->crow_buf + 1,
-                                  s->last_row, s->pass_row_size, s->bpp);
+                if ( (s->avctx->ffedit_flags & FFEDIT_FLAGS_PARSE_ONLY) == 0 )
+                {
+                    ff_png_filter_row(&s->dsp, s->tmp_row, s->crow_buf[0], s->crow_buf + 1,
+                                      s->last_row, s->pass_row_size, s->bpp);
+                }
                 FFSWAP(uint8_t *, s->last_row, s->tmp_row);
                 FFSWAP(unsigned int, s->last_row_size, s->tmp_row_size);
                 got_line = 1;
             }
             if ((png_pass_dsp_ymask[s->pass] << (s->y & 7)) & 0x80) {
-                png_put_interlaced_row(ptr, s->cur_w, s->bits_per_pixel, s->pass,
-                                       s->color_type, s->last_row);
+                if ( (s->avctx->ffedit_flags & FFEDIT_FLAGS_PARSE_ONLY) == 0 )
+                {
+                    png_put_interlaced_row(ptr, s->cur_w, s->bits_per_pixel, s->pass,
+                                           s->color_type, s->last_row);
+                }
             }
             s->y++;
             if (s->y == s->cur_h) {
