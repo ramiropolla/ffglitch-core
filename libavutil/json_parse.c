@@ -310,7 +310,7 @@ static const char *json_parse_array(json_parse_ctx_t *jpctx, json_t *jso, const 
         PARSE_ARRAY_ELEMENT(&jint);
 
         // Convert to normal array if any element is not a number.
-        if ( JSON_TYPE(jint.flags) != JSON_TYPE_NUMBER )
+        if ( JSON_TYPE(jint.flags) != JSON_TYPE_NUMBER || jint.val == JSON_NULL )
         {
             jval = json_allocator_dup(&jpctx->jctx, &jint, sizeof(json_t));
             goto switch_to_normal_array;
