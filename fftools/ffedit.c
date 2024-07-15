@@ -940,7 +940,9 @@ static int ffedit_decode(
      */
     if ( ret < 0 && ret != AVERROR_EOF )
     {
-        av_log(ffe_class, AV_LOG_FATAL, "send_packet() failed\n");
+        char errbuf[0x100] = "unknown error";
+        av_strerror(ret, errbuf, sizeof(errbuf));
+        av_log(ffe_class, AV_LOG_FATAL, "send_packet() failed: %s\n", errbuf);
         return ret;
     }
 
@@ -950,7 +952,11 @@ static int ffedit_decode(
         if ( ret < 0 )
         {
             if ( ret != AVERROR(EAGAIN) && ret != AVERROR_EOF )
-                av_log(ffe_class, AV_LOG_FATAL, "receive_frame() failed\n");
+            {
+                char errbuf[0x100] = "unknown error";
+                av_strerror(ret, errbuf, sizeof(errbuf));
+                av_log(ffe_class, AV_LOG_FATAL, "receive_frame() failed: %s\n", errbuf);
+            }
             return ret;
         }
 
