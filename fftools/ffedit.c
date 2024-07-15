@@ -1298,6 +1298,7 @@ int main(int argc, char *argv[])
     int64_t t0;
     int64_t t1;
     FFEditAction action;
+    int ret;
 
     hack_musl_pthread_stack_size();
 
@@ -1309,7 +1310,9 @@ int main(int argc, char *argv[])
 
     show_banner(argc, argv, options);
 
-    parse_options(NULL, argc, argv, options, opt_unknown);
+    ret = parse_options(NULL, argc, argv, options, opt_unknown);
+    if ( ret < 0 )
+        exit(ret == AVERROR_EXIT ? 0 : 1);
 
     /* there must be one input */
     if ( !input_fname )
