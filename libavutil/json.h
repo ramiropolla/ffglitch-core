@@ -42,6 +42,11 @@ typedef struct {
     void *userdata;
 } json_obj_t;
 
+typedef struct {
+    json_t **data;
+    void *userdata;
+} json_arr_t;
+
 #define MAX_MV2DARRAY_NBLOCKS 4
 #define MV_NULL 0x80000000
 typedef struct {
@@ -72,7 +77,7 @@ struct json_t {
         char *str;
         int64_t val;
         json_mv2darray_t *mv2darray;
-        json_t **array;
+        json_arr_t *arr;
         int32_t *array_of_ints;
         json_obj_t *obj;
     };
@@ -160,6 +165,18 @@ void *json_object_userdata_get(json_t *jso)
     return jso->obj->userdata;
 }
 
+static inline
+void json_array_userdata_set(json_t *jso, void *userdata)
+{
+    jso->arr->userdata = userdata;
+}
+
+static inline
+void *json_array_userdata_get(json_t *jso)
+{
+    return jso->arr->userdata;
+}
+
 //---------------------------------------------------------------------
 // array (fixed)
 static inline
@@ -169,7 +186,8 @@ json_t *json_array_new_uninit(json_ctx_t *jctx, size_t len)
 {
     json_t *jso = alloc_json_t(jctx);
     jso->flags = JSON_TYPE_ARRAY;
-    jso->array = json_allocator_get(jctx, len * sizeof(json_t *));
+    jso->arr = json_allocator_get(jctx, sizeof(json_arr_t));
+    jso->arr->data = json_allocator_get(jctx, len * sizeof(json_t *));
     json_set_len(jso, len);
     return jso;
 }
@@ -178,7 +196,7 @@ json_t *json_array_new(json_ctx_t *jctx, size_t len)
 {
     json_t *jso = json_array_new_uninit(jctx, len);
     for ( size_t i = 0; i < len; i++ )
-        jso->array[i] = NULL;
+        jso->arr->data[i] = NULL;
     return jso;
 }
 
@@ -193,7 +211,7 @@ int json_array_set(json_t *jso, size_t idx, json_t *jval)
 {
     if ( json_array_length(jso) <= idx )
         return -1;
-    jso->array[idx] = jval;
+    jso->arr->data[idx] = jval;
     return 0;
 }
 static inline
@@ -201,14 +219,14 @@ json_t *json_int_new(json_ctx_t *jctx, int64_t val);
 static inline
 json_t *json_array_get(json_t *jso, size_t idx)
 {
-    return jso->array[idx];
+    return jso->arr->data[idx];
 }
 static inline
 int64_t json_int_val(json_t *jso);
 static inline
 void json_array_sort(json_t *jso, int (* sort_fn)(const void *, const void *))
 {
-    qsort(jso->array, json_array_length(jso), sizeof(json_t *), sort_fn);
+    qsort(jso->arr->data, json_array_length(jso), sizeof(json_t *), sort_fn);
 }
 
 // array (dynamic)

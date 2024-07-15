@@ -291,7 +291,8 @@ json_t *json_dynamic_array_new(json_ctx_t *jctx)
 {
     json_t *jso = alloc_json_t(jctx);
     jso->flags = JSON_TYPE_ARRAY;
-    jso->array = NULL;
+    jso->arr = json_allocator_get(jctx, sizeof(json_arr_t));
+    jso->arr->data = NULL;
     return jso;
 }
 
@@ -299,19 +300,19 @@ int json_dynamic_array_add(json_t *jso, json_t *jval)
 {
     size_t len = json_array_length(jso);
     size_t cur_i = len++;
-    jso->array = realloc(jso->array, len * sizeof(json_t *));
-    jso->array[cur_i] = jval;
+    jso->arr->data = realloc(jso->arr->data, len * sizeof(json_t *));
+    jso->arr->data[cur_i] = jval;
     json_set_len(jso, len);
     return 0;
 }
 
 int json_dynamic_array_done(json_ctx_t *jctx, json_t *jso)
 {
-    json_t **orig_array = jso->array;
+    json_t **orig_array = jso->arr->data;
     if ( orig_array != NULL )
     {
         size_t len = json_array_length(jso);
-        jso->array = json_allocator_dup(jctx, orig_array, len * sizeof(json_t *));
+        jso->arr->data = json_allocator_dup(jctx, orig_array, len * sizeof(json_t *));
         free(orig_array);
     }
     return 0;

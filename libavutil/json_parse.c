@@ -273,7 +273,8 @@ static const char *json_parse_array(json_parse_ctx_t *jpctx, json_t *jso, const 
     {
         // Empty array.
         jso->flags = JSON_TYPE_ARRAY;
-        jso->array = NULL;
+        jso->arr = json_allocator_get(&jpctx->jctx, sizeof(json_arr_t));
+        jso->arr->data = NULL;
         buf++;
         return buf;
     }
@@ -360,7 +361,8 @@ headstart:
     array = (json_t **) jpctx->array.ptr + orig_array_len;
     len = jpctx->array.len - orig_array_len;
     jso->flags = JSON_TYPE_ARRAY | len;
-    jso->array = json_allocator_dup(&jpctx->jctx, array, len * sizeof(json_t *));
+    jso->arr = json_allocator_get(&jpctx->jctx, sizeof(json_arr_t));
+    jso->arr->data = json_allocator_dup(&jpctx->jctx, array, len * sizeof(json_t *));
     jpctx->array.len = orig_array_len;
     return buf;
 }

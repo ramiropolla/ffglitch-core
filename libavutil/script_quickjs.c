@@ -82,7 +82,7 @@ static JSValue quickjs_from_json(FFQuickJSContext *js_ctx, json_t *jso)
         len = json_array_length(jso);
         val = JS_NewFastArray(ctx, &parray, len, 1);
         for ( size_t i = 0; i < len; i++ )
-            parray[i] = quickjs_from_json(js_ctx, jso->array[i]);
+            parray[i] = quickjs_from_json(js_ctx, jso->arr->data[i]);
         break;
     case JSON_TYPE_ARRAY_OF_INTS:
         len = json_array_length(jso);
@@ -225,7 +225,7 @@ static json_t *quickjs_to_json(json_ctx_t *jctx, JSContext *ctx, JSValue val)
             {
                 array = json_array_new_uninit(jctx, length);
                 for ( size_t i = 0; i < length; i++ )
-                    array->array[i] = quickjs_to_json(jctx, ctx, parray[i]);
+                    array->arr->data[i] = quickjs_to_json(jctx, ctx, parray[i]);
             }
         }
         else
@@ -261,7 +261,7 @@ static json_t *quickjs_to_json(json_ctx_t *jctx, JSContext *ctx, JSValue val)
                 for ( size_t i = 0; i < length; i++ )
                 {
                     JSValue val_i = JS_GetPropertyUint32(ctx, val, i);
-                    array->array[i] = quickjs_to_json(jctx, ctx, val_i);
+                    array->arr->data[i] = quickjs_to_json(jctx, ctx, val_i);
                     JS_FreeValue(ctx, val_i);
                 }
             }

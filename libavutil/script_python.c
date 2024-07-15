@@ -464,7 +464,7 @@ static PyObject *python_from_json(FFPythonContext *py_ctx, json_t *jso)
         val = pyfuncs->PyList_New(len);
         for ( size_t i = 0; i < len; i++ )
         {
-            PyObject *val_i = python_from_json(py_ctx, jso->array[i]);
+            PyObject *val_i = python_from_json(py_ctx, jso->arr->data[i]);
             pyfuncs->PyList_SetItem(val, i, val_i);
         }
         break;
@@ -583,7 +583,7 @@ static json_t *python_to_json(json_ctx_t *jctx, FFPythonContext *py_ctx, PyObjec
             for ( size_t i = 0; i < length; i++ )
             {
                 PyObject *val_i = pyfuncs->PyList_GetItem(val, i);
-                array->array[i] = python_to_json(jctx, py_ctx, val_i);
+                array->arr->data[i] = python_to_json(jctx, py_ctx, val_i);
             }
         }
 
