@@ -65,32 +65,39 @@ static JSValue quickjs_from_json(FFQuickJSContext *js_ctx, json_t *jso)
 {
     JSContext *ctx = js_ctx->ctx;
     JSValue val = JS_NULL;
-    JSValue *parray;
-    int32_t *pint32;
-    size_t len;
     if ( jso == NULL )
         return JS_NULL;
     switch ( JSON_TYPE(jso->flags) )
     {
     case JSON_TYPE_OBJECT:
-        len = json_object_length(jso);
-        val = JS_NewObject(ctx);
-        for ( size_t i = 0; i < len; i++ )
-            JS_SetPropertyStr(ctx, val, jso->obj->kvps[i].key, quickjs_from_json(js_ctx, jso->obj->kvps[i].value));
+        {
+            size_t len = json_object_length(jso);
+            json_kvp_t *kvps = jso->obj->kvps;
+            val = JS_NewObject(ctx);
+            for ( size_t i = 0; i < len; i++ )
+                JS_SetPropertyStr(ctx, val, kvps[i].key, quickjs_from_json(js_ctx, kvps[i].value));
+        }
         break;
     case JSON_TYPE_ARRAY:
-        len = json_array_length(jso);
-        val = JS_NewFastArray(ctx, &parray, len, 1);
-        for ( size_t i = 0; i < len; i++ )
-            parray[i] = quickjs_from_json(js_ctx, jso->arr->data[i]);
+        {
+            size_t len = json_array_length(jso);
+            json_t **data = jso->arr->data;
+            JSValue *parray;
+            val = JS_NewFastArray(ctx, &parray, len, 1);
+            for ( size_t i = 0; i < len; i++ )
+                parray[i] = quickjs_from_json(js_ctx, data[i]);
+        }
         break;
     case JSON_TYPE_ARRAY_OF_INTS:
-        len = json_array_length(jso);
-        if ( len < MAX_AOI_CACHE_LEN && (js_ctx->flags & FFSCRIPT_FLAGS_AOI_CACHE) != 0 )
-            val = js_aoi_cache_get(js_ctx, &pint32, len);
-        else
-            val = JS_NewInt32FFArray(ctx, &pint32, len, 0);
-        memcpy(pint32, jso->array_of_ints, len * sizeof(int32_t));
+        {
+            size_t len = json_array_length(jso);
+            int32_t *pint32;
+            if ( len < MAX_AOI_CACHE_LEN && (js_ctx->flags & FFSCRIPT_FLAGS_AOI_CACHE) != 0 )
+                val = js_aoi_cache_get(js_ctx, &pint32, len);
+            else
+                val = JS_NewInt32FFArray(ctx, &pint32, len, 0);
+            memcpy(pint32, jso->array_of_ints, len * sizeof(int32_t));
+        }
         break;
     case JSON_TYPE_MV_2DARRAY:
         {
@@ -106,6 +113,7 @@ static JSValue quickjs_from_json(FFQuickJSContext *js_ctx, json_t *jso)
             else
             {
                 const uint8_t *nb_blocks_array = mv2d->nb_blocks_array;
+                JSValue *parray;
                 val = JS_NewFastArray(ctx, &parray, height, 1);
                 for ( size_t i = 0; i < height; i++ )
                 {
@@ -122,6 +130,7 @@ static JSValue quickjs_from_json(FFQuickJSContext *js_ctx, json_t *jso)
                         else if ( nb_blocks == 1 )
                         {
                             int32_t *mv = &mv2d->mvs[0][idx << 1];
+                            int32_t *pint32;
                             prow[j] = js_aoi_cache_get(js_ctx, &pint32, 2);
                             pint32[0] = mv[0];
                             pint32[1] = mv[1];
@@ -133,6 +142,7 @@ static JSValue quickjs_from_json(FFQuickJSContext *js_ctx, json_t *jso)
                             for ( size_t k = 0; k < nb_blocks; k++ )
                             {
                                 int32_t *mv = &mv2d->mvs[k][idx << 1];
+                                int32_t *pint32;
                                 pmvs[k] = js_aoi_cache_get(js_ctx, &pint32, 2);
                                 pint32[0] = mv[0];
                                 pint32[1] = mv[1];
@@ -217,15 +227,19 @@ static json_t *quickjs_to_json(json_ctx_t *jctx, JSContext *ctx, JSValue val)
             }
             if ( is_array_of_ints )
             {
+                int32_t *array_of_ints;
                 array = json_array_of_ints_new(jctx, length);
+                array_of_ints = array->array_of_ints;
                 for ( size_t i = 0; i < length; i++ )
-                    array->array_of_ints[i] = JS_VALUE_GET_INT(parray[i]);
+                    array_of_ints[i] = JS_VALUE_GET_INT(parray[i]);
             }
             else
             {
+                json_t **data;
                 array = json_array_new_uninit(jctx, length);
+                data = array->arr->data;
                 for ( size_t i = 0; i < length; i++ )
-                    array->arr->data[i] = quickjs_to_json(jctx, ctx, parray[i]);
+                    data[i] = quickjs_to_json(jctx, ctx, parray[i]);
             }
         }
         else
@@ -247,21 +261,25 @@ static json_t *quickjs_to_json(json_ctx_t *jctx, JSContext *ctx, JSValue val)
 
             if ( is_array_of_ints )
             {
+                int32_t *array_of_ints;
                 array = json_array_of_ints_new(jctx, length);
+                array_of_ints = array->array_of_ints;
                 for ( size_t i = 0; i < length; i++ )
                 {
                     JSValue val_i = JS_GetPropertyUint32(ctx, val, i);
-                    array->array_of_ints[i] = JS_VALUE_GET_INT(val_i);
+                    array_of_ints[i] = JS_VALUE_GET_INT(val_i);
                     JS_FreeValue(ctx, val_i);
                 }
             }
             else
             {
+                json_t **data;
                 array = json_array_new_uninit(jctx, length);
+                data = array->arr->data;
                 for ( size_t i = 0; i < length; i++ )
                 {
                     JSValue val_i = JS_GetPropertyUint32(ctx, val, i);
-                    array->arr->data[i] = quickjs_to_json(jctx, ctx, val_i);
+                    data[i] = quickjs_to_json(jctx, ctx, val_i);
                     JS_FreeValue(ctx, val_i);
                 }
             }

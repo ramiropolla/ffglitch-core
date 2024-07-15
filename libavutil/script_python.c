@@ -246,13 +246,15 @@ static PyObject *array_of_ints_repr(PyObject *self)
     PythonFunctions *pyfuncs = &py_ctx->pyfuncs;
     AVBPrint bp;
     PyObject *ret;
+    size_t len = _self->len;
+    int32_t *ptr = _self->ptr;
     av_bprint_init(&bp, 1, AV_BPRINT_SIZE_UNLIMITED);
     av_bprint_chars(&bp, '[', 1);
-    for ( size_t i = 0; i < _self->len; i++ )
+    for ( size_t i = 0; i < len; i++ )
     {
         if ( i != 0 )
             av_bprint_chars(&bp, ',', 1);
-        av_bprintf(&bp, "%d", _self->ptr[i]);
+        av_bprintf(&bp, "%d", ptr[i]);
     }
     av_bprint_chars(&bp, ']', 1);
     ret = pyfuncs->PyUnicode_FromString(bp.str);
@@ -381,10 +383,12 @@ static PyObject *py_aoi_cache_get(FFPythonContext *py_ctx, int32_t *array_of_int
     else
     {
         py_ArrayOfInts *py_arr;
+        int32_t *ptr;
         py_obj = py_ctx->aoi_cache[len][py_ctx->aoi_cache_offset[len]++];
         py_arr = (py_ArrayOfInts *) py_obj;
+        ptr = py_arr->ptr;
         for ( size_t i = 0; i < len; i++ )
-            py_arr->ptr[i] = array_of_ints[i];
+            ptr[i] = array_of_ints[i];
     }
     pyfuncs->Py_IncRef(py_obj);
     return py_obj;
@@ -444,36 +448,44 @@ static PyObject *python_from_json(FFPythonContext *py_ctx, json_t *jso)
 {
     PythonFunctions *pyfuncs = &py_ctx->pyfuncs;
     PyObject *val = NULL;
-    size_t len;
     if ( jso == NULL )
         return Py_None_New(py_ctx);
     switch ( JSON_TYPE(jso->flags) )
     {
     case JSON_TYPE_OBJECT:
-        len = json_object_length(jso);
-        val = pyfuncs->PyDict_New();
-        for ( size_t i = 0; i < len; i++ )
         {
-            PyObject *val_i = python_from_json(py_ctx, jso->obj->kvps[i].value);
-            pyfuncs->PyDict_SetItemString(val, jso->obj->kvps[i].key, val_i);
-            pyfuncs->Py_DecRef(val_i);
+            size_t len = json_object_length(jso);
+            json_kvp_t *kvps = jso->obj->kvps;
+            val = pyfuncs->PyDict_New();
+            for ( size_t i = 0; i < len; i++ )
+            {
+                PyObject *val_i = python_from_json(py_ctx, kvps[i].value);
+                pyfuncs->PyDict_SetItemString(val, kvps[i].key, val_i);
+                pyfuncs->Py_DecRef(val_i);
+            }
         }
         break;
     case JSON_TYPE_ARRAY:
-        len = json_array_length(jso);
-        val = pyfuncs->PyList_New(len);
-        for ( size_t i = 0; i < len; i++ )
         {
-            PyObject *val_i = python_from_json(py_ctx, jso->arr->data[i]);
-            pyfuncs->PyList_SetItem(val, i, val_i);
+            size_t len = json_array_length(jso);
+            json_t **data = jso->arr->data;
+            val = pyfuncs->PyList_New(len);
+            for ( size_t i = 0; i < len; i++ )
+            {
+                PyObject *val_i = python_from_json(py_ctx, data[i]);
+                pyfuncs->PyList_SetItem(val, i, val_i);
+            }
         }
         break;
     case JSON_TYPE_ARRAY_OF_INTS:
-        len = json_array_length(jso);
-        if ( len < MAX_AOI_CACHE_LEN && (py_ctx->flags & FFSCRIPT_FLAGS_AOI_CACHE) != 0 )
-            val = py_aoi_cache_get(py_ctx, jso->array_of_ints, len);
-        else
-            val = new_ArrayOfInts(py_ctx, jso->array_of_ints, len);
+        {
+            size_t len = json_array_length(jso);
+            int32_t *array_of_ints = jso->array_of_ints;
+            if ( len < MAX_AOI_CACHE_LEN && (py_ctx->flags & FFSCRIPT_FLAGS_AOI_CACHE) != 0 )
+                val = py_aoi_cache_get(py_ctx, array_of_ints, len);
+            else
+                val = new_ArrayOfInts(py_ctx, array_of_ints, len);
+        }
         break;
     case JSON_TYPE_MV_2DARRAY:
         {
@@ -570,20 +582,24 @@ static json_t *python_to_json(json_ctx_t *jctx, FFPythonContext *py_ctx, PyObjec
 
         if ( is_array_of_ints )
         {
+            int32_t *array_of_ints;
             array = json_array_of_ints_new(jctx, length);
+            array_of_ints = array->array_of_ints;
             for ( size_t i = 0; i < length; i++ )
             {
                 PyObject *val_i = pyfuncs->PyList_GetItem(val, i);
-                array->array_of_ints[i] = pyfuncs->PyLong_AsLong(val_i);
+                array_of_ints[i] = pyfuncs->PyLong_AsLong(val_i);
             }
         }
         else
         {
+            json_t **data;
             array = json_array_new_uninit(jctx, length);
+            data = array->arr->data;
             for ( size_t i = 0; i < length; i++ )
             {
                 PyObject *val_i = pyfuncs->PyList_GetItem(val, i);
-                array->arr->data[i] = python_to_json(jctx, py_ctx, val_i);
+                data[i] = python_to_json(jctx, py_ctx, val_i);
             }
         }
 

@@ -122,9 +122,11 @@ void *json_allocator_strndup(json_ctx_t *jctx, const void *src, size_t len)
 
 static void json_allocator_free(json_allocator_t *jal)
 {
-    for ( size_t i = 0; i < jal->len; i++ )
-        free(jal->chunks[i]);
-    free(jal->chunks);
+    size_t len = jal->len;
+    void **chunks = jal->chunks;
+    for ( size_t i = 0; i < len; i++ )
+        free(chunks[i]);
+    free(chunks);
 }
 
 void json_ctx_free(json_ctx_t *jctx)
@@ -185,13 +187,14 @@ int json_object_add(json_t *jso, const char *key, json_t *jval)
 int json_object_del(json_t *jso, const char *key)
 {
     size_t len = json_object_length(jso);
+    json_kvp_t *kvps = jso->obj->kvps;
     for ( size_t i = 0; i < len; i++ )
     {
-        const char *cur_key = jso->obj->kvps[i].key;
+        const char *cur_key = kvps[i].key;
         if ( cur_key != NULL && strcmp(cur_key, key) == 0 )
         {
             free((void *)cur_key);
-            jso->obj->kvps[i].key = NULL;
+            kvps[i].key = NULL;
             return 0;
         }
     }
@@ -201,11 +204,12 @@ int json_object_del(json_t *jso, const char *key)
 json_t *json_object_get(json_t *jso, const char *key)
 {
     size_t len = json_object_length(jso);
+    json_kvp_t *kvps = jso->obj->kvps;
     for ( size_t i = 0; i < len; i++ )
     {
-        const char *cur_key = jso->obj->kvps[i].key;
+        const char *cur_key = kvps[i].key;
         if ( cur_key != NULL && strcmp(cur_key, key) == 0 )
-            return jso->obj->kvps[i].value;
+            return kvps[i].value;
     }
     return NULL;
 }

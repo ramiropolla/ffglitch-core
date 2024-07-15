@@ -195,8 +195,9 @@ static inline
 json_t *json_array_new(json_ctx_t *jctx, size_t len)
 {
     json_t *jso = json_array_new_uninit(jctx, len);
+    json_t **data = jso->arr->data;
     for ( size_t i = 0; i < len; i++ )
-        jso->arr->data[i] = NULL;
+        data[i] = NULL;
     return jso;
 }
 

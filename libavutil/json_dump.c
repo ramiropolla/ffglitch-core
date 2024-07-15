@@ -227,7 +227,6 @@ static void output_mv_or_null(sbuf *ctx, int32_t *mv)
 
 static void json_print_element(sbuf *ctx, json_t *jso, int level)
 {
-    size_t len;
     if ( jso == NULL )
     {
         sbuf_fputs(ctx, "null");
@@ -236,45 +235,54 @@ static void json_print_element(sbuf *ctx, json_t *jso, int level)
     switch ( JSON_TYPE(jso->flags) )
     {
     case JSON_TYPE_OBJECT:
-        sbuf_fputc(ctx, '{');
-        len = json_object_length(jso);
-        for ( size_t i = 0; i < len; i++ )
         {
-            if ( i != 0 )
-                sbuf_fputc(ctx, ',');
-            output_lf(ctx, jso, level+1);
-            output_string(ctx, jso->obj->kvps[i].key);
-            sbuf_fputc(ctx, ':');
-            json_print_element(ctx, jso->obj->kvps[i].value, level+1);
+            size_t len = json_object_length(jso);
+            json_kvp_t *kvps = jso->obj->kvps;
+            sbuf_fputc(ctx, '{');
+            for ( size_t i = 0; i < len; i++ )
+            {
+                if ( i != 0 )
+                    sbuf_fputc(ctx, ',');
+                output_lf(ctx, jso, level+1);
+                output_string(ctx, kvps[i].key);
+                sbuf_fputc(ctx, ':');
+                json_print_element(ctx, kvps[i].value, level+1);
+            }
+            output_lf(ctx, jso, level);
+            sbuf_fputc(ctx, '}');
         }
-        output_lf(ctx, jso, level);
-        sbuf_fputc(ctx, '}');
         break;
     case JSON_TYPE_ARRAY:
-        sbuf_fputc(ctx, '[');
-        len = json_array_length(jso);
-        for ( size_t i = 0; i < len; i++ )
         {
-            if ( i != 0 )
-                sbuf_fputc(ctx, ',');
-            output_lf_array(ctx, jso, level+1, i);
-            json_print_element(ctx, jso->arr->data[i], level+1);
+            size_t len = json_array_length(jso);
+            json_t **data = jso->arr->data;
+            sbuf_fputc(ctx, '[');
+            for ( size_t i = 0; i < len; i++ )
+            {
+                if ( i != 0 )
+                    sbuf_fputc(ctx, ',');
+                output_lf_array(ctx, jso, level+1, i);
+                json_print_element(ctx, data[i], level+1);
+            }
+            output_lf(ctx, jso, level);
+            sbuf_fputc(ctx, ']');
         }
-        output_lf(ctx, jso, level);
-        sbuf_fputc(ctx, ']');
         break;
     case JSON_TYPE_ARRAY_OF_INTS:
-        sbuf_fputc(ctx, '[');
-        len = json_array_length(jso);
-        for ( size_t i = 0; i < len; i++ )
         {
-            if ( i != 0 )
-                sbuf_fputc(ctx, ',');
-            output_lf_array(ctx, jso, level+1, i);
-            output_num_32(ctx, jso->array_of_ints[i]);
+            size_t len = json_array_length(jso);
+            int32_t *array_of_ints = jso->array_of_ints;
+            sbuf_fputc(ctx, '[');
+            for ( size_t i = 0; i < len; i++ )
+            {
+                if ( i != 0 )
+                    sbuf_fputc(ctx, ',');
+                output_lf_array(ctx, jso, level+1, i);
+                output_num_32(ctx, array_of_ints[i]);
+            }
+            output_lf(ctx, jso, level);
+            sbuf_fputc(ctx, ']');
         }
-        output_lf(ctx, jso, level);
-        sbuf_fputc(ctx, ']');
         break;
     case JSON_TYPE_MV_2DARRAY:
         {
