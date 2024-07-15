@@ -149,13 +149,13 @@ void json_error_free(json_error_ctx_t *jectx);
 //---------------------------------------------------------------------
 // dynamic
 static inline
-void json_userdata_set(json_t *jso, void *userdata)
+void json_object_userdata_set(json_t *jso, void *userdata)
 {
     jso->obj->userdata = userdata;
 }
 
 static inline
-void *json_userdata_get(json_t *jso)
+void *json_object_userdata_get(json_t *jso)
 {
     return jso->obj->userdata;
 }

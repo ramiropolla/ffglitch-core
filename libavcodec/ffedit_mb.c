@@ -45,7 +45,7 @@ void ffe_mb_export_init(
 
     json_t *jframe = json_object_new(jctx);
     ffe_mb_ctx *ctx = json_allocator_get0(jctx, sizeof(ffe_mb_ctx));
-    json_userdata_set(jframe, ctx);
+    json_object_userdata_set(jframe, ctx);
 
     ctx->jdatas = ffe_jblock_new(jctx, mb_width, mb_height, JSON_PFLAGS_NO_LF);
     ctx->jsizes = ffe_jblock_new(jctx, mb_width, mb_height, JSON_PFLAGS_NO_LF);
@@ -67,7 +67,7 @@ void ffe_mb_import_init(json_ctx_t *jctx, AVFrame *f)
 {
     json_t *jframe = f->ffedit_sd[FFEDIT_FEAT_MB];
     ffe_mb_ctx *ctx = json_allocator_get0(jctx, sizeof(ffe_mb_ctx));
-    json_userdata_set(jframe, ctx);
+    json_object_userdata_set(jframe, ctx);
     ctx->jsizes = json_object_get(jframe, "sizes");
     ctx->jdatas = json_object_get(jframe, "data");
 }
@@ -102,7 +102,7 @@ void ffe_mb_export_flush_mb(
         int mb_x)
 {
     json_t *jframe = f->ffedit_sd[FFEDIT_FEAT_MB];
-    ffe_mb_ctx *ctx = json_userdata_get(jframe);
+    ffe_mb_ctx *ctx = json_object_userdata_get(jframe);
     json_t *jsize_y = json_array_get(ctx->jsizes, mb_y);
     json_t *jdata_y = json_array_get(ctx->jdatas, mb_y);
     int size = put_bits_count(&mbctx->pb); // in bits
@@ -151,7 +151,7 @@ void ffe_mb_import_init_mb(
         int mb_x)
 {
     json_t *jframe = f->ffedit_sd[FFEDIT_FEAT_MB];
-    ffe_mb_ctx *ctx = json_userdata_get(jframe);
+    ffe_mb_ctx *ctx = json_object_userdata_get(jframe);
     json_t *jdata_y = json_array_get(ctx->jdatas, mb_y);
     json_t *jdata = json_array_get(jdata_y, mb_x);
     const char *str = json_string_get(jdata);
@@ -184,7 +184,7 @@ void ffe_mb_import_flush_mb(
         int mb_x)
 {
     json_t *jframe = f->ffedit_sd[FFEDIT_FEAT_MB];
-    ffe_mb_ctx *ctx = json_userdata_get(jframe);
+    ffe_mb_ctx *ctx = json_object_userdata_get(jframe);
     json_t *jsize_y = json_array_get(ctx->jsizes, mb_y);
     int size = jsize_y->array_of_ints[mb_x]; // in bits
 

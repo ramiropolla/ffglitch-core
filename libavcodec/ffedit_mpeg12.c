@@ -326,7 +326,7 @@ ffe_mpeg12_export_qscale_init(MpegEncContext *s, AVFrame *f)
 
     json_t *jframe = json_object_new(s->jctx);
     qscale_ctx *ctx = json_allocator_get0(s->jctx, sizeof(qscale_ctx));
-    json_userdata_set(jframe, ctx);
+    json_object_userdata_set(jframe, ctx);
 
     ctx->slice = json_array_new(s->jctx, s->mb_height);
     for ( size_t mb_y = 0; mb_y < s->mb_height; mb_y++ )
@@ -351,7 +351,7 @@ ffe_mpeg12_import_qscale_init(MpegEncContext *s, AVFrame *f)
 {
     json_t *jframe = f->ffedit_sd[FFEDIT_FEAT_QSCALE];
     qscale_ctx *ctx = json_allocator_get0(s->jctx, sizeof(qscale_ctx));
-    json_userdata_set(jframe, ctx);
+    json_object_userdata_set(jframe, ctx);
     ctx->slice = json_object_get(jframe, "slice");
     ctx->mb = json_object_get(jframe, "mb");
 }
@@ -362,7 +362,7 @@ static void
 ffe_mpeg12_export_qscale_cleanup(MpegEncContext *s, AVFrame *f)
 {
     json_t *jframe = f->ffedit_sd[FFEDIT_FEAT_QSCALE];
-    qscale_ctx *ctx = json_userdata_get(jframe);
+    qscale_ctx *ctx = json_object_userdata_get(jframe);
     for ( size_t mb_y = 0; mb_y < s->mb_height; mb_y++ )
     {
         json_t *jmb_y = json_array_get(ctx->slice, mb_y);
@@ -380,7 +380,7 @@ ffe_qscale_get_mb(MpegEncContext *s)
 {
     AVFrame *f = s->current_picture_ptr->f;
     json_t *jframe = f->ffedit_sd[FFEDIT_FEAT_QSCALE];
-    qscale_ctx *ctx = json_userdata_get(jframe);
+    qscale_ctx *ctx = json_object_userdata_get(jframe);
     json_t *jdata = ctx->mb;
     json_t *jmb_y = json_array_get(jdata, s->mb_y);
     return jmb_y->array_of_ints[s->mb_x];
@@ -391,7 +391,7 @@ ffe_qscale_get_slice(MpegEncContext *s, int mb_y)
 {
     AVFrame *f = s->current_picture_ptr->f;
     json_t *jframe = f->ffedit_sd[FFEDIT_FEAT_QSCALE];
-    qscale_ctx *ctx = json_userdata_get(jframe);
+    qscale_ctx *ctx = json_object_userdata_get(jframe);
     json_t *jdata = ctx->slice;
     json_t *jmb_y = json_array_get(jdata, mb_y);
     json_t *jint;
@@ -413,7 +413,7 @@ ffe_qscale_set_mb(MpegEncContext *s, int val)
 {
     AVFrame *f = s->current_picture_ptr->f;
     json_t *jframe = f->ffedit_sd[FFEDIT_FEAT_QSCALE];
-    qscale_ctx *ctx = json_userdata_get(jframe);
+    qscale_ctx *ctx = json_object_userdata_get(jframe);
     json_t *jdata = ctx->mb;
     json_t *jmb_y = json_array_get(jdata, s->mb_y);
     json_t *jval = json_int_new(s->jctx, val);
@@ -427,7 +427,7 @@ ffe_qscale_set_slice(MpegEncContext *s, int mb_y, int val)
     // TODO not multi-thread friendly!
     AVFrame *f = s->current_picture_ptr->f;
     json_t *jframe = f->ffedit_sd[FFEDIT_FEAT_QSCALE];
-    qscale_ctx *ctx = json_userdata_get(jframe);
+    qscale_ctx *ctx = json_object_userdata_get(jframe);
     json_t *jdata = ctx->slice;
     json_t *jmb_y = json_array_get(jdata, mb_y);
     json_t *jval = json_int_new(s->jctx, val);

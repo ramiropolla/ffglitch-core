@@ -158,7 +158,7 @@ ffe_jmb_set_context(
 
     ctx->jdata = json_object_get(jso, "data");
 
-    json_userdata_set(jso, ctx);
+    json_object_userdata_set(jso, ctx);
 }
 
 //---------------------------------------------------------------------
@@ -170,7 +170,7 @@ ffe_jmb_select(
         int *pmb_x,
         int block)
 {
-    mb_array_ctx *ctx = json_userdata_get(jso);
+    mb_array_ctx *ctx = json_object_userdata_get(jso);
     int mb_y = *pmb_y;
     int mb_x = *pmb_x;
     json_t *jplane;

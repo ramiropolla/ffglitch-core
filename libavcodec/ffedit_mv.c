@@ -84,7 +84,7 @@ void mv_import_init_mb(
     if ( jframe == NULL )
         return;
 
-    ctx = json_userdata_get(jframe);
+    ctx = json_object_userdata_get(jframe);
     mbctx->overflow_action = ctx->overflow_action;
     mbctx->mb_y = mb_y;
     mbctx->mb_x = mb_x;
@@ -142,7 +142,7 @@ void mv_export_select(
     if ( jframe == NULL )
         return;
 
-    ctx = json_userdata_get(jframe);
+    ctx = json_object_userdata_get(jframe);
 
     jdata = ctx->data[direction];
     jmv2d = jdata->mv2darray;
@@ -186,7 +186,7 @@ void mv_import_select(
     if ( jframe == NULL )
         return;
 
-    ctx = json_userdata_get(jframe);
+    ctx = json_object_userdata_get(jframe);
 
     mbctx->cur_export = NULL;
     mbctx->cur_import = NULL;
@@ -296,7 +296,7 @@ void mv_export_fcode_internal(
     if ( jframe == NULL )
         return;
 
-    ctx = json_userdata_get(jframe);
+    ctx = json_object_userdata_get(jframe);
     if ( f_or_b == 0 )
         ctx->fcode->array_of_ints[num] = fcode;
     else
@@ -434,7 +434,7 @@ void mv_export_init_internal(
 
     json_t *jframe = json_object_new(jctx);
     ffe_mv_ctx *ctx = json_allocator_get0(jctx, sizeof(ffe_mv_ctx));
-    json_userdata_set(jframe, ctx);
+    json_object_userdata_set(jframe, ctx);
 
     ctx->data[0] = json_mv2darray_new(jctx, mb_width, mb_height, max_nb_blocks, -1);
     ctx->data[1] = json_mv2darray_new(jctx, mb_width, mb_height, max_nb_blocks, -1);
@@ -490,7 +490,7 @@ void mv_export_cleanup(
         AVFrame *f)
 {
     json_t *jframe = f->ffedit_sd[feat];
-    ffe_mv_ctx *ctx = json_userdata_get(jframe);
+    ffe_mv_ctx *ctx = json_object_userdata_get(jframe);
     int mvs_deleted = 0;
     if ( ctx->used[0] == 0 )
     {
@@ -546,7 +546,7 @@ void mv_import_init(
     json_t *jframe = f->ffedit_sd[feat];
     ffe_mv_ctx *ctx = json_allocator_get0(jctx, sizeof(ffe_mv_ctx));
     int overflow_action = MV_OVERFLOW_ASSERT;
-    json_userdata_set(jframe, ctx);
+    json_object_userdata_set(jframe, ctx);
     ctx->data[0] = json_object_get(jframe, "forward");
     ctx->data[1] = json_object_get(jframe, "backward");
     ctx->data[2] = json_object_get(jframe, "direct");
