@@ -1035,23 +1035,24 @@ static int decode_trns_chunk(AVCodecContext *avctx, PNGDecContext *s,
 
 static int decode_iccp_chunk(PNGDecContext *s, GetByteContext *gb)
 {
+    const uint8_t *gb_buffer = gb->buffer;
     int ret, cnt = 0;
     AVBPrint bp;
 
-    while ((s->iccp_name[cnt++] = bytestream2_get_byte(gb)) && cnt < 81);
+    while ((s->iccp_name[cnt++] = *gb_buffer++) && cnt < 81);
     if (cnt > 80) {
         av_log(s->avctx, AV_LOG_ERROR, "iCCP with invalid name!\n");
         ret = AVERROR_INVALIDDATA;
         goto fail;
     }
 
-    if (bytestream2_get_byte(gb) != 0) {
+    if (*gb_buffer++ != 0) {
         av_log(s->avctx, AV_LOG_ERROR, "iCCP with invalid compression!\n");
         ret =  AVERROR_INVALIDDATA;
         goto fail;
     }
 
-    if ((ret = decode_zbuf(&bp, gb->buffer, gb->buffer_end, s->avctx)) < 0)
+    if ((ret = decode_zbuf(&bp, gb_buffer, gb->buffer_end, s->avctx)) < 0)
         return ret;
 
     av_freep(&s->iccp_data);
