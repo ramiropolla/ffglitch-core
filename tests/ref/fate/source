@@ -5,6 +5,7 @@ libavcodec/ffedit_mjpeg.c
 libavcodec/ffedit_mpeg12.c
 libavcodec/ffedit_mpeg4.c
 libavcodec/ffedit_mpegvideo.c
+libavcodec/ffedit_png.c
 libavcodec/file_open.c
 libavcodec/ilbcdata.h
 libavcodec/ilbcdec.c

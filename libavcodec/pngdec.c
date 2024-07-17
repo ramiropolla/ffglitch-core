@@ -47,6 +47,8 @@
 
 #include <zlib.h>
 
+#include "ffedit_xp_bytes.h"
+
 enum PNGHeaderState {
     PNG_IHDR = 1 << 0,
     PNG_PLTE = 1 << 1,
@@ -124,7 +126,12 @@ typedef struct PNGDecContext {
     int pass_row_size; /* decompress row size of the current pass */
     int y;
     FFZStream zstream;
+
+    /* ffedit bitstream */
+    FFEditTransplicateBytesContext ffe_xp;
 } PNGDecContext;
+
+#include "ffedit_png.c"
 
 /* Mask to determine which pixels are valid in a pass */
 static const uint8_t png_pass_mask[NB_PASSES] = {
@@ -452,11 +459,14 @@ static int png_decode_idat(PNGDecContext *s, GetByteContext *gb,
 
     /* decode one line if possible */
     while (zstream->avail_in > 0) {
+        z_stream orig_zstream = *zstream;
         ret = inflate(zstream, Z_PARTIAL_FLUSH);
         if (ret != Z_OK && ret != Z_STREAM_END) {
             av_log(s->avctx, AV_LOG_ERROR, "inflate returned error %d\n", ret);
             return AVERROR_EXTERNAL;
         }
+        if ( gb->pb != NULL )
+            bytestream2_put_buffer(gb->pb, orig_zstream.next_in, (orig_zstream.avail_in - zstream->avail_in));
         if (zstream->avail_out == 0) {
             if (!(s->pic_state & PNG_ALLIMAGE)) {
                 png_handle_row(s, dst, dst_stride);
@@ -800,6 +810,10 @@ static int decode_idat_chunk(AVCodecContext *avctx, PNGDecContext *s,
         return AVERROR_INVALIDDATA;
     }
     if (!(s->pic_state & PNG_IDAT)) {
+        void *ffedit_sd[FFEDIT_FEAT_LAST];
+        json_ctx_t *jctx = p->jctx;
+        memcpy(ffedit_sd, p->ffedit_sd, sizeof(json_t *)*FFEDIT_FEAT_LAST);
+
         /* init image info */
         ret = ff_set_dimensions(avctx, s->width, s->height);
         if (ret < 0)
@@ -899,6 +913,9 @@ static int decode_idat_chunk(AVCodecContext *avctx, PNGDecContext *s,
             if (ret < 0)
                 return ret;
         }
+
+        memcpy(p->ffedit_sd, ffedit_sd, sizeof(json_t *)*FFEDIT_FEAT_LAST);
+        p->jctx = jctx;
 
         p->pict_type        = AV_PICTURE_TYPE_I;
         p->flags           |= AV_FRAME_FLAG_KEY;
@@ -1386,9 +1403,11 @@ static int decode_frame_common(AVCodecContext *avctx, PNGDecContext *s,
     uint32_t tag, length;
     int decode_next_dat = 0;
     int i, ret;
+    int iend_found = 0;
 
-    for (;;) {
+    while ( !iend_found ) {
         GetByteContext gb_chunk;
+        PutByteContext pb_chunk;
 
         length = bytestream2_get_bytes_left(&s->gb);
         if (length <= 0) {
@@ -1411,6 +1430,10 @@ static int decode_frame_common(AVCodecContext *avctx, PNGDecContext *s,
             ret = AVERROR_INVALIDDATA;
             goto fail;
         }
+
+        /* save start of chunk inside s->gb.pb */
+        if ( s->gb.pb != NULL )
+            pb_chunk = *s->gb.pb;
 
         length = bytestream2_get_be32(&s->gb);
         if (length > 0x7fffffff || length + 8 > bytestream2_get_bytes_left(&s->gb)) {
@@ -1439,6 +1462,8 @@ static int decode_frame_common(AVCodecContext *avctx, PNGDecContext *s,
                    av_fourcc2str(tag), length);
 
         bytestream2_init(&gb_chunk, s->gb.buffer, length);
+        gb_chunk.pb = s->gb.pb;
+        s->gb.pb = NULL;
         bytestream2_skip(&s->gb, length + 4);
 
         if (avctx->codec_id == AV_CODEC_ID_PNG &&
@@ -1455,7 +1480,7 @@ static int decode_frame_common(AVCodecContext *avctx, PNGDecContext *s,
             case MKTAG('g', 'A', 'M', 'A'):
                 break;
             default:
-                continue;
+                goto loop_continue;
             }
         }
 
@@ -1470,14 +1495,14 @@ static int decode_frame_common(AVCodecContext *avctx, PNGDecContext *s,
             break;
         case MKTAG('f', 'c', 'T', 'L'):
             if (!CONFIG_APNG_DECODER || avctx->codec_id != AV_CODEC_ID_APNG)
-                continue;
+                goto loop_continue;
             if ((ret = decode_fctl_chunk(avctx, s, &gb_chunk)) < 0)
                 goto fail;
             decode_next_dat = 1;
             break;
         case MKTAG('f', 'd', 'A', 'T'):
             if (!CONFIG_APNG_DECODER || avctx->codec_id != AV_CODEC_ID_APNG)
-                continue;
+                goto loop_continue;
             if (!decode_next_dat || bytestream2_get_bytes_left(&gb_chunk) < 4) {
                 ret = AVERROR_INVALIDDATA;
                 goto fail;
@@ -1485,7 +1510,7 @@ static int decode_frame_common(AVCodecContext *avctx, PNGDecContext *s,
             /* fallthrough */
         case MKTAG('I', 'D', 'A', 'T'):
             if (CONFIG_APNG_DECODER && avctx->codec_id == AV_CODEC_ID_APNG && !decode_next_dat)
-                continue;
+                goto loop_continue;
             if ((ret = decode_idat_chunk(avctx, s, &gb_chunk, p, tag)) < 0)
                 goto fail;
             break;
@@ -1498,11 +1523,11 @@ static int decode_frame_common(AVCodecContext *avctx, PNGDecContext *s,
         case MKTAG('t', 'E', 'X', 't'):
             if (decode_text_chunk(s, &gb_chunk, 0) < 0)
                 av_log(avctx, AV_LOG_WARNING, "Broken tEXt chunk\n");
-            break;
+            goto copy_chunk;
         case MKTAG('z', 'T', 'X', 't'):
             if (decode_text_chunk(s, &gb_chunk, 1) < 0)
                 av_log(avctx, AV_LOG_WARNING, "Broken zTXt chunk\n");
-            break;
+            goto copy_chunk;
         case MKTAG('s', 'T', 'E', 'R'): {
             int mode = bytestream2_get_byte(&gb_chunk);
 
@@ -1532,7 +1557,7 @@ static int decode_frame_common(AVCodecContext *avctx, PNGDecContext *s,
         case MKTAG('i', 'C', 'C', 'P'): {
             if ((ret = decode_iccp_chunk(s, &gb_chunk)) < 0)
                 goto fail;
-            break;
+            goto copy_chunk;
         }
         case MKTAG('c', 'H', 'R', 'M'): {
             s->have_chrm = 1;
@@ -1598,7 +1623,26 @@ static int decode_frame_common(AVCodecContext *avctx, PNGDecContext *s,
                 ret = AVERROR_INVALIDDATA;
                 goto fail;
             }
-            goto exit_loop;
+            iend_found = 1;
+            break;
+        /* FFEdit */
+        default:
+copy_chunk:
+            if ( gb_chunk.pb != NULL )
+                bytestream2_put_buffer(gb_chunk.pb, gb_chunk.buffer, length);
+            break;
+        }
+loop_continue:
+        /* write modified data to output, fix length, and checksum */
+        if ( gb_chunk.pb != NULL )
+        {
+            uint32_t real_length = (gb_chunk.pb->buffer - pb_chunk.buffer) - 8;
+            uint32_t real_crc;
+            bytestream2_put_be32(&pb_chunk, real_length);
+            real_crc = ~av_crc(crc_tab, UINT32_MAX, pb_chunk.buffer, real_length + 4);
+            bytestream2_put_be32(gb_chunk.pb, real_crc);
+            s->gb.pb = gb_chunk.pb;
+            gb_chunk.pb = NULL;
         }
     }
 exit_loop:
@@ -1754,9 +1798,12 @@ static int decode_frame_png(AVCodecContext *avctx, AVFrame *p,
     int64_t sig;
     int ret;
 
+    ffe_png_prepare_frame(s, p, avpkt);
+
     clear_frame_metadata(s);
 
     bytestream2_init(&s->gb, buf, buf_size);
+    ffe_png_transplicate_init(s, avpkt, &s->ffe_xp);
 
     /* check signature */
     sig = bytestream2_get_be64(&s->gb);
@@ -1795,6 +1842,9 @@ static int decode_frame_png(AVCodecContext *avctx, AVFrame *p,
 
     *got_frame = 1;
 
+    ffe_png_transplicate_cleanup(s, avpkt, &s->ffe_xp);
+    ffe_png_cleanup_frame(s, p);
+
     ret = bytestream2_tell(&s->gb);
 the_end:
     s->crow_buf = NULL;
@@ -1809,17 +1859,27 @@ static int decode_frame_apng(AVCodecContext *avctx, AVFrame *p,
     PNGDecContext *const s = avctx->priv_data;
     int ret;
 
+    ffe_png_prepare_frame(s, p, avpkt);
+
     clear_frame_metadata(s);
 
     if (!(s->hdr_state & PNG_IHDR)) {
+        FFEditTransplicateBytesContext extradata_xp = { NULL };
+        AVPacket extradata_pkt = {
+            .pos = 8,
+            .size = avctx->extradata_size,
+        };
+
         if (!avctx->extradata_size)
             return AVERROR_INVALIDDATA;
 
         if ((ret = inflateReset(&s->zstream.zstream)) != Z_OK)
             return AVERROR_EXTERNAL;
         bytestream2_init(&s->gb, avctx->extradata, avctx->extradata_size);
-        if ((ret = decode_frame_common(avctx, s, NULL, avpkt)) < 0)
+        ffe_png_transplicate_init(s, &extradata_pkt, &extradata_xp);
+        if ((ret = decode_frame_common(avctx, s, p, avpkt)) < 0)
             return ret;
+        ffe_png_transplicate_cleanup(s, &extradata_pkt, &extradata_xp);
     }
 
     /* reset state for a new frame */
@@ -1828,6 +1888,7 @@ static int decode_frame_apng(AVCodecContext *avctx, AVFrame *p,
     s->y = 0;
     s->pic_state = 0;
     bytestream2_init(&s->gb, avpkt->data, avpkt->size);
+    ffe_png_transplicate_init(s, avpkt, &s->ffe_xp);
     if ((ret = decode_frame_common(avctx, s, p, avpkt)) < 0)
         return ret;
 
@@ -1850,6 +1911,10 @@ static int decode_frame_apng(AVCodecContext *avctx, AVFrame *p,
     }
 
     *got_frame = 1;
+
+    ffe_png_transplicate_cleanup(s, avpkt, &s->ffe_xp);
+    ffe_png_cleanup_frame(s, p);
+
     return bytestream2_tell(&s->gb);
 }
 #endif
@@ -1944,7 +2009,7 @@ const FFCodec ff_apng_decoder = {
     .close          = png_dec_end,
     FF_CODEC_DECODE_CB(decode_frame_apng),
     UPDATE_THREAD_CONTEXT(update_thread_context),
-    .p.capabilities = AV_CODEC_CAP_DR1 | AV_CODEC_CAP_FRAME_THREADS,
+    .p.capabilities = AV_CODEC_CAP_DR1 | AV_CODEC_CAP_FRAME_THREADS | AV_CODEC_CAP_FFEDIT_BITSTREAM,
     .caps_internal  = FF_CODEC_CAP_INIT_CLEANUP |
                       FF_CODEC_CAP_ALLOCATE_PROGRESS |
                       FF_CODEC_CAP_ICC_PROFILES,
@@ -1962,7 +2027,7 @@ const FFCodec ff_png_decoder = {
     .close          = png_dec_end,
     FF_CODEC_DECODE_CB(decode_frame_png),
     UPDATE_THREAD_CONTEXT(update_thread_context),
-    .p.capabilities = AV_CODEC_CAP_DR1 | AV_CODEC_CAP_FRAME_THREADS,
+    .p.capabilities = AV_CODEC_CAP_DR1 | AV_CODEC_CAP_FRAME_THREADS | AV_CODEC_CAP_FFEDIT_BITSTREAM,
     .caps_internal  = FF_CODEC_CAP_SKIP_FRAME_FILL_PARAM |
                       FF_CODEC_CAP_ALLOCATE_PROGRESS | FF_CODEC_CAP_INIT_CLEANUP |
                       FF_CODEC_CAP_ICC_PROFILES,
