@@ -68,6 +68,7 @@ typedef struct PythonFunctions {
     PyObject   *(*PyDict_New)(void);
     int         (*PyDict_Next)(PyObject *p, size_t *ppos, PyObject **pkey, PyObject **pvalue);
     int         (*PyDict_SetItemString)(PyObject *p, const char *key, PyObject *val);
+    void        (*PyErr_Clear)(void);
     void        (*PyErr_Print)(void);
     void        (*PyErr_SetString)(PyObject *type, const char *message);
     PyObject   *(*PyEval_GetBuiltins)(void);

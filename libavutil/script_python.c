@@ -155,6 +155,7 @@ static int dlsyms_python(PythonFunctions *pyfuncs, void *libpython_so)
     *(void **) &pyfuncs->PyDict_New              = dlsym(libpython_so, "PyDict_New");
     *(void **) &pyfuncs->PyDict_Next             = dlsym(libpython_so, "PyDict_Next");
     *(void **) &pyfuncs->PyDict_SetItemString    = dlsym(libpython_so, "PyDict_SetItemString");
+    *(void **) &pyfuncs->PyErr_Clear             = dlsym(libpython_so, "PyErr_Clear");
     *(void **) &pyfuncs->PyErr_Print             = dlsym(libpython_so, "PyErr_Print");
     *(void **) &pyfuncs->PyErr_SetString         = dlsym(libpython_so, "PyErr_SetString");
     *(void **) &pyfuncs->PyEval_GetBuiltins      = dlsym(libpython_so, "PyEval_GetBuiltins");
@@ -747,6 +748,10 @@ FFPythonObject *ff_python_get_func(FFPythonContext *py_ctx, const char *func_nam
         {
             av_log(py_ctx, AV_LOG_FATAL, "Could not find function %s() in %s\n", func_name, py_ctx->script_fname);
             pyfuncs->PyErr_Print();
+        }
+        else
+        {
+            pyfuncs->PyErr_Clear();
         }
         if ( py_func != NULL )
             pyfuncs->Py_DecRef(py_func);
