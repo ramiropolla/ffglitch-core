@@ -788,7 +788,7 @@ static int populate_avctx_color_fields(AVCodecContext *avctx, AVFrame *frame)
 }
 
 static int decode_idat_chunk(AVCodecContext *avctx, PNGDecContext *s,
-                             GetByteContext *gb, AVFrame *p)
+                             GetByteContext *gb, AVFrame *p, uint32_t tag)
 {
     int ret;
     size_t byte_depth = s->bit_depth > 8 ? 2 : 1;
@@ -944,6 +944,9 @@ static int decode_idat_chunk(AVCodecContext *avctx, PNGDecContext *s,
         s->zstream.zstream.avail_out = s->crow_size;
         s->zstream.zstream.next_out  = s->crow_buf;
     }
+
+    if ( tag == MKTAG('f', 'd', 'A', 'T') )
+        bytestream2_get_be32(gb);
 
     s->pic_state |= PNG_IDAT;
 
@@ -1479,12 +1482,11 @@ static int decode_frame_common(AVCodecContext *avctx, PNGDecContext *s,
                 ret = AVERROR_INVALIDDATA;
                 goto fail;
             }
-            bytestream2_get_be32(&gb_chunk);
             /* fallthrough */
         case MKTAG('I', 'D', 'A', 'T'):
             if (CONFIG_APNG_DECODER && avctx->codec_id == AV_CODEC_ID_APNG && !decode_next_dat)
                 continue;
-            if ((ret = decode_idat_chunk(avctx, s, &gb_chunk, p)) < 0)
+            if ((ret = decode_idat_chunk(avctx, s, &gb_chunk, p, tag)) < 0)
                 goto fail;
             break;
         case MKTAG('P', 'L', 'T', 'E'):
