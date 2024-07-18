@@ -292,13 +292,6 @@ static PyType_Spec ArrayOfInts_spec = {
 };
 
 /*********************************************************************/
-typedef struct {
-    PyObject ob_base;
-    FFPythonContext *py_ctx;
-    uint8_t *ptr;
-    size_t len;
-} py_Uint8FFPtr;
-
 static size_t uint8carray_len(PyObject *self)
 {
     py_Uint8FFPtr *_self = (py_Uint8FFPtr *) self;

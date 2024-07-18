@@ -142,6 +142,14 @@ typedef struct FFPythonContext {
 typedef PyObject FFPythonObject;
 
 /*********************************************************************/
+typedef struct {
+    PyObject ob_base;
+    FFPythonContext *py_ctx;
+    uint8_t *ptr;
+    size_t len;
+} py_Uint8FFPtr;
+
+/*********************************************************************/
 FFPythonContext *ff_python_init(const char *script_fname, int flags);
 void ff_python_uninit(FFPythonContext **ppy_ctx);
 
