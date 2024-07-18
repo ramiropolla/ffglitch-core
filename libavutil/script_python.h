@@ -135,6 +135,7 @@ typedef struct FFPythonContext {
     PyObject *PyBool_Type;
     PyObject *PyDict_Type;
     PyObject *PyExc_IndexError;
+    PyObject *PyExc_TypeError;
     PyObject *PyList_Type;
     PyObject *PyLong_Type;
     PyObject *PyUnicode_Type;

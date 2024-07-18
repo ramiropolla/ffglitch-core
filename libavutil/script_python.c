@@ -713,6 +713,7 @@ FFPythonContext *ff_python_init(const char *script_fname, int flags)
     py_ctx->PyBool_Type      = pyfuncs->PyDict_GetItemString(builtins, "bool");
     py_ctx->PyDict_Type      = pyfuncs->PyDict_GetItemString(builtins, "dict");
     py_ctx->PyExc_IndexError = pyfuncs->PyDict_GetItemString(builtins, "IndexError");
+    py_ctx->PyExc_TypeError  = pyfuncs->PyDict_GetItemString(builtins, "TypeError");
     py_ctx->PyList_Type      = pyfuncs->PyDict_GetItemString(builtins, "list");
     py_ctx->PyLong_Type      = pyfuncs->PyDict_GetItemString(builtins, "int");
     py_ctx->PyUnicode_Type   = pyfuncs->PyDict_GetItemString(builtins, "str");
