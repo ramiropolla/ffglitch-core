@@ -365,6 +365,30 @@ static PyType_Spec Uint8FFPtr_spec = {
 };
 
 /*********************************************************************/
+static PyType_Slot py_Opaque_slots[] = {
+    { 0, 0 },
+};
+
+static PyObject *new_Opaque(FFPythonContext *py_ctx, void *ptr)
+{
+    PythonFunctions *pyfuncs = &py_ctx->pyfuncs;
+    PyObject *obj = (PyObject *) pyfuncs->PyObject_Malloc(sizeof(py_Opaque));
+    PyObject *py_obj = pyfuncs->PyObject_Init(obj, py_ctx->Opaque);
+    py_Uint8FFPtr *py_arr = (py_Uint8FFPtr *) py_obj;
+    py_arr->py_ctx = py_ctx;
+    py_arr->ptr = ptr;
+    return py_obj;
+}
+
+static PyType_Spec Opaque_spec = {
+    "Opaque",
+    sizeof(py_Opaque),
+    0,
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+    py_Opaque_slots
+};
+
+/*********************************************************************/
 static PyObject *py_aoi_cache_get(FFPythonContext *py_ctx, int32_t *array_of_ints, size_t len)
 {
     PythonFunctions *pyfuncs = &py_ctx->pyfuncs;
@@ -677,7 +701,9 @@ FFPythonContext *ff_python_init(const char *script_fname, int flags)
 
     /* custom ffglitch types */
     py_ctx->ArrayOfInts    = pyfuncs->PyType_FromSpec(&ArrayOfInts_spec);
+    py_ctx->Opaque         = pyfuncs->PyType_FromSpec(&Opaque_spec);
     py_ctx->Uint8FFPtr     = pyfuncs->PyType_FromSpec(&Uint8FFPtr_spec);
+    py_ctx->new_Opaque     = new_Opaque;
     py_ctx->new_Uint8FFPtr = new_Uint8FFPtr;
 
     builtins = pyfuncs->PyEval_GetBuiltins();

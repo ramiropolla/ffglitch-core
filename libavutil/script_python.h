@@ -129,8 +129,10 @@ typedef struct FFPythonContext {
     PyObject *PyNone_Type;
 
     PyObject *ArrayOfInts;
+    PyObject *Opaque;
     PyObject *Uint8FFPtr;
     PyObject *(*new_Uint8FFPtr)(struct FFPythonContext *, size_t, void *);
+    PyObject *(*new_Opaque)(struct FFPythonContext *, void *);
 
     PyObject *module;
     PyObject *numpy;
@@ -151,6 +153,13 @@ typedef struct {
     uint8_t *ptr;
     size_t len;
 } py_Uint8FFPtr;
+
+/*********************************************************************/
+typedef struct {
+    PyObject ob_base;
+    FFPythonContext *py_ctx;
+    void *ptr;
+} py_Opaque;
 
 /*********************************************************************/
 FFPythonContext *ff_python_init(const char *script_fname, int flags);
