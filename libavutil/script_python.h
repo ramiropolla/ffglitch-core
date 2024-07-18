@@ -41,12 +41,24 @@
 #define Py_TPFLAGS_HAVE_VERSION_TAG (1UL << 18)
 #define Py_TPFLAGS_DEFAULT          Py_TPFLAGS_HAVE_VERSION_TAG
 
+#define METH_VARARGS  0x0001
+
 typedef struct PyObject {
   size_t ob_refcnt;
   void *ob_type;
 } PyObject;
 
 typedef size_t Py_ssize_t;
+
+typedef PyObject *(*PyCFunction)(PyObject *, PyObject *);
+
+typedef struct {
+    const char  *ml_name;   /* The name of the built-in function/method */
+    PyCFunction ml_meth;    /* The C function that implements it */
+    int         ml_flags;   /* Combination of METH_xxx flags, which mostly
+                               describe the args expected by the C func */
+    const char  *ml_doc;    /* The __doc__ attribute, or NULL */
+} PyMethodDef;
 
 typedef struct {
     int slot;    /* slot id, see below */
@@ -63,6 +75,7 @@ typedef struct {
 
 typedef struct PythonFunctions {
     PyObject   *(*PyBool_FromLong)(long v);
+    PyObject   *(*PyCFunction_NewEx)(PyMethodDef *ml, PyObject *self, PyObject *module);
     int         (*PyCallable_Check)(PyObject *o);
     PyObject   *(*PyDict_GetItemString)(PyObject *p, const char *key);
     PyObject   *(*PyDict_New)(void);

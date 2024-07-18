@@ -150,6 +150,7 @@ static void *dlopen_python(void)
 static int dlsyms_python(PythonFunctions *pyfuncs, void *libpython_so)
 {
     *(void **) &pyfuncs->PyBool_FromLong         = dlsym(libpython_so, "PyBool_FromLong");
+    *(void **) &pyfuncs->PyCFunction_NewEx       = dlsym(libpython_so, "PyCFunction_NewEx");
     *(void **) &pyfuncs->PyCallable_Check        = dlsym(libpython_so, "PyCallable_Check");
     *(void **) &pyfuncs->PyDict_GetItemString    = dlsym(libpython_so, "PyDict_GetItemString");
     *(void **) &pyfuncs->PyDict_New              = dlsym(libpython_so, "PyDict_New");
