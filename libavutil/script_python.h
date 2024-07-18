@@ -91,8 +91,10 @@ typedef struct PythonFunctions {
     PyObject   *(*PyObject_Init)(PyObject *op, PyObject *type);
     void       *(*PyObject_Malloc)(size_t n);
     PyObject   *(*PyObject_Type)(PyObject *o);
+    PyObject   *(*PyTuple_GetItem)(PyObject *p, Py_ssize_t pos);
     PyObject   *(*PyTuple_New)(Py_ssize_t len);
     int        *(*PyTuple_SetItem)(PyObject *p, Py_ssize_t pos, PyObject *o);
+    Py_ssize_t  (*PyTuple_Size)(PyObject *p);
     PyObject   *(*PyType_FromSpec)(PyType_Spec *spec);
     const char *(*PyUnicode_AsUTF8AndSize)(PyObject *unicode, Py_ssize_t *size);
     PyObject   *(*PyUnicode_FromString)(const char *u);

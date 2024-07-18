@@ -178,8 +178,10 @@ static int dlsyms_python(PythonFunctions *pyfuncs, void *libpython_so)
     *(void **) &pyfuncs->PyObject_Init           = dlsym(libpython_so, "PyObject_Init");
     *(void **) &pyfuncs->PyObject_Malloc         = dlsym(libpython_so, "PyObject_Malloc");
     *(void **) &pyfuncs->PyObject_Type           = dlsym(libpython_so, "PyObject_Type");
+    *(void **) &pyfuncs->PyTuple_GetItem         = dlsym(libpython_so, "PyTuple_GetItem");
     *(void **) &pyfuncs->PyTuple_New             = dlsym(libpython_so, "PyTuple_New");
     *(void **) &pyfuncs->PyTuple_SetItem         = dlsym(libpython_so, "PyTuple_SetItem");
+    *(void **) &pyfuncs->PyTuple_Size            = dlsym(libpython_so, "PyTuple_Size");
     *(void **) &pyfuncs->PyType_FromSpec         = dlsym(libpython_so, "PyType_FromSpec");
     *(void **) &pyfuncs->PyUnicode_AsUTF8AndSize = dlsym(libpython_so, "PyUnicode_AsUTF8AndSize");
     *(void **) &pyfuncs->PyUnicode_FromString    = dlsym(libpython_so, "PyUnicode_FromString");
