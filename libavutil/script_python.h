@@ -152,4 +152,12 @@ FFPythonObject *ff_python_from_json(FFPythonContext *py_ctx, json_t *jso);
 json_t *ff_python_to_json(json_ctx_t *jctx, FFPythonContext *py_ctx, FFPythonObject *val);
 void ff_python_free_obj(FFPythonContext *py_ctx, FFPythonObject *py_obj);
 
+/*********************************************************************/
+static inline PyObject *Py_None_New(FFPythonContext *py_ctx)
+{
+    PythonFunctions *pyfuncs = &py_ctx->pyfuncs;
+    pyfuncs->Py_IncRef(py_ctx->Py_None);
+    return py_ctx->Py_None;
+}
+
 #endif

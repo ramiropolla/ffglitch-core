@@ -396,14 +396,6 @@ static PyObject *py_aoi_cache_get(FFPythonContext *py_ctx, int32_t *array_of_int
 }
 
 /*********************************************************************/
-static inline PyObject *Py_None_New(FFPythonContext *py_ctx)
-{
-    PythonFunctions *pyfuncs = &py_ctx->pyfuncs;
-    pyfuncs->Py_IncRef(py_ctx->Py_None);
-    return py_ctx->Py_None;
-}
-
-/*********************************************************************/
 int ff_python_call_func(FFPythonContext *py_ctx, FFPythonObject **ppy_ret, FFPythonObject *py_func, va_list vl)
 {
     PythonFunctions *pyfuncs = &py_ctx->pyfuncs;
