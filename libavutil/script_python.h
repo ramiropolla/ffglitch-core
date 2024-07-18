@@ -90,6 +90,7 @@ typedef struct PythonFunctions {
     PyObject   *(*PyObject_GetAttrString)(PyObject *o, const char *attr_name);
     PyObject   *(*PyObject_Init)(PyObject *op, PyObject *type);
     void       *(*PyObject_Malloc)(size_t n);
+    PyObject   *(*PyObject_Type)(PyObject *o);
     PyObject   *(*PyTuple_New)(Py_ssize_t len);
     int        *(*PyTuple_SetItem)(PyObject *p, Py_ssize_t pos, PyObject *o);
     PyObject   *(*PyType_FromSpec)(PyType_Spec *spec);
@@ -124,6 +125,8 @@ typedef struct FFPythonContext {
     PyObject *PyUnicode_Type;
     PyObject *Py_None;
     PyObject *Py_True;
+
+    PyObject *PyNone_Type;
 
     PyObject *ArrayOfInts;
     PyObject *Uint8FFPtr;

@@ -177,6 +177,7 @@ static int dlsyms_python(PythonFunctions *pyfuncs, void *libpython_so)
     *(void **) &pyfuncs->PyObject_GetAttrString  = dlsym(libpython_so, "PyObject_GetAttrString");
     *(void **) &pyfuncs->PyObject_Init           = dlsym(libpython_so, "PyObject_Init");
     *(void **) &pyfuncs->PyObject_Malloc         = dlsym(libpython_so, "PyObject_Malloc");
+    *(void **) &pyfuncs->PyObject_Type           = dlsym(libpython_so, "PyObject_Type");
     *(void **) &pyfuncs->PyTuple_New             = dlsym(libpython_so, "PyTuple_New");
     *(void **) &pyfuncs->PyTuple_SetItem         = dlsym(libpython_so, "PyTuple_SetItem");
     *(void **) &pyfuncs->PyType_FromSpec         = dlsym(libpython_so, "PyType_FromSpec");
@@ -689,6 +690,8 @@ FFPythonContext *ff_python_init(const char *script_fname, int flags)
     py_ctx->Py_None          = pyfuncs->PyDict_GetItemString(builtins, "None");
     py_ctx->Py_True          = pyfuncs->PyDict_GetItemString(builtins, "True");
     pyfuncs->Py_DecRef(builtins);
+
+    py_ctx->PyNone_Type      = pyfuncs->PyObject_Type(py_ctx->Py_None);
 
     ret = 0;
 
