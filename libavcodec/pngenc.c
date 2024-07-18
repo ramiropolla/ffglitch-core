@@ -37,6 +37,8 @@
 #include "libavutil/rational.h"
 #include "libavutil/stereo3d.h"
 
+#include "libavutil/script.h"
+
 #include <zlib.h>
 
 #define IOBUF_SIZE 4096
@@ -81,6 +83,12 @@ typedef struct PNGEncContext {
     APNGFctlChunk last_frame_fctl;
     uint8_t *last_frame_packet;
     size_t last_frame_packet_size;
+
+    /* ffgac extra */
+    const char *filter_row_script_fname;
+    FFScriptContext *filter_row_script;
+    FFScriptObject *filter_row_func;
+    JSValue jfunc;
 } PNGEncContext;
 
 static void png_get_interlaced_row(uint8_t *dst, int row_size,
@@ -195,6 +203,108 @@ static void png_filter_row(PNGEncContext *c, uint8_t *dst, int filter_type,
     }
 }
 
+static int JS_GetNumber(JSValueConst v, int *pret)
+{
+    if ( !JS_IsNumber(v) )
+        return 0;
+    *pret = JS_VALUE_GET_INT(v);
+    return 1;
+}
+
+/* ffgac extra */
+static int Py_GetNumber(FFPythonContext *py_ctx, PyObject *o, int *pret)
+{
+    PythonFunctions *pyfuncs = &py_ctx->pyfuncs;
+    if ( o->ob_type != py_ctx->PyLong_Type )
+        return 0;
+    *pret = pyfuncs->PyLong_AsLong(o);
+    return 1;
+}
+
+static int Py_GetUint8FFPtr(FFPythonContext *py_ctx, PyObject *o, uint8_t **puint8, uint32_t *plen)
+{
+    py_Uint8FFPtr *_o = (py_Uint8FFPtr *) o;
+    if ( o->ob_type != py_ctx->Uint8FFPtr )
+        return 0;
+    *puint8 = _o->ptr;
+    *plen = _o->len;
+    return 1;
+}
+
+static PyObject *
+png_filter_row_python(PyObject *self, PyObject *args)
+{
+    py_Opaque *_self = (py_Opaque *) self;
+    FFPythonContext *py_ctx = _self->py_ctx;
+    PythonFunctions *pyfuncs = &py_ctx->pyfuncs;
+    PNGEncContext *c = (PNGEncContext *) _self->ptr;
+    PyObject *py_top;
+    int filter_type;
+    uint8_t *dst;
+    uint32_t dst_len;
+    uint8_t *src;
+    uint32_t src_len;
+    uint8_t *top = NULL;
+    uint32_t top_len = 0;
+    int bpp;
+
+    if ( pyfuncs->PyTuple_Size(args) != 5 )
+    {
+fail:
+        pyfuncs->PyErr_SetString(py_ctx->PyExc_TypeError, "png_filter_row(filter_type, dst, src, top, bpp)");
+        return NULL;
+    }
+    py_top = pyfuncs->PyTuple_GetItem(args, 3);
+
+    if ( !Py_GetNumber     (py_ctx, pyfuncs->PyTuple_GetItem(args, 0), &filter_type)
+      || !Py_GetUint8FFPtr (py_ctx, pyfuncs->PyTuple_GetItem(args, 1), &dst, &dst_len)
+      || !Py_GetUint8FFPtr (py_ctx, pyfuncs->PyTuple_GetItem(args, 2), &src, &src_len)
+      || !(Py_GetUint8FFPtr(py_ctx, py_top, &top, &top_len) || py_top->ob_type == py_ctx->PyNone_Type)
+      || !Py_GetNumber     (py_ctx, pyfuncs->PyTuple_GetItem(args, 4), &bpp)
+      || (dst_len != src_len || (top_len != 0 && dst_len != top_len)) )
+    {
+        goto fail;
+    }
+
+    png_filter_row(c, dst, filter_type, src, top, dst_len, bpp);
+
+    return Py_None_New(py_ctx);
+}
+
+static PyMethodDef png_filter_row_python_method_def = {
+    "png_filter_row", png_filter_row_python, METH_VARARGS,
+};
+
+static JSValue
+png_filter_row_quickjs(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
+{
+    PNGEncContext *c = (PNGEncContext *) JS_GetContextOpaque(ctx);
+    int filter_type;
+    uint8_t *dst;
+    uint32_t dst_len;
+    uint8_t *src;
+    uint32_t src_len;
+    uint8_t *top = NULL;
+    uint32_t top_len = 0;
+    int bpp;
+
+    /* check input arguments */
+    if ( !JS_GetNumber     (argv[0], &filter_type)
+      || !JS_GetUint8FFPtr (argv[1], &dst, &dst_len)
+      || !JS_GetUint8FFPtr (argv[2], &src, &src_len)
+      || !(JS_GetUint8FFPtr(argv[3], &top, &top_len) || JS_IsUndefined(argv[3]))
+      || !JS_GetNumber     (argv[4], &bpp)
+      || (dst_len != src_len || (top_len != 0 && dst_len != top_len)) )
+    {
+        JS_ThrowTypeError(ctx, "png_filter_row(filter_type, dst, src, top, bpp)");
+        return JS_EXCEPTION;
+    }
+
+    png_filter_row(c, dst, filter_type, src, top, dst_len, bpp);
+
+    return JS_UNDEFINED;
+}
+
 static uint8_t *png_choose_filter(PNGEncContext *s, uint8_t *dst,
                                   const uint8_t *src, const uint8_t *top, int size, int bpp)
 {
@@ -202,6 +312,74 @@ static uint8_t *png_choose_filter(PNGEncContext *s, uint8_t *dst,
     av_assert0(bpp || !pred);
     if (!top && pred)
         pred = PNG_FILTER_VALUE_SUB;
+    /* ffgac extra */
+    if ( s->filter_row_func != NULL )
+    {
+        FFScriptContext *script = s->filter_row_script;
+        FFScriptObject *func_args = NULL;
+        FFScriptObject *script_ret;
+        json_ctx_t jctx;
+        json_t *jret;
+        int ret;
+
+        /* convert to python/quickjs */
+        if ( script->script_is_py )
+        {
+            FFPythonContext *py_ctx = (FFPythonContext *) script;
+            PythonFunctions *pyfuncs = &py_ctx->pyfuncs;
+            PyObject *py_args = pyfuncs->PyDict_New();
+            PyObject *py_self = py_ctx->new_Opaque(py_ctx, s);
+            PyObject *py_func = pyfuncs->PyCFunction_NewEx(&png_filter_row_python_method_def, py_self, NULL);
+            pyfuncs->PyDict_SetItemString(py_args, "png_filter_row", py_func);
+            pyfuncs->PyDict_SetItemString(py_args, "dst", py_ctx->new_Uint8FFPtr(py_ctx, size, dst + 1));
+            pyfuncs->PyDict_SetItemString(py_args, "src", py_ctx->new_Uint8FFPtr(py_ctx, size, (uint8_t *) src));
+            if ( top != NULL )
+                pyfuncs->PyDict_SetItemString(py_args, "top", py_ctx->new_Uint8FFPtr(py_ctx, size, (uint8_t *) top));
+            pyfuncs->PyDict_SetItemString(py_args, "bpp", pyfuncs->PyLong_FromLong(bpp));
+            func_args = (FFScriptObject *) py_args;
+        }
+        else
+        {
+            FFQuickJSContext *js_ctx = (FFQuickJSContext *) script;
+            JSContext *qjs_ctx = js_ctx->ctx;
+            JSValue jval = JS_NewObject(qjs_ctx);
+            JS_SetContextOpaque(qjs_ctx, s);
+            JS_SetPropertyStr(qjs_ctx, jval, "png_filter_row", JS_DupValue(qjs_ctx, s->jfunc));
+            JS_SetPropertyStr(qjs_ctx, jval, "dst", JS_NewUint8FFPtr(qjs_ctx, dst + 1, size));
+            JS_SetPropertyStr(qjs_ctx, jval, "src", JS_NewUint8FFPtr(qjs_ctx, (uint8_t *) src, size));
+            if ( top != NULL )
+                JS_SetPropertyStr(qjs_ctx, jval, "top", JS_NewUint8FFPtr(qjs_ctx, (uint8_t *) top, size));
+            JS_SetPropertyStr(qjs_ctx, jval, "bpp", JS_NewInt32(qjs_ctx, bpp));
+            func_args = (FFScriptObject *) av_malloc(sizeof(FFQuickJSObject));
+            ((FFQuickJSObject *)func_args)->jval = jval;
+        }
+
+        /* call filter_row_func() with data */
+        ret = ff_script_call_func(script, &script_ret, s->filter_row_func, func_args, NULL);
+        ff_script_free_obj(script, func_args);
+        if ( ret < 0 )
+        {
+            av_log(script, AV_LOG_FATAL, "Error calling filter_row_func() function in %s\n", s->filter_row_script_fname);
+            dst[0] = pred;
+            return dst;
+        }
+
+        /* convert back from python/quickjs */
+        json_ctx_start(&jctx, 0);
+        jret = ff_script_to_json(&jctx, script, script_ret);
+        if ( JSON_TYPE(jret->flags) != JSON_TYPE_NUMBER )
+            av_log(script, AV_LOG_FATAL, "filter_row_func() must return a number for the filter type\n");
+        else
+            pred = json_int_val(jret);
+
+        /* free stuff */
+        ff_script_free_obj(script, script_ret);
+        json_ctx_free(&jctx);
+
+        dst[0] = pred;
+        return dst;
+    }
+    else
     if (pred == PNG_FILTER_VALUE_MIXED) {
         int i;
         int cost, bcost = INT_MAX;
@@ -1104,6 +1282,36 @@ static av_cold int png_enc_init(AVCodecContext *avctx)
     PNGEncContext *s = avctx->priv_data;
     int compression_level;
 
+    /* ffgac extra */
+    if ( s->filter_row_script_fname != NULL )
+    {
+        FFScriptContext *script;
+        FFScriptObject *setup_func;
+        script = ff_script_init(s->filter_row_script_fname, 0);
+        if ( script == NULL )
+            return AVERROR(EINVAL);
+        s->filter_row_script = script;
+        s->filter_row_func = ff_script_get_func(script, "filter_row_func", 1);
+        if ( s->filter_row_func == NULL )
+            return AVERROR(EINVAL);
+        setup_func = ff_script_get_func(script, "setup", 0);
+        if ( setup_func != NULL )
+        {
+            int ret = ff_script_call_func(script, NULL, setup_func, NULL);
+            ff_script_free_obj(script, setup_func);
+            if ( ret < 0 )
+            {
+                av_log(script, AV_LOG_FATAL, "Error calling setup() function in %s\n", s->filter_row_script_fname);
+                return AVERROR(EINVAL);
+            }
+        }
+        if ( script->script_is_js )
+        {
+            FFQuickJSContext *js_ctx = (FFQuickJSContext *) script;
+            s->jfunc = JS_NewCFunction(js_ctx->ctx, png_filter_row_quickjs, "png_filter_row", 5);
+        }
+    }
+
     switch (avctx->pix_fmt) {
     case AV_PIX_FMT_RGBA:
         avctx->bits_per_coded_sample = 32;
@@ -1190,6 +1398,20 @@ static av_cold int png_enc_close(AVCodecContext *avctx)
 {
     PNGEncContext *s = avctx->priv_data;
 
+    /* ffgac extra */
+    if ( s->filter_row_script != NULL )
+    {
+        if ( s->filter_row_script->script_is_js )
+        {
+            FFQuickJSContext *js_ctx = (FFQuickJSContext *) s->filter_row_script;
+            JS_FreeValue(js_ctx->ctx, s->jfunc);
+        }
+        if ( s->filter_row_func != NULL )
+            ff_script_free_obj(s->filter_row_script, s->filter_row_func);
+        s->filter_row_func = NULL;
+        ff_script_uninit(&s->filter_row_script);
+    }
+
     ff_deflate_end(&s->zstream);
     av_frame_free(&s->last_frame);
     av_frame_free(&s->prev_frame);
@@ -1211,6 +1433,7 @@ static const AVOption options[] = {
         { "avg",   NULL, 0, AV_OPT_TYPE_CONST, { .i64 = PNG_FILTER_VALUE_AVG },   INT_MIN, INT_MAX, VE, .unit = "pred" },
         { "paeth", NULL, 0, AV_OPT_TYPE_CONST, { .i64 = PNG_FILTER_VALUE_PAETH }, INT_MIN, INT_MAX, VE, .unit = "pred" },
         { "mixed", NULL, 0, AV_OPT_TYPE_CONST, { .i64 = PNG_FILTER_VALUE_MIXED }, INT_MIN, INT_MAX, VE, .unit = "pred" },
+    {"filter_row_script", "script to filter row", OFFSET(filter_row_script_fname), AV_OPT_TYPE_STRING, {.str = NULL}, 0, 0, VE},
     { NULL},
 };
 
@@ -1226,7 +1449,7 @@ const FFCodec ff_png_encoder = {
     CODEC_LONG_NAME("PNG (Portable Network Graphics) image"),
     .p.type         = AVMEDIA_TYPE_VIDEO,
     .p.id           = AV_CODEC_ID_PNG,
-    .p.capabilities = AV_CODEC_CAP_DR1 | AV_CODEC_CAP_FRAME_THREADS |
+    .p.capabilities = AV_CODEC_CAP_DR1 | /*AV_CODEC_CAP_FRAME_THREADS |*/
                       AV_CODEC_CAP_ENCODER_REORDERED_OPAQUE,
     .priv_data_size = sizeof(PNGEncContext),
     .init           = png_enc_init,
