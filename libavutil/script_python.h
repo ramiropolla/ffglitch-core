@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020-2022 Ramiro Polla
+ * Copyright (C) 2020-2024 Ramiro Polla
  *
  * This file is part of FFmpeg.
  *
