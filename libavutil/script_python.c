@@ -73,6 +73,7 @@ static void *dlopen_python(void)
     {
 #if defined(_WIN32)
         static const char *paths[] = {
+            "Python/Python313/python3.dll",
             "Python/Python312/python3.dll",
             "Python/Python311/python3.dll",
             "Python/Python310/python3.dll",
@@ -105,6 +106,7 @@ static void *dlopen_python(void)
 #else
         static const char *paths[] = {
 #if defined(__APPLE__)
+            "/Library/Frameworks/Python.framework/Versions/3.13/lib/libpython3.13.dylib",
             "/Library/Frameworks/Python.framework/Versions/3.12/lib/libpython3.12.dylib",
             "/Library/Frameworks/Python.framework/Versions/3.11/lib/libpython3.11.dylib",
             "/Library/Frameworks/Python.framework/Versions/3.10/lib/libpython3.10.dylib",
@@ -114,6 +116,8 @@ static void *dlopen_python(void)
             "/Library/Frameworks/Python.framework/Versions/3.6/lib/libpython3.6.dylib",
             "/Library/Frameworks/Python.framework/Versions/3.5/lib/libpython3.5.dylib",
 #else
+            "libpython3.13m.so.1",
+            "libpython3.13.so.1",
             "libpython3.12m.so.1",
             "libpython3.12.so.1",
             "libpython3.11m.so.1",
