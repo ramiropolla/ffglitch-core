@@ -48,8 +48,7 @@ static inline void grow_parse_mem(json_parse_mem_t *__mem, void **ptr, size_t sz
         if ( len == 1 )
             __alloc += MEM_CHUNK;
         else
-            while ( __mem->len > __alloc )
-                __alloc += MEM_CHUNK;
+            __alloc = (__mem->len + (MEM_CHUNK - 1)) & ~(MEM_CHUNK - 1);
         __ptr = realloc(__ptr, __alloc * sz_ptr);
         __mem->ptr = __ptr;
         __mem->alloc = __alloc;
