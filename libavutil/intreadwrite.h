@@ -64,7 +64,9 @@ typedef union {
 
 #include "config.h"
 
-#if   ARCH_ARM
+#if   ARCH_AARCH64
+#   include "aarch64/intreadwrite.h"
+#elif ARCH_ARM
 #   include "arm/intreadwrite.h"
 #elif ARCH_AVR32
 #   include "avr32/intreadwrite.h"
