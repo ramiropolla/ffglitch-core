@@ -324,7 +324,9 @@ av_cold void ff_dct_encode_init(MpegEncContext *s)
     s->dct_quantize = dct_quantize_c;
     s->denoise_dct  = denoise_dct_c;
 
-#if ARCH_MIPS
+#if ARCH_AARCH64
+    ff_dct_encode_init_aarch64(s);
+#elif ARCH_MIPS
     ff_mpvenc_dct_init_mips(s);
 #elif ARCH_X86
     ff_dct_encode_init_x86(s);
