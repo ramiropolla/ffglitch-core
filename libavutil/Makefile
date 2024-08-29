@@ -351,14 +351,22 @@ QUICKJS_OBJS += quickjs/libregexp.o
 QUICKJS_OBJS += quickjs/libunicode.o
 QUICKJS_OBJS += quickjs/quickjs-libc.o
 QUICKJS_OBJS += quickjs/quickjs.o
+QUICKJS_OBJS-$(CONFIG_LIBZMQ) += quickjs/quickjs-zmq.o
+QUICKJS_OBJS += $(QUICKJS_OBJS-yes)
+
+$(addprefix $(SUBDIR), quickjs/quickjs-zmq.o): CFLAGS += -I$(SRC_PATH)/libavutil/zeromq/include
 
 QUICKJS_QJS_OBJS += quickjs/qjs.o
 QUICKJS_QJS_OBJS += quickjs/qjscalc.o
 QUICKJS_QJS_OBJS += quickjs/repl.o
+QUICKJS_QJS_OBJS-$(CONFIG_LIBZMQ) += $(ZEROMQ_OBJS)
+QUICKJS_QJS_OBJS += $(QUICKJS_QJS_OBJS-yes)
 
 QUICKJS_CONFIG_VERSION := $(shell cat $(SRC_PATH)/libavutil/quickjs/VERSION)
 
-$(addprefix $(SUBDIR), $(QUICKJS_OBJS) $(QUICKJS_QJS_OBJS)): CFLAGS += -D_GNU_SOURCE -DCONFIG_VERSION=\"$(QUICKJS_CONFIG_VERSION)\" -DCONFIG_BIGNUM
+QUICKJS_EXTRA_CFLAGS-$(CONFIG_LIBZMQ) += -DCONFIG_LIBZMQ
+QUICKJS_EXTRA_CFLAGS += $(QUICKJS_EXTRA_CFLAGS-yes)
+$(addprefix $(SUBDIR), $(QUICKJS_OBJS) $(QUICKJS_QJS_OBJS)): CFLAGS += -D_GNU_SOURCE -DCONFIG_VERSION=\"$(QUICKJS_CONFIG_VERSION)\" -DCONFIG_BIGNUM $(QUICKJS_EXTRA_CFLAGS)
 
 QUICKJS_LIBS=-lm -lpthread
 ifneq ($(EXESUF),.exe)
@@ -366,7 +374,7 @@ QUICKJS_LIBS+=-ldl
 endif
 
 qjs$(EXESUF): $(addprefix $(SUBDIR), $(QUICKJS_OBJS) $(QUICKJS_QJS_OBJS))
-	$(CC) -o $@ $^ $(QUICKJS_LIBS)
+	$(CXX) -o $@ $^ $(QUICKJS_LIBS) $(EXTRALIBS-qjs)
 
 OBJS += $(QUICKJS_OBJS)
 
@@ -384,8 +392,6 @@ rtmidi-repeater$(EXESUF): $(addprefix $(SUBDIR), $(RTMIDI_OBJS) $(RTMIDI-REPEATE
 	$(CXX) -o $@ $^ $(EXTRALIBS-avutil)
 
 OBJS-$(CONFIG_SDL2) += quickjs-sdl.o
-
-OBJS-$(CONFIG_LIBZMQ) += quickjs-zmq.o
 
 # Windows resource file
 SHLIBOBJS-$(HAVE_GNU_WINDRES)           += avutilres.o

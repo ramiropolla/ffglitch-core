@@ -31,7 +31,7 @@
 #include "libavutil/quickjs-sdl.h"
 #endif
 #if CONFIG_LIBZMQ
-#include "libavutil/quickjs-zmq.h"
+#include "libavutil/quickjs/quickjs-zmq.h"
 #endif
 
 /*********************************************************************/
@@ -395,13 +395,13 @@ FFQuickJSContext *ff_quickjs_init(const char *script_fname, int flags)
 #if CONFIG_SDL2
     ff_quickjs_sdl_init(qjs_ctx, js_ctx->global_object);
 #endif
-#if CONFIG_LIBZMQ
-    ff_quickjs_zmq_init(qjs_ctx, js_ctx->global_object);
-#endif
 
     /* system modules */
     js_init_module_std(qjs_ctx, "std");
     js_init_module_os(qjs_ctx, "os");
+#if CONFIG_LIBZMQ
+    js_init_module_zmq(qjs_ctx, "zmq");
+#endif
 
     /* load file */
     buf = ff_script_read_file(script_fname, &len);

@@ -2011,6 +2011,7 @@ HWACCEL_AUTODETECT_LIBRARY_LIST="
 EXTRALIBS_LIST="
     cpu_init
     cws2fws
+    qjs
 "
 
 HWACCEL_LIBRARY_NONFREE_LIST="
@@ -3992,6 +3993,7 @@ qsv_transcode_example_deps="avcodec avformat avutil h264_qsv_encoder"
 # EXTRALIBS_LIST
 cpu_init_extralibs="pthreads_extralibs"
 cws2fws_extralibs="zlib_extralibs"
+qjs_extralibs="libzmq_extralibs"
 
 # libraries, in any order
 avcodec_deps="avutil"
