@@ -30,9 +30,6 @@
 #if CONFIG_SDL2
 #include "libavutil/quickjs-sdl.h"
 #endif
-#if CONFIG_LIBZMQ
-#include "libavutil/quickjs-zmq.h"
-#endif
 
 /*********************************************************************/
 static const AVClass quickjs_class = {
@@ -394,9 +391,6 @@ FFQuickJSContext *ff_quickjs_init(const char *script_fname, int flags)
 #endif
 #if CONFIG_SDL2
     ff_quickjs_sdl_init(qjs_ctx, js_ctx->global_object);
-#endif
-#if CONFIG_LIBZMQ
-    ff_quickjs_zmq_init(qjs_ctx, js_ctx->global_object);
 #endif
 
     /* system modules */
