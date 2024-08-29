@@ -28,6 +28,7 @@
 #include "libavutil/json.h"
 #include "libavutil/log.h"
 #include "libavutil/quickjs/quickjs-libc.h"
+#include "libavutil/quickjs/quickjs-zmq.h"
 
 /*********************************************************************/
 typedef struct FFQuickJSContext {

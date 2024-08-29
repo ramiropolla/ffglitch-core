@@ -12630,6 +12630,23 @@ int JS_IsArray(JSContext *ctx, JSValueConst val)
     }
 }
 
+static JSValue js_array_push(JSContext *ctx, JSValueConst this_val,
+                             int argc, JSValueConst *argv, int unshift);
+
+int JS_ArrayPush(JSContext *ctx, JSValueConst this_obj, JSValue val)
+{
+    if ( JS_IsArray(ctx, this_obj) )
+    {
+        JSValue jval = js_array_push(ctx, this_obj, 1, (JSValueConst *)&val, 0);
+        int val = 0;
+        if ( JS_IsException(jval) )
+            return -1;
+        JS_ToInt32Free(ctx, &val, jval);
+        return val;
+    }
+    return -1;
+}
+
 static double js_pow(double a, double b)
 {
     if (unlikely(!isfinite(b)) && fabs(a) == 1) {
