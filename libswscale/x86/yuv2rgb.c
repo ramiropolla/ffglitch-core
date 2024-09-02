@@ -96,8 +96,6 @@ av_cold SwsFunc ff_yuv2rgb_init_x86(SwsContext *c)
             return yuv420_rgb16_ssse3;
         case AV_PIX_FMT_RGB555:
             return yuv420_rgb15_ssse3;
-        case AV_PIX_FMT_GBRP:
-            return yuv420_gbrp_ssse3;
         }
     }
 
