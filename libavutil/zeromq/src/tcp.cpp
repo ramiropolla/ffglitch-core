@@ -102,7 +102,7 @@ int zmq::tune_tcp_keepalives (fd_t s_,
             return rc;
     }
 #else
-#ifdef ZMQ_HAVE_SO_KEEPALIVE
+#ifdef SO_KEEPALIVE
     if (keepalive_ != -1) {
         int rc =
           setsockopt (s_, SOL_SOCKET, SO_KEEPALIVE,
@@ -111,7 +111,7 @@ int zmq::tune_tcp_keepalives (fd_t s_,
         if (rc != 0)
             return rc;
 
-#ifdef ZMQ_HAVE_TCP_KEEPCNT
+#ifdef TCP_KEEPCNT
         if (keepalive_cnt_ != -1) {
             int rc = setsockopt (s_, IPPROTO_TCP, TCP_KEEPCNT, &keepalive_cnt_,
                                  sizeof (int));
@@ -119,9 +119,9 @@ int zmq::tune_tcp_keepalives (fd_t s_,
             if (rc != 0)
                 return rc;
         }
-#endif // ZMQ_HAVE_TCP_KEEPCNT
+#endif // TCP_KEEPCNT
 
-#ifdef ZMQ_HAVE_TCP_KEEPIDLE
+#ifdef TCP_KEEPIDLE
         if (keepalive_idle_ != -1) {
             int rc = setsockopt (s_, IPPROTO_TCP, TCP_KEEPIDLE,
                                  &keepalive_idle_, sizeof (int));
@@ -129,8 +129,8 @@ int zmq::tune_tcp_keepalives (fd_t s_,
             if (rc != 0)
                 return rc;
         }
-#else // ZMQ_HAVE_TCP_KEEPIDLE
-#ifdef ZMQ_HAVE_TCP_KEEPALIVE
+#else // TCP_KEEPIDLE
+#ifdef TCP_KEEPALIVE
         if (keepalive_idle_ != -1) {
             int rc = setsockopt (s_, IPPROTO_TCP, TCP_KEEPALIVE,
                                  &keepalive_idle_, sizeof (int));
@@ -138,10 +138,10 @@ int zmq::tune_tcp_keepalives (fd_t s_,
             if (rc != 0)
                 return rc;
         }
-#endif // ZMQ_HAVE_TCP_KEEPALIVE
-#endif // ZMQ_HAVE_TCP_KEEPIDLE
+#endif // TCP_KEEPALIVE
+#endif // TCP_KEEPIDLE
 
-#ifdef ZMQ_HAVE_TCP_KEEPINTVL
+#ifdef TCP_KEEPINTVL
         if (keepalive_intvl_ != -1) {
             int rc = setsockopt (s_, IPPROTO_TCP, TCP_KEEPINTVL,
                                  &keepalive_intvl_, sizeof (int));
@@ -149,9 +149,9 @@ int zmq::tune_tcp_keepalives (fd_t s_,
             if (rc != 0)
                 return rc;
         }
-#endif // ZMQ_HAVE_TCP_KEEPINTVL
+#endif // TCP_KEEPINTVL
     }
-#endif // ZMQ_HAVE_SO_KEEPALIVE
+#endif // SO_KEEPALIVE
 #endif // ZMQ_HAVE_WINDOWS
 
     return 0;

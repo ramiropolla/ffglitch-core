@@ -269,6 +269,183 @@ OBJS-$(CONFIG_SDL2) += quickjs-sdl.o
 
 OBJS-$(CONFIG_LIBZMQ) += quickjs-zmq.o
 
+# zeromq
+ZEROMQ_OBJS += zeromq/external/sha1/sha1.o
+ZEROMQ_OBJS += zeromq/src/address.o
+ZEROMQ_OBJS += zeromq/src/channel.o
+ZEROMQ_OBJS += zeromq/src/client.o
+ZEROMQ_OBJS += zeromq/src/clock.o
+ZEROMQ_OBJS += zeromq/src/ctx.o
+ZEROMQ_OBJS += zeromq/src/curve_client.o
+ZEROMQ_OBJS += zeromq/src/curve_mechanism_base.o
+ZEROMQ_OBJS += zeromq/src/curve_server.o
+ZEROMQ_OBJS += zeromq/src/dealer.o
+ZEROMQ_OBJS += zeromq/src/decoder_allocators.o
+ZEROMQ_OBJS += zeromq/src/devpoll.o
+ZEROMQ_OBJS += zeromq/src/dgram.o
+ZEROMQ_OBJS += zeromq/src/dish.o
+ZEROMQ_OBJS += zeromq/src/dist.o
+ZEROMQ_OBJS += zeromq/src/endpoint.o
+ZEROMQ_OBJS += zeromq/src/epoll.o
+ZEROMQ_OBJS += zeromq/src/err.o
+ZEROMQ_OBJS += zeromq/src/fq.o
+ZEROMQ_OBJS += zeromq/src/gather.o
+ZEROMQ_OBJS += zeromq/src/gssapi_client.o
+ZEROMQ_OBJS += zeromq/src/gssapi_mechanism_base.o
+ZEROMQ_OBJS += zeromq/src/gssapi_server.o
+ZEROMQ_OBJS += zeromq/src/io_object.o
+ZEROMQ_OBJS += zeromq/src/io_thread.o
+ZEROMQ_OBJS += zeromq/src/ip.o
+ZEROMQ_OBJS += zeromq/src/ip_resolver.o
+ZEROMQ_OBJS += zeromq/src/ipc_address.o
+ZEROMQ_OBJS += zeromq/src/ipc_connecter.o
+ZEROMQ_OBJS += zeromq/src/ipc_listener.o
+ZEROMQ_OBJS += zeromq/src/kqueue.o
+ZEROMQ_OBJS += zeromq/src/lb.o
+ZEROMQ_OBJS += zeromq/src/mailbox.o
+ZEROMQ_OBJS += zeromq/src/mailbox_safe.o
+ZEROMQ_OBJS += zeromq/src/mechanism.o
+ZEROMQ_OBJS += zeromq/src/mechanism_base.o
+ZEROMQ_OBJS += zeromq/src/metadata.o
+ZEROMQ_OBJS += zeromq/src/msg.o
+ZEROMQ_OBJS += zeromq/src/mtrie.o
+ZEROMQ_OBJS += zeromq/src/norm_engine.o
+ZEROMQ_OBJS += zeromq/src/null_mechanism.o
+ZEROMQ_OBJS += zeromq/src/object.o
+ZEROMQ_OBJS += zeromq/src/options.o
+ZEROMQ_OBJS += zeromq/src/own.o
+ZEROMQ_OBJS += zeromq/src/pair.o
+ZEROMQ_OBJS += zeromq/src/peer.o
+ZEROMQ_OBJS += zeromq/src/pgm_receiver.o
+ZEROMQ_OBJS += zeromq/src/pgm_sender.o
+ZEROMQ_OBJS += zeromq/src/pgm_socket.o
+ZEROMQ_OBJS += zeromq/src/pipe.o
+ZEROMQ_OBJS += zeromq/src/plain_client.o
+ZEROMQ_OBJS += zeromq/src/plain_server.o
+ZEROMQ_OBJS += zeromq/src/poll.o
+ZEROMQ_OBJS += zeromq/src/poller_base.o
+ZEROMQ_OBJS += zeromq/src/polling_util.o
+ZEROMQ_OBJS += zeromq/src/pollset.o
+ZEROMQ_OBJS += zeromq/src/precompiled.o
+ZEROMQ_OBJS += zeromq/src/proxy.o
+ZEROMQ_OBJS += zeromq/src/pub.o
+ZEROMQ_OBJS += zeromq/src/pull.o
+ZEROMQ_OBJS += zeromq/src/push.o
+ZEROMQ_OBJS += zeromq/src/radio.o
+ZEROMQ_OBJS += zeromq/src/radix_tree.o
+ZEROMQ_OBJS += zeromq/src/random.o
+ZEROMQ_OBJS += zeromq/src/raw_decoder.o
+ZEROMQ_OBJS += zeromq/src/raw_encoder.o
+ZEROMQ_OBJS += zeromq/src/raw_engine.o
+ZEROMQ_OBJS += zeromq/src/reaper.o
+ZEROMQ_OBJS += zeromq/src/rep.o
+ZEROMQ_OBJS += zeromq/src/req.o
+ZEROMQ_OBJS += zeromq/src/router.o
+ZEROMQ_OBJS += zeromq/src/scatter.o
+ZEROMQ_OBJS += zeromq/src/select.o
+ZEROMQ_OBJS += zeromq/src/server.o
+ZEROMQ_OBJS += zeromq/src/session_base.o
+ZEROMQ_OBJS += zeromq/src/signaler.o
+ZEROMQ_OBJS += zeromq/src/socket_base.o
+ZEROMQ_OBJS += zeromq/src/socket_poller.o
+ZEROMQ_OBJS += zeromq/src/socks.o
+ZEROMQ_OBJS += zeromq/src/socks_connecter.o
+ZEROMQ_OBJS += zeromq/src/stream.o
+ZEROMQ_OBJS += zeromq/src/stream_connecter_base.o
+ZEROMQ_OBJS += zeromq/src/stream_engine_base.o
+ZEROMQ_OBJS += zeromq/src/stream_listener_base.o
+ZEROMQ_OBJS += zeromq/src/sub.o
+ZEROMQ_OBJS += zeromq/src/tcp.o
+ZEROMQ_OBJS += zeromq/src/tcp_address.o
+ZEROMQ_OBJS += zeromq/src/tcp_connecter.o
+ZEROMQ_OBJS += zeromq/src/tcp_listener.o
+ZEROMQ_OBJS += zeromq/src/thread.o
+ZEROMQ_OBJS += zeromq/src/timers.o
+ZEROMQ_OBJS += zeromq/src/tipc_address.o
+ZEROMQ_OBJS += zeromq/src/tipc_connecter.o
+ZEROMQ_OBJS += zeromq/src/tipc_listener.o
+ZEROMQ_OBJS += zeromq/src/trie.o
+ZEROMQ_OBJS += zeromq/src/udp_address.o
+ZEROMQ_OBJS += zeromq/src/udp_engine.o
+ZEROMQ_OBJS += zeromq/src/v1_decoder.o
+ZEROMQ_OBJS += zeromq/src/v1_encoder.o
+ZEROMQ_OBJS += zeromq/src/v2_decoder.o
+ZEROMQ_OBJS += zeromq/src/v2_encoder.o
+ZEROMQ_OBJS += zeromq/src/v3_1_encoder.o
+ZEROMQ_OBJS += zeromq/src/vmci.o
+ZEROMQ_OBJS += zeromq/src/vmci_address.o
+ZEROMQ_OBJS += zeromq/src/vmci_connecter.o
+ZEROMQ_OBJS += zeromq/src/vmci_listener.o
+ZEROMQ_OBJS += zeromq/src/ws_address.o
+ZEROMQ_OBJS += zeromq/src/ws_connecter.o
+ZEROMQ_OBJS += zeromq/src/ws_decoder.o
+ZEROMQ_OBJS += zeromq/src/ws_encoder.o
+ZEROMQ_OBJS += zeromq/src/ws_engine.o
+ZEROMQ_OBJS += zeromq/src/ws_listener.o
+ZEROMQ_OBJS += zeromq/src/wss_address.o
+ZEROMQ_OBJS += zeromq/src/xpub.o
+ZEROMQ_OBJS += zeromq/src/xsub.o
+ZEROMQ_OBJS += zeromq/src/zap_client.o
+ZEROMQ_OBJS += zeromq/src/zmq.o
+ZEROMQ_OBJS += zeromq/src/zmq_utils.o
+ZEROMQ_OBJS += zeromq/src/zmtp_engine.o
+
+$(addprefix $(SUBDIR), $(ZEROMQ_OBJS)): CFLAGS += -I$(SUBDIR)zeromq -I$(SUBDIR)zeromq/src -DZMQ_STATIC
+
+OBJS += $(ZEROMQ_OBJS)
+
+# quickjs
+QUICKJS_OBJS += quickjs/cutils.o
+QUICKJS_OBJS += quickjs/libbf.o
+QUICKJS_OBJS += quickjs/libregexp.o
+QUICKJS_OBJS += quickjs/libunicode.o
+QUICKJS_OBJS += quickjs/quickjs-libc.o
+QUICKJS_OBJS += quickjs/quickjs-zmq.o
+QUICKJS_OBJS += quickjs/quickjs.o
+
+QUICKJS_QJS_OBJS += quickjs/qjs.o
+QUICKJS_QJS_OBJS += quickjs/qjscalc.o
+QUICKJS_QJS_OBJS += quickjs/repl.o
+
+QUICKJS_CONFIG_VERSION := $(shell cat $(SRC_PATH)/libavutil/quickjs/VERSION)
+
+$(SUBDIR)quickjs/cutils.o:       CFLAGS += -D_GNU_SOURCE -DCONFIG_VERSION=\"$(QUICKJS_CONFIG_VERSION)\" -DCONFIG_BIGNUM
+$(SUBDIR)quickjs/libbf.o:        CFLAGS += -D_GNU_SOURCE -DCONFIG_VERSION=\"$(QUICKJS_CONFIG_VERSION)\" -DCONFIG_BIGNUM
+$(SUBDIR)quickjs/libregexp.o:    CFLAGS += -D_GNU_SOURCE -DCONFIG_VERSION=\"$(QUICKJS_CONFIG_VERSION)\" -DCONFIG_BIGNUM
+$(SUBDIR)quickjs/libunicode.o:   CFLAGS += -D_GNU_SOURCE -DCONFIG_VERSION=\"$(QUICKJS_CONFIG_VERSION)\" -DCONFIG_BIGNUM
+$(SUBDIR)quickjs/quickjs-libc.o: CFLAGS += -D_GNU_SOURCE -DCONFIG_VERSION=\"$(QUICKJS_CONFIG_VERSION)\" -DCONFIG_BIGNUM
+$(SUBDIR)quickjs/quickjs-zmq.o:  CFLAGS += -D_GNU_SOURCE -DCONFIG_VERSION=\"$(QUICKJS_CONFIG_VERSION)\" -DCONFIG_BIGNUM
+$(SUBDIR)quickjs/quickjs.o:      CFLAGS += -D_GNU_SOURCE -DCONFIG_VERSION=\"$(QUICKJS_CONFIG_VERSION)\" -DCONFIG_BIGNUM
+
+$(SUBDIR)quickjs/qjs.o:          CFLAGS += -D_GNU_SOURCE -DCONFIG_VERSION=\"$(QUICKJS_CONFIG_VERSION)\" -DCONFIG_BIGNUM
+$(SUBDIR)quickjs/qjscalc.o:      CFLAGS += -D_GNU_SOURCE -DCONFIG_VERSION=\"$(QUICKJS_CONFIG_VERSION)\" -DCONFIG_BIGNUM
+$(SUBDIR)quickjs/repl.o:         CFLAGS += -D_GNU_SOURCE -DCONFIG_VERSION=\"$(QUICKJS_CONFIG_VERSION)\" -DCONFIG_BIGNUM
+
+QUICKJS_LIBS=-lm -lpthread
+ifneq ($(EXESUF),.exe)
+QUICKJS_LIBS+=-ldl
+endif
+
+qjs$(EXESUF): $(addprefix $(SUBDIR), $(QUICKJS_OBJS) $(QUICKJS_QJS_OBJS) $(ZEROMQ_OBJS))
+	$(CXX) -o $@ $^ $(QUICKJS_LIBS)
+
+OBJS += $(QUICKJS_OBJS)
+
+# rtmidi
+RTMIDI_OBJS += rtmidi/RtMidi.o
+
+$(SUBDIR)rtmidi/RtMidi.o: CXXFLAGS += -DRTMIDI_EXPORT $(RTMIDI_API)
+
+OBJS-$(CONFIG_RTMIDI) += $(RTMIDI_OBJS)
+OBJS-$(CONFIG_RTMIDI) += quickjs-rtmidi.o
+
+RTMIDI-REPEATER_OBJS += rtmidi-repeater.o
+
+rtmidi-repeater$(EXESUF): $(addprefix $(SUBDIR), $(RTMIDI_OBJS) $(RTMIDI-REPEATER_OBJS))
+	$(CXX) -o $@ $^ $(EXTRALIBS-avutil)
+
+OBJS-$(CONFIG_SDL2) += quickjs-sdl.o
+
 # Windows resource file
 SHLIBOBJS-$(HAVE_GNU_WINDRES)           += avutilres.o
 
