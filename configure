@@ -1354,15 +1354,21 @@ check_apple_framework(){
         enable $name && eval ${name}_extralibs='"-framework $framework"'
 }
 
-check_func(){
-    log check_func "$@"
+test_func(){
+    log test_func "$@"
     func=$1
     shift
-    disable $func
-    test_ld "cc" "$@" <<EOF && enable $func
+    test_ld "cc" "$@" <<EOF
 extern int $func();
 int main(void){ $func(); }
 EOF
+}
+
+check_func(){
+    log check_func "$@"
+    func=$1
+    disable $func
+    test_func "$@" && enable $func
 }
 
 check_mathfunc(){
