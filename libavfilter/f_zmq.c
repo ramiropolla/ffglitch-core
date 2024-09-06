@@ -25,7 +25,7 @@
 
 #include "config_components.h"
 
-#include <zmq.h>
+#include "libavutil/zeromq/include/zmq.h"
 #include "libavutil/avstring.h"
 #include "libavutil/bprint.h"
 #include "libavutil/opt.h"

@@ -12,20 +12,10 @@ namespace zmq
 typedef zmq_fd_t fd_t;
 
 #ifdef ZMQ_HAVE_WINDOWS
-#if defined _MSC_VER && _MSC_VER <= 1400
-enum
-{
-    retired_fd = (fd_t) (~0)
-};
-#else
-enum
-#if _MSC_VER >= 1800
-  : fd_t
-#endif
+enum : fd_t
 {
     retired_fd = INVALID_SOCKET
 };
-#endif
 #else
 enum
 {

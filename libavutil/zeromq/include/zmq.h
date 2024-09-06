@@ -32,27 +32,7 @@ extern "C" {
 #include <stdio.h>
 
 /*  Handle DSO symbol visibility                                             */
-#if defined ZMQ_NO_EXPORT
 #define ZMQ_EXPORT
-#else
-#if defined _WIN32
-#if defined ZMQ_STATIC
-#define ZMQ_EXPORT
-#elif defined DLL_EXPORT
-#define ZMQ_EXPORT __declspec(dllexport)
-#else
-#define ZMQ_EXPORT __declspec(dllimport)
-#endif
-#else
-#if defined __SUNPRO_C || defined __SUNPRO_CC
-#define ZMQ_EXPORT __global
-#elif (defined __GNUC__ && __GNUC__ >= 4) || defined __INTEL_COMPILER
-#define ZMQ_EXPORT __attribute__ ((visibility ("default")))
-#else
-#define ZMQ_EXPORT
-#endif
-#endif
-#endif
 
 /*  Define integer types needed for event interface                          */
 #define ZMQ_DEFINED_STDINT 1

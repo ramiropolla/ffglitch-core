@@ -20,7 +20,7 @@
 
 /*********************************************************************/
 #include <string.h>
-#include <zmq.h>
+#include "libavutil/zeromq/include/zmq.h"
 
 /*********************************************************************/
 #include "libavutil/quickjs/quickjs-libc.h"

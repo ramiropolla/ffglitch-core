@@ -274,7 +274,7 @@ zmq::fd_t zmq::ipc_listener_t::accept ()
     //  The situation where connection cannot be accepted due to insufficient
     //  resources is considered valid and treated by ignoring the connection.
     zmq_assert (_s != retired_fd);
-#if defined ZMQ_HAVE_SOCK_CLOEXEC && defined HAVE_ACCEPT4
+#if defined SOCK_CLOEXEC && defined HAVE_ACCEPT4
     fd_t sock = ::accept4 (_s, NULL, NULL, SOCK_CLOEXEC);
 #else
     struct sockaddr_storage ss;

@@ -22,7 +22,7 @@
 
 #include <stdio.h>
 #include <string.h>
-#include <zmq.h>
+#include "libavutil/zeromq/include/zmq.h"
 
 #include "libavutil/log.h"
 #include "libavutil/mem.h"

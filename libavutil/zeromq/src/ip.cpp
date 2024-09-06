@@ -76,7 +76,7 @@ zmq::fd_t zmq::open_socket (int domain_, int type_, int protocol_)
 
     //  Setting this option result in sane behaviour when exec() functions
     //  are used. Old sockets are closed and don't block TCP ports etc.
-#if defined ZMQ_HAVE_SOCK_CLOEXEC
+#if defined SOCK_CLOEXEC
     type_ |= SOCK_CLOEXEC;
 #endif
 
@@ -210,7 +210,7 @@ void zmq::set_ip_type_of_service (fd_t s_, int iptos_)
 
 void zmq::set_socket_priority (fd_t s_, int priority_)
 {
-#ifdef ZMQ_HAVE_SO_PRIORITY
+#ifdef SO_PRIORITY
     int rc =
       setsockopt (s_, SOL_SOCKET, SO_PRIORITY,
                   reinterpret_cast<char *> (&priority_), sizeof (priority_));
@@ -243,7 +243,7 @@ int zmq::set_nosigpipe (fd_t s_)
 
 int zmq::bind_to_device (fd_t s_, const std::string &bound_device_)
 {
-#ifdef ZMQ_HAVE_SO_BINDTODEVICE
+#ifdef SO_BINDTODEVICE
     int rc = setsockopt (s_, SOL_SOCKET, SO_BINDTODEVICE,
                          bound_device_.c_str (), bound_device_.length ());
     if (rc != 0) {
@@ -533,7 +533,7 @@ int zmq::make_fdpair (fd_t *r_, fd_t *w_)
 {
 #if defined ZMQ_HAVE_EVENTFD
     int flags = 0;
-#if defined ZMQ_HAVE_EVENTFD_CLOEXEC
+#if defined EFD_CLOEXEC
     //  Setting this option result in sane behaviour when exec() functions
     //  are used. Old sockets are closed and don't block TCP ports, avoid
     //  leaks, etc.
@@ -557,6 +557,7 @@ int zmq::make_fdpair (fd_t *r_, fd_t *w_)
     socklen_t lcladdr_len = sizeof lcladdr;
     int rc = 0;
     int saved_errno = 0;
+    SOCKET listener;
 
     // It appears that a lack of runtime AF_UNIX support
     // can fail in more than one way.
@@ -569,7 +570,7 @@ int zmq::make_fdpair (fd_t *r_, fd_t *w_)
     }
 
     //  Create a listening socket.
-    const SOCKET listener = open_socket (AF_UNIX, SOCK_STREAM, 0);
+    listener = open_socket (AF_UNIX, SOCK_STREAM, 0);
     if (listener == retired_fd) {
         //  This may happen if the library was built on a system supporting AF_UNIX, but the system running doesn't support it.
         goto try_tcpip;
@@ -787,7 +788,7 @@ try_tcpip:
     //  Setting this option result in sane behaviour when exec() functions
     //  are used. Old sockets are closed and don't block TCP ports, avoid
     //  leaks, etc.
-#if defined ZMQ_HAVE_SOCK_CLOEXEC
+#if defined SOCK_CLOEXEC
     type |= SOCK_CLOEXEC;
 #endif
     int rc = socketpair (AF_UNIX, type, 0, sv);
@@ -814,7 +815,7 @@ void zmq::make_socket_noninheritable (fd_t sock_)
     const BOOL brc = SetHandleInformation (reinterpret_cast<HANDLE> (sock_),
                                            HANDLE_FLAG_INHERIT, 0);
     win_assert (brc);
-#elif (!defined ZMQ_HAVE_SOCK_CLOEXEC || !defined HAVE_ACCEPT4)                \
+#elif (!defined SOCK_CLOEXEC || !defined HAVE_ACCEPT4)                         \
   && defined FD_CLOEXEC
     //  If there 's no SOCK_CLOEXEC, let's try the second best option.
     //  Race condition can cause socket not to be closed (if fork happens

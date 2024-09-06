@@ -19,7 +19,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#include <zmq.h>
+#include "libavutil/zeromq/include/zmq.h"
 #include "url.h"
 #include "network.h"
 #include "libavutil/avstring.h"
