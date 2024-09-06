@@ -343,3 +343,4 @@ $(SUBDIR)tests/lzo$(EXESUF): ELIBS = -llzo2
 
 clean::
 	$(RM) $(CLEANSUFFIXES:%=libavutil/quickjs/%) qjs$(EXESUF)
+	$(RM) $(CLEANSUFFIXES:%=libavutil/rtmidi/%)
