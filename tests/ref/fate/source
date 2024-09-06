@@ -132,6 +132,17 @@ libavutil/quickjs/unicode_gen_def.h
 libavutil/rtmidi/contrib/go/rtmidi/rtmidi_stub.h
 libavutil/rtmidi/rtmidi_c.h
 libavutil/rtmidi/tests/testcapi.c
+libavutil/zeromq/builds/deprecated-msvc/resource.h
+libavutil/zeromq/external/sha1/sha1.c
+libavutil/zeromq/external/sha1/sha1.h
+libavutil/zeromq/external/unity/unity.c
+libavutil/zeromq/external/unity/unity.h
+libavutil/zeromq/external/unity/unity_internals.h
+libavutil/zeromq/external/wepoll/wepoll.c
+libavutil/zeromq/external/wepoll/wepoll.h
+libavutil/zeromq/include/zmq.h
+libavutil/zeromq/include/zmq_utils.h
+libavutil/zeromq/src/zmq_draft.h
 libswresample/log2_tab.c
 libswscale/log2_tab.c
 tools/uncoded_frame.c
@@ -190,6 +201,14 @@ libavutil/quickjs/unicode_gen_def.h
 libavutil/rtmidi/RtMidi.h
 libavutil/rtmidi/contrib/go/rtmidi/rtmidi_stub.h
 libavutil/rtmidi/rtmidi_c.h
+libavutil/zeromq/builds/deprecated-msvc/resource.h
+libavutil/zeromq/external/sha1/sha1.h
+libavutil/zeromq/external/unity/unity.h
+libavutil/zeromq/external/unity/unity_internals.h
+libavutil/zeromq/external/wepoll/wepoll.h
+libavutil/zeromq/include/zmq.h
+libavutil/zeromq/include/zmq_utils.h
+libavutil/zeromq/src/zmq_draft.h
 tools/decode_simple.h
 Use of av_clip() where av_clip_uintp2() could be used:
 Use of av_clip() where av_clip_intp2() could be used:
