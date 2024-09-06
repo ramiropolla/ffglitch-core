@@ -340,3 +340,6 @@ tools/crypto_bench$(EXESUF): ELIBS += $(if $(VERSUS),$(subst +, -l,+$(VERSUS)),)
 tools/crypto_bench.o: CFLAGS += -DUSE_EXT_LIBS=0$(if $(VERSUS),$(subst +,+USE_,+$(VERSUS)),)
 
 $(SUBDIR)tests/lzo$(EXESUF): ELIBS = -llzo2
+
+clean::
+	$(RM) $(CLEANSUFFIXES:%=libavutil/quickjs/%) qjs$(EXESUF)
