@@ -217,60 +217,6 @@ OBJS-$(!CONFIG_VULKAN)                  += hwcontext_stub.o
 
 OBJS += $(COMPAT_OBJS:%=../compat/%)
 
-# quickjs
-QUICKJS_OBJS += quickjs/cutils.o
-QUICKJS_OBJS += quickjs/libbf.o
-QUICKJS_OBJS += quickjs/libregexp.o
-QUICKJS_OBJS += quickjs/libunicode.o
-QUICKJS_OBJS += quickjs/quickjs-libc.o
-QUICKJS_OBJS += quickjs/quickjs-zmq.o
-QUICKJS_OBJS += quickjs/quickjs.o
-
-QUICKJS_QJS_OBJS += quickjs/qjs.o
-QUICKJS_QJS_OBJS += quickjs/qjscalc.o
-QUICKJS_QJS_OBJS += quickjs/repl.o
-
-QUICKJS_CONFIG_VERSION := $(shell cat $(SRC_PATH)/libavutil/quickjs/VERSION)
-
-$(SUBDIR)quickjs/cutils.o:       CFLAGS += -D_GNU_SOURCE -DCONFIG_VERSION=\"$(QUICKJS_CONFIG_VERSION)\" -DCONFIG_BIGNUM
-$(SUBDIR)quickjs/libbf.o:        CFLAGS += -D_GNU_SOURCE -DCONFIG_VERSION=\"$(QUICKJS_CONFIG_VERSION)\" -DCONFIG_BIGNUM
-$(SUBDIR)quickjs/libregexp.o:    CFLAGS += -D_GNU_SOURCE -DCONFIG_VERSION=\"$(QUICKJS_CONFIG_VERSION)\" -DCONFIG_BIGNUM
-$(SUBDIR)quickjs/libunicode.o:   CFLAGS += -D_GNU_SOURCE -DCONFIG_VERSION=\"$(QUICKJS_CONFIG_VERSION)\" -DCONFIG_BIGNUM
-$(SUBDIR)quickjs/quickjs-libc.o: CFLAGS += -D_GNU_SOURCE -DCONFIG_VERSION=\"$(QUICKJS_CONFIG_VERSION)\" -DCONFIG_BIGNUM
-$(SUBDIR)quickjs/quickjs-zmq.o:  CFLAGS += -D_GNU_SOURCE -DCONFIG_VERSION=\"$(QUICKJS_CONFIG_VERSION)\" -DCONFIG_BIGNUM
-$(SUBDIR)quickjs/quickjs.o:      CFLAGS += -D_GNU_SOURCE -DCONFIG_VERSION=\"$(QUICKJS_CONFIG_VERSION)\" -DCONFIG_BIGNUM
-
-$(SUBDIR)quickjs/qjs.o:          CFLAGS += -D_GNU_SOURCE -DCONFIG_VERSION=\"$(QUICKJS_CONFIG_VERSION)\" -DCONFIG_BIGNUM
-$(SUBDIR)quickjs/qjscalc.o:      CFLAGS += -D_GNU_SOURCE -DCONFIG_VERSION=\"$(QUICKJS_CONFIG_VERSION)\" -DCONFIG_BIGNUM
-$(SUBDIR)quickjs/repl.o:         CFLAGS += -D_GNU_SOURCE -DCONFIG_VERSION=\"$(QUICKJS_CONFIG_VERSION)\" -DCONFIG_BIGNUM
-
-QUICKJS_LIBS=-lm -lpthread
-ifneq ($(EXESUF),.exe)
-QUICKJS_LIBS+=-ldl
-endif
-
-qjs$(EXESUF): $(addprefix $(SUBDIR), $(QUICKJS_OBJS) $(QUICKJS_QJS_OBJS))
-	$(CC) -o $@ $^ $(QUICKJS_LIBS) -L/usr/local/lib -lzmq -lstdc++ -lpthread -lrt -lbsd
-
-OBJS += $(QUICKJS_OBJS)
-
-# rtmidi
-RTMIDI_OBJS += rtmidi/RtMidi.o
-
-$(SUBDIR)rtmidi/RtMidi.o: CXXFLAGS += -DRTMIDI_EXPORT $(RTMIDI_API)
-
-OBJS-$(CONFIG_RTMIDI) += $(RTMIDI_OBJS)
-OBJS-$(CONFIG_RTMIDI) += quickjs-rtmidi.o
-
-RTMIDI-REPEATER_OBJS += rtmidi-repeater.o
-
-rtmidi-repeater$(EXESUF): $(addprefix $(SUBDIR), $(RTMIDI_OBJS) $(RTMIDI-REPEATER_OBJS))
-	$(CXX) -o $@ $^ $(EXTRALIBS-avutil)
-
-OBJS-$(CONFIG_SDL2) += quickjs-sdl.o
-
-OBJS-$(CONFIG_LIBZMQ) += quickjs-zmq.o
-
 # zeromq
 ZEROMQ_OBJS += zeromq/external/sha1/sha1.o
 ZEROMQ_OBJS += zeromq/src/address.o
