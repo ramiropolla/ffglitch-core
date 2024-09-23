@@ -25,6 +25,7 @@
 #include "libavutil/script.h"
 
 #if CONFIG_RTMIDI
+#include "libavutil/quickjs/quickjs-rtmidi.h"
 #include "libavutil/quickjs-rtmidi.h"
 #endif
 #if CONFIG_SDL2
@@ -401,6 +402,9 @@ FFQuickJSContext *ff_quickjs_init(const char *script_fname, int flags)
     js_init_module_os(qjs_ctx, "os");
 #if CONFIG_LIBZMQ
     js_init_module_zmq(qjs_ctx, "zmq");
+#endif
+#if CONFIG_RTMIDI
+    js_init_module_rtmidi(qjs_ctx, "rtmidi");
 #endif
 
     /* load file */

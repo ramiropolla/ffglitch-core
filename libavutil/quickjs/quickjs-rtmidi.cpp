@@ -1,34 +1,31 @@
 /*
- * Copyright (C) 2022 Ramiro Polla
+ * Copyright (C) 2022-2024 Ramiro Polla
  *
- * This file is part of FFmpeg.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- * FFmpeg is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
- * FFmpeg is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+ * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
  */
 
-#include <math.h>
+/*********************************************************************/
+#include "RtMidi.h"
 
-#include "libavutil/rtmidi/RtMidi.h"
-
-extern "C" {
-#include "libavutil/quickjs/quickjs-libc.h"
-#include "libavutil/quickjs-rtmidi.h"
-#include "internal.h"
-#include "log.h"
-#include "mem.h"
-}
+/*********************************************************************/
+#include "quickjs-rtmidi.h"
+#include "cutils.h"
 
 /*********************************************************************/
 /* RtMidi */
@@ -41,56 +38,30 @@ static const JSCFunctionListEntry js_RtMidi_funcs[] = {
     JS_PROP_INT32_DEF("RTMIDI_DUMMY",      RtMidi::RTMIDI_DUMMY, JS_PROP_CONFIGURABLE),
     JS_PROP_INT32_DEF("WEB_MIDI_API",      RtMidi::WEB_MIDI_API, JS_PROP_CONFIGURABLE),
     JS_PROP_INT32_DEF("NUM_APIS",          RtMidi::NUM_APIS,     JS_PROP_CONFIGURABLE),
-    JS_PROP_STRING_DEF("[Symbol.toStringTag]", "RtMidi", JS_PROP_CONFIGURABLE),
 };
-
-static const JSCFunctionListEntry js_RtMidi_obj[] = {
-    JS_OBJECT_DEF("RtMidi", js_RtMidi_funcs, FF_ARRAY_ELEMS(js_RtMidi_funcs), JS_PROP_WRITABLE | JS_PROP_CONFIGURABLE ),
-};
-
-static void init_RtMidi(JSContext *ctx, JSValueConst global_object)
-{
-    JS_SetPropertyFunctionList(ctx, global_object, js_RtMidi_obj, FF_ARRAY_ELEMS(js_RtMidi_obj));
-}
 
 /*********************************************************************/
-static const AVClass rtmidi_class = {
-    .class_name = "quickjs-rtmidi",
-    .item_name  = av_default_item_name,
-    .version    = LIBAVUTIL_VERSION_INT,
-};
-
-typedef struct {
-    const AVClass *klass;
-    RtMidiIn *midiin;
-} RtMidiInContext;
-
-typedef struct {
-    const AVClass *klass;
-    RtMidiOut *midiout;
-} RtMidiOutContext;
+static JSValue
+ThrowRtMidiError(JSContext *ctx, const RtMidiError &err)
+{
+    JSValue ret = JS_NewError(ctx);
+    JS_DefinePropertyValueStr(ctx, ret, "message",
+                              JS_NewString(ctx, err.what()),
+                              JS_PROP_WRITABLE | JS_PROP_CONFIGURABLE);
+    if ( JS_IsException(ret) )
+        ret = JS_NULL;
+    return JS_Throw(ctx, ret);
+}
 
 /*********************************************************************/
 /* RtMidiIn */
 static JSClassID js_RtMidiIn_class_id;
 
-static JSValue RtMidiIn_ctor(JSContext *ctx, JSValueConst new_target, int argc, JSValueConst *argv)
+static JSValue js_RtMidiIn_ctor(JSContext *ctx, JSValueConst new_target, int argc, JSValueConst *argv)
 {
     RtMidi::Api api = RtMidi::UNSPECIFIED;
     std::string clientName = "RtMidi Input Client";
     unsigned int queueSizeLimit = 1024;
-    static int warned = 0;
-
-    if ( !warned )
-    {
-        RtMidiInContext logctx;
-        logctx.klass = &rtmidi_class;
-        av_log(&logctx, AV_LOG_WARNING, "'new RtMidiIn()' is deprecated and will be removed in FFglitch 0.11.\n");
-        av_log(&logctx, AV_LOG_WARNING, "Instead of 'new RtMidiIn()', import the 'rtmidi' module and use 'new rtmidi.In()':\n");
-        av_log(&logctx, AV_LOG_WARNING, " import * as rtmidi from \"rtmidi\";\n");
-        av_log(&logctx, AV_LOG_WARNING, " const midiin = new rtmidi.In();\n");
-        warned = 1;
-    }
 
     /* check arguments */
     if ( argc > 0 )
@@ -131,26 +102,21 @@ args_error:
         return JS_EXCEPTION;
     }
 
-    RtMidiInContext *rtmidictx = (RtMidiInContext *) av_mallocz(sizeof(RtMidiInContext));
-    rtmidictx->klass = &rtmidi_class;
-    rtmidictx->midiin = new RtMidiIn(api, clientName, queueSizeLimit);
-    JS_SetOpaque(obj, rtmidictx);
+    RtMidiIn *midiin = new RtMidiIn(api, clientName, queueSizeLimit);
+    JS_SetOpaque(obj, midiin);
 
     return obj;
 }
 
 static void js_RtMidiIn_finalizer(JSRuntime *rt, JSValue val)
 {
-    RtMidiInContext *rtmidictx = (RtMidiInContext *) JS_GetOpaque(val, js_RtMidiIn_class_id);
-    RtMidiIn *midiin = rtmidictx->midiin;
+    RtMidiIn *midiin = (RtMidiIn *) JS_GetOpaque(val, js_RtMidiIn_class_id);
     delete midiin;
-    av_free(rtmidictx);
 }
 
 static JSValue js_RtMidiIn_getVersion(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
 {
-    RtMidiInContext *rtmidictx = (RtMidiInContext *) JS_GetOpaque(this_val, js_RtMidiIn_class_id);
-    RtMidiIn *midiin = rtmidictx->midiin;
+    RtMidiIn *midiin = (RtMidiIn *) JS_GetOpaque(this_val, js_RtMidiIn_class_id);
     if ( midiin == nullptr )
         return JS_EXCEPTION;
     std::string version = midiin->getVersion();
@@ -159,8 +125,7 @@ static JSValue js_RtMidiIn_getVersion(JSContext *ctx, JSValueConst this_val, int
 
 static JSValue js_RtMidiIn_getCompiledApi(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
 {
-    RtMidiInContext *rtmidictx = (RtMidiInContext *) JS_GetOpaque(this_val, js_RtMidiIn_class_id);
-    RtMidiIn *midiin = rtmidictx->midiin;
+    RtMidiIn *midiin = (RtMidiIn *) JS_GetOpaque(this_val, js_RtMidiIn_class_id);
     if ( midiin == nullptr )
         return JS_EXCEPTION;
     std::vector<RtMidi::Api> apis;
@@ -173,8 +138,7 @@ static JSValue js_RtMidiIn_getCompiledApi(JSContext *ctx, JSValueConst this_val,
 
 static JSValue js_RtMidiIn_getApiName(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
 {
-    RtMidiInContext *rtmidictx = (RtMidiInContext *) JS_GetOpaque(this_val, js_RtMidiIn_class_id);
-    RtMidiIn *midiin = rtmidictx->midiin;
+    RtMidiIn *midiin = (RtMidiIn *) JS_GetOpaque(this_val, js_RtMidiIn_class_id);
     if ( midiin == nullptr )
         return JS_EXCEPTION;
     if ( argc != 1 || !JS_IsInt32(argv[0]) )
@@ -186,8 +150,7 @@ static JSValue js_RtMidiIn_getApiName(JSContext *ctx, JSValueConst this_val, int
 
 static JSValue js_RtMidiIn_getApiDisplayName(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
 {
-    RtMidiInContext *rtmidictx = (RtMidiInContext *) JS_GetOpaque(this_val, js_RtMidiIn_class_id);
-    RtMidiIn *midiin = rtmidictx->midiin;
+    RtMidiIn *midiin = (RtMidiIn *) JS_GetOpaque(this_val, js_RtMidiIn_class_id);
     if ( midiin == nullptr )
         return JS_EXCEPTION;
     if ( argc != 1 || !JS_IsInt32(argv[0]) )
@@ -199,8 +162,7 @@ static JSValue js_RtMidiIn_getApiDisplayName(JSContext *ctx, JSValueConst this_v
 
 static JSValue js_RtMidiIn_getCompiledApiByName(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
 {
-    RtMidiInContext *rtmidictx = (RtMidiInContext *) JS_GetOpaque(this_val, js_RtMidiIn_class_id);
-    RtMidiIn *midiin = rtmidictx->midiin;
+    RtMidiIn *midiin = (RtMidiIn *) JS_GetOpaque(this_val, js_RtMidiIn_class_id);
     if ( midiin == nullptr )
         return JS_EXCEPTION;
     if ( argc != 1 || !JS_IsString(argv[0]) )
@@ -214,8 +176,7 @@ static JSValue js_RtMidiIn_getCompiledApiByName(JSContext *ctx, JSValueConst thi
 
 static JSValue js_RtMidiIn_setClientName(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
 {
-    RtMidiInContext *rtmidictx = (RtMidiInContext *) JS_GetOpaque(this_val, js_RtMidiIn_class_id);
-    RtMidiIn *midiin = rtmidictx->midiin;
+    RtMidiIn *midiin = (RtMidiIn *) JS_GetOpaque(this_val, js_RtMidiIn_class_id);
     if ( midiin == nullptr )
         return JS_EXCEPTION;
     if ( argc != 1 || !JS_IsString(argv[0]) )
@@ -229,8 +190,7 @@ static JSValue js_RtMidiIn_setClientName(JSContext *ctx, JSValueConst this_val, 
 
 static JSValue js_RtMidiIn_setPortName(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
 {
-    RtMidiInContext *rtmidictx = (RtMidiInContext *) JS_GetOpaque(this_val, js_RtMidiIn_class_id);
-    RtMidiIn *midiin = rtmidictx->midiin;
+    RtMidiIn *midiin = (RtMidiIn *) JS_GetOpaque(this_val, js_RtMidiIn_class_id);
     if ( midiin == nullptr )
         return JS_EXCEPTION;
     if ( argc != 1 || !JS_IsString(argv[0]) )
@@ -244,8 +204,7 @@ static JSValue js_RtMidiIn_setPortName(JSContext *ctx, JSValueConst this_val, in
 
 static JSValue js_RtMidiIn_getCurrentApi(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
 {
-    RtMidiInContext *rtmidictx = (RtMidiInContext *) JS_GetOpaque(this_val, js_RtMidiIn_class_id);
-    RtMidiIn *midiin = rtmidictx->midiin;
+    RtMidiIn *midiin = (RtMidiIn *) JS_GetOpaque(this_val, js_RtMidiIn_class_id);
     if ( midiin == nullptr )
         return JS_EXCEPTION;
     RtMidi::Api api = midiin->getCurrentApi();
@@ -254,8 +213,7 @@ static JSValue js_RtMidiIn_getCurrentApi(JSContext *ctx, JSValueConst this_val, 
 
 static JSValue js_RtMidiIn_openPort(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
 {
-    RtMidiInContext *rtmidictx = (RtMidiInContext *) JS_GetOpaque(this_val, js_RtMidiIn_class_id);
-    RtMidiIn *midiin = rtmidictx->midiin;
+    RtMidiIn *midiin = (RtMidiIn *) JS_GetOpaque(this_val, js_RtMidiIn_class_id);
     if ( midiin == nullptr )
         return JS_EXCEPTION;
     unsigned int portNumber = 0;
@@ -279,15 +237,13 @@ static JSValue js_RtMidiIn_openPort(JSContext *ctx, JSValueConst this_val, int a
         midiin->openPort(portNumber, portName);
         return JS_TRUE;
     } catch (const RtMidiError &err) {
-        av_log(rtmidictx, AV_LOG_ERROR, "%s", err.what());
-        return JS_NULL;
+        return ThrowRtMidiError(ctx, err);
     }
 }
 
 static JSValue js_RtMidiIn_openVirtualPort(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
 {
-    RtMidiInContext *rtmidictx = (RtMidiInContext *) JS_GetOpaque(this_val, js_RtMidiIn_class_id);
-    RtMidiIn *midiin = rtmidictx->midiin;
+    RtMidiIn *midiin = (RtMidiIn *) JS_GetOpaque(this_val, js_RtMidiIn_class_id);
     if ( midiin == nullptr )
         return JS_EXCEPTION;
     std::string portName = "RtMidi Input";
@@ -303,61 +259,53 @@ static JSValue js_RtMidiIn_openVirtualPort(JSContext *ctx, JSValueConst this_val
     try {
         midiin->openVirtualPort(portName);
     } catch (const RtMidiError &err) {
-        av_log(rtmidictx, AV_LOG_ERROR, "%s", err.what());
-        return JS_NULL;
+        return ThrowRtMidiError(ctx, err);
     }
     return JS_TRUE;
 }
 
 static JSValue js_RtMidiIn_closePort(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
 {
-    RtMidiInContext *rtmidictx = (RtMidiInContext *) JS_GetOpaque(this_val, js_RtMidiIn_class_id);
-    RtMidiIn *midiin = rtmidictx->midiin;
+    RtMidiIn *midiin = (RtMidiIn *) JS_GetOpaque(this_val, js_RtMidiIn_class_id);
     if ( midiin == nullptr )
         return JS_EXCEPTION;
     try {
         midiin->closePort();
     } catch (const RtMidiError &err) {
-        av_log(rtmidictx, AV_LOG_ERROR, "%s", err.what());
-        return JS_NULL;
+        return ThrowRtMidiError(ctx, err);
     }
     return JS_TRUE;
 }
 
 static JSValue js_RtMidiIn_isPortOpen(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
 {
-    RtMidiInContext *rtmidictx = (RtMidiInContext *) JS_GetOpaque(this_val, js_RtMidiIn_class_id);
-    RtMidiIn *midiin = rtmidictx->midiin;
+    RtMidiIn *midiin = (RtMidiIn *) JS_GetOpaque(this_val, js_RtMidiIn_class_id);
     if ( midiin == nullptr )
         return JS_EXCEPTION;
     try {
         bool ret = midiin->isPortOpen();
         return JS_NewBool(ctx, ret);
     } catch (const RtMidiError &err) {
-        av_log(rtmidictx, AV_LOG_ERROR, "%s", err.what());
-        return JS_NULL;
+        return ThrowRtMidiError(ctx, err);
     }
 }
 
 static JSValue js_RtMidiIn_getPortCount(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
 {
-    RtMidiInContext *rtmidictx = (RtMidiInContext *) JS_GetOpaque(this_val, js_RtMidiIn_class_id);
-    RtMidiIn *midiin = rtmidictx->midiin;
+    RtMidiIn *midiin = (RtMidiIn *) JS_GetOpaque(this_val, js_RtMidiIn_class_id);
     if ( midiin == nullptr )
         return JS_EXCEPTION;
     try {
         int ret = midiin->getPortCount();
         return JS_NewInt32(ctx, ret);
     } catch (const RtMidiError &err) {
-        av_log(rtmidictx, AV_LOG_ERROR, "%s", err.what());
-        return JS_NULL;
+        return ThrowRtMidiError(ctx, err);
     }
 }
 
 static JSValue js_RtMidiIn_getPortName(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
 {
-    RtMidiInContext *rtmidictx = (RtMidiInContext *) JS_GetOpaque(this_val, js_RtMidiIn_class_id);
-    RtMidiIn *midiin = rtmidictx->midiin;
+    RtMidiIn *midiin = (RtMidiIn *) JS_GetOpaque(this_val, js_RtMidiIn_class_id);
     if ( midiin == nullptr )
         return JS_EXCEPTION;
     unsigned int portNumber = 0;
@@ -372,15 +320,13 @@ static JSValue js_RtMidiIn_getPortName(JSContext *ctx, JSValueConst this_val, in
         std::string name = midiin->getPortName(portNumber);
         return JS_NewString(ctx, name.c_str());
     } catch (const RtMidiError &err) {
-        av_log(rtmidictx, AV_LOG_ERROR, "%s", err.what());
-        return JS_NULL;
+        return ThrowRtMidiError(ctx, err);
     }
 }
 
 static JSValue js_RtMidiIn_ignoreTypes(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
 {
-    RtMidiInContext *rtmidictx = (RtMidiInContext *) JS_GetOpaque(this_val, js_RtMidiIn_class_id);
-    RtMidiIn *midiin = rtmidictx->midiin;
+    RtMidiIn *midiin = (RtMidiIn *) JS_GetOpaque(this_val, js_RtMidiIn_class_id);
     if ( midiin == nullptr )
         return JS_EXCEPTION;
     bool midiSysex = true;
@@ -409,15 +355,13 @@ static JSValue js_RtMidiIn_ignoreTypes(JSContext *ctx, JSValueConst this_val, in
         midiin->ignoreTypes(midiSysex, midiTime, midiSense);
         return JS_TRUE;
     } catch (const RtMidiError &err) {
-        av_log(rtmidictx, AV_LOG_ERROR, "%s", err.what());
-        return JS_NULL;
+        return ThrowRtMidiError(ctx, err);
     }
 }
 
 static JSValue js_RtMidiIn_getMessage(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
 {
-    RtMidiInContext *rtmidictx = (RtMidiInContext *) JS_GetOpaque(this_val, js_RtMidiIn_class_id);
-    RtMidiIn *midiin = rtmidictx->midiin;
+    RtMidiIn *midiin = (RtMidiIn *) JS_GetOpaque(this_val, js_RtMidiIn_class_id);
     if ( midiin == nullptr )
         return JS_EXCEPTION;
     try {
@@ -439,8 +383,7 @@ static JSValue js_RtMidiIn_getMessage(JSContext *ctx, JSValueConst this_val, int
         JS_SetPropertyStr(ctx, ret, "delta", JS_NewFloat64(ctx, delta));
         return ret;
     } catch (const RtMidiError &err) {
-        av_log(rtmidictx, AV_LOG_ERROR, "%s", err.what());
-        return JS_NULL;
+        return ThrowRtMidiError(ctx, err);
     }
 }
 
@@ -468,39 +411,14 @@ static const JSCFunctionListEntry js_RtMidiIn_proto_funcs[] = {
     JS_CFUNC_DEF("getMessage", 0, js_RtMidiIn_getMessage),
 };
 
-static void init_RtMidiIn(JSContext *ctx, JSValueConst global_object)
-{
-    JSRuntime *rt = JS_GetRuntime(ctx);
-    JSValue RtMidiIn_proto = JS_NewObject(ctx);
-    JSValue jRtMidiIn_ctor = JS_NewCFunction2(ctx, RtMidiIn_ctor, "RtMidiIn", 3, JS_CFUNC_constructor, 0);
-    JS_NewClassID(&js_RtMidiIn_class_id);
-    JS_NewClass(rt, js_RtMidiIn_class_id, &js_RtMidiIn_class);
-    JS_SetPropertyFunctionList(ctx, RtMidiIn_proto, js_RtMidiIn_proto_funcs, FF_ARRAY_ELEMS(js_RtMidiIn_proto_funcs));
-    JS_SetConstructor(ctx, jRtMidiIn_ctor, RtMidiIn_proto);
-    JS_SetClassProto(ctx, js_RtMidiIn_class_id, RtMidiIn_proto);
-    JS_SetPropertyStr(ctx, global_object, "RtMidiIn", jRtMidiIn_ctor);
-}
-
 /*********************************************************************/
 /* RtMidiOut */
 static JSClassID js_RtMidiOut_class_id;
 
-static JSValue RtMidiOut_ctor(JSContext *ctx, JSValueConst new_target, int argc, JSValueConst *argv)
+static JSValue js_RtMidiOut_ctor(JSContext *ctx, JSValueConst new_target, int argc, JSValueConst *argv)
 {
     RtMidi::Api api = RtMidi::UNSPECIFIED;
     std::string clientName = "RtMidi Output Client";
-    static int warned = 0;
-
-    if ( !warned )
-    {
-        RtMidiOutContext logctx;
-        logctx.klass = &rtmidi_class;
-        av_log(&logctx, AV_LOG_WARNING, "'new RtMidiOut()' is deprecated and will be removed in FFglitch 0.11.\n");
-        av_log(&logctx, AV_LOG_WARNING, "Instead of 'new RtMidiOut()', import the 'rtmidi' module and use 'new rtmidi.Out()':\n");
-        av_log(&logctx, AV_LOG_WARNING, " import * as rtmidi from \"rtmidi\";\n");
-        av_log(&logctx, AV_LOG_WARNING, " const midiout = new rtmidi.Out();\n");
-        warned = 1;
-    }
 
     /* check arguments */
     if ( argc > 0 )
@@ -535,26 +453,21 @@ args_error:
         return JS_EXCEPTION;
     }
 
-    RtMidiOutContext *rtmidictx = (RtMidiOutContext *) av_mallocz(sizeof(RtMidiOutContext));
-    rtmidictx->klass = &rtmidi_class;
-    rtmidictx->midiout = new RtMidiOut(api, clientName);
-    JS_SetOpaque(obj, rtmidictx);
+    RtMidiOut *midiout = new RtMidiOut(api, clientName);
+    JS_SetOpaque(obj, midiout);
 
     return obj;
 }
 
 static void js_RtMidiOut_finalizer(JSRuntime *rt, JSValue val)
 {
-    RtMidiOutContext *rtmidictx = (RtMidiOutContext *) JS_GetOpaque(val, js_RtMidiOut_class_id);
-    RtMidiOut *midiout = rtmidictx->midiout;
+    RtMidiOut *midiout = (RtMidiOut *) JS_GetOpaque(val, js_RtMidiOut_class_id);
     delete midiout;
-    av_free(rtmidictx);
 }
 
 static JSValue js_RtMidiOut_getCurrentApi(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
 {
-    RtMidiOutContext *rtmidictx = (RtMidiOutContext *) JS_GetOpaque(this_val, js_RtMidiOut_class_id);
-    RtMidiOut *midiout = rtmidictx->midiout;
+    RtMidiOut *midiout = (RtMidiOut *) JS_GetOpaque(this_val, js_RtMidiOut_class_id);
     if ( midiout == nullptr )
         return JS_EXCEPTION;
     RtMidi::Api api = midiout->getCurrentApi();
@@ -563,8 +476,7 @@ static JSValue js_RtMidiOut_getCurrentApi(JSContext *ctx, JSValueConst this_val,
 
 static JSValue js_RtMidiOut_openPort(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
 {
-    RtMidiOutContext *rtmidictx = (RtMidiOutContext *) JS_GetOpaque(this_val, js_RtMidiOut_class_id);
-    RtMidiOut *midiout = rtmidictx->midiout;
+    RtMidiOut *midiout = (RtMidiOut *) JS_GetOpaque(this_val, js_RtMidiOut_class_id);
     if ( midiout == nullptr )
         return JS_EXCEPTION;
     unsigned int portNumber = 0;
@@ -588,15 +500,13 @@ static JSValue js_RtMidiOut_openPort(JSContext *ctx, JSValueConst this_val, int 
         midiout->openPort(portNumber, portName);
         return JS_TRUE;
     } catch (const RtMidiError &err) {
-        av_log(rtmidictx, AV_LOG_ERROR, "%s", err.what());
-        return JS_NULL;
+        return ThrowRtMidiError(ctx, err);
     }
 }
 
 static JSValue js_RtMidiOut_openVirtualPort(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
 {
-    RtMidiOutContext *rtmidictx = (RtMidiOutContext *) JS_GetOpaque(this_val, js_RtMidiOut_class_id);
-    RtMidiOut *midiout = rtmidictx->midiout;
+    RtMidiOut *midiout = (RtMidiOut *) JS_GetOpaque(this_val, js_RtMidiOut_class_id);
     if ( midiout == nullptr )
         return JS_EXCEPTION;
     std::string portName = "RtMidi Input";
@@ -612,61 +522,53 @@ static JSValue js_RtMidiOut_openVirtualPort(JSContext *ctx, JSValueConst this_va
     try {
         midiout->openVirtualPort(portName);
     } catch (const RtMidiError &err) {
-        av_log(rtmidictx, AV_LOG_ERROR, "%s", err.what());
-        return JS_NULL;
+        return ThrowRtMidiError(ctx, err);
     }
     return JS_TRUE;
 }
 
 static JSValue js_RtMidiOut_closePort(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
 {
-    RtMidiOutContext *rtmidictx = (RtMidiOutContext *) JS_GetOpaque(this_val, js_RtMidiOut_class_id);
-    RtMidiOut *midiout = rtmidictx->midiout;
+    RtMidiOut *midiout = (RtMidiOut *) JS_GetOpaque(this_val, js_RtMidiOut_class_id);
     if ( midiout == nullptr )
         return JS_EXCEPTION;
     try {
         midiout->closePort();
     } catch (const RtMidiError &err) {
-        av_log(rtmidictx, AV_LOG_ERROR, "%s", err.what());
-        return JS_NULL;
+        return ThrowRtMidiError(ctx, err);
     }
     return JS_TRUE;
 }
 
 static JSValue js_RtMidiOut_isPortOpen(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
 {
-    RtMidiOutContext *rtmidictx = (RtMidiOutContext *) JS_GetOpaque(this_val, js_RtMidiOut_class_id);
-    RtMidiOut *midiout = rtmidictx->midiout;
+    RtMidiOut *midiout = (RtMidiOut *) JS_GetOpaque(this_val, js_RtMidiOut_class_id);
     if ( midiout == nullptr )
         return JS_EXCEPTION;
     try {
         bool ret = midiout->isPortOpen();
         return JS_NewBool(ctx, ret);
     } catch (const RtMidiError &err) {
-        av_log(rtmidictx, AV_LOG_ERROR, "%s", err.what());
-        return JS_NULL;
+        return ThrowRtMidiError(ctx, err);
     }
 }
 
 static JSValue js_RtMidiOut_getPortCount(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
 {
-    RtMidiOutContext *rtmidictx = (RtMidiOutContext *) JS_GetOpaque(this_val, js_RtMidiOut_class_id);
-    RtMidiOut *midiout = rtmidictx->midiout;
+    RtMidiOut *midiout = (RtMidiOut *) JS_GetOpaque(this_val, js_RtMidiOut_class_id);
     if ( midiout == nullptr )
         return JS_EXCEPTION;
     try {
         int ret = midiout->getPortCount();
         return JS_NewInt32(ctx, ret);
     } catch (const RtMidiError &err) {
-        av_log(rtmidictx, AV_LOG_ERROR, "%s", err.what());
-        return JS_NULL;
+        return ThrowRtMidiError(ctx, err);
     }
 }
 
 static JSValue js_RtMidiOut_getPortName(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
 {
-    RtMidiOutContext *rtmidictx = (RtMidiOutContext *) JS_GetOpaque(this_val, js_RtMidiOut_class_id);
-    RtMidiOut *midiout = rtmidictx->midiout;
+    RtMidiOut *midiout = (RtMidiOut *) JS_GetOpaque(this_val, js_RtMidiOut_class_id);
     if ( midiout == nullptr )
         return JS_EXCEPTION;
     unsigned int portNumber = 0;
@@ -681,8 +583,7 @@ static JSValue js_RtMidiOut_getPortName(JSContext *ctx, JSValueConst this_val, i
         std::string name = midiout->getPortName(portNumber);
         return JS_NewString(ctx, name.c_str());
     } catch (const RtMidiError &err) {
-        av_log(rtmidictx, AV_LOG_ERROR, "%s", err.what());
-        return JS_NULL;
+        return ThrowRtMidiError(ctx, err);
     }
 }
 
@@ -690,8 +591,7 @@ static JSValue js_RtMidiOut_sendMessage(JSContext *ctx, JSValueConst this_val, i
 {
 //    void sendMessage( const std::vector<unsigned char> *message );
 
-    RtMidiOutContext *rtmidictx = (RtMidiOutContext *) JS_GetOpaque(this_val, js_RtMidiOut_class_id);
-    RtMidiOut *midiout = rtmidictx->midiout;
+    RtMidiOut *midiout = (RtMidiOut *) JS_GetOpaque(this_val, js_RtMidiOut_class_id);
     if ( midiout == nullptr )
         return JS_EXCEPTION;
     uint32_t length;
@@ -704,8 +604,7 @@ static JSValue js_RtMidiOut_sendMessage(JSContext *ctx, JSValueConst this_val, i
             message.push_back(JS_VALUE_GET_INT(parray[i]));
         midiout->sendMessage(&message);
     } catch (const RtMidiError &err) {
-        av_log(rtmidictx, AV_LOG_ERROR, "%s", err.what());
-        return JS_NULL;
+        return ThrowRtMidiError(ctx, err);
     }
     return JS_TRUE;
 }
@@ -726,24 +625,51 @@ static const JSCFunctionListEntry js_RtMidiOut_proto_funcs[] = {
     JS_CFUNC_DEF("sendMessage", 1, js_RtMidiOut_sendMessage),
 };
 
-static void init_RtMidiOut(JSContext *ctx, JSValueConst global_object)
+/*********************************************************************/
+static int js_RtMidiIn_init(JSContext *ctx, JSModuleDef *m)
+{
+    JSRuntime *rt = JS_GetRuntime(ctx);
+    JSValue RtMidiIn_proto = JS_NewObject(ctx);
+    JSValue jRtMidiIn_ctor = JS_NewCFunction2(ctx, js_RtMidiIn_ctor, "In", 0, JS_CFUNC_constructor, 0);
+    JS_NewClassID(&js_RtMidiIn_class_id);
+    JS_NewClass(rt, js_RtMidiIn_class_id, &js_RtMidiIn_class);
+    JS_SetPropertyFunctionList(ctx, RtMidiIn_proto, js_RtMidiIn_proto_funcs, countof(js_RtMidiIn_proto_funcs));
+    JS_SetConstructor(ctx, jRtMidiIn_ctor, RtMidiIn_proto);
+    JS_SetClassProto(ctx, js_RtMidiIn_class_id, RtMidiIn_proto);
+    JS_SetModuleExport(ctx, m, "In", jRtMidiIn_ctor);
+    return 0;
+}
+
+static int js_RtMidiOut_init(JSContext *ctx, JSModuleDef *m)
 {
     JSRuntime *rt = JS_GetRuntime(ctx);
     JSValue RtMidiOut_proto = JS_NewObject(ctx);
-    JSValue jRtMidiOut_ctor = JS_NewCFunction2(ctx, RtMidiOut_ctor, "RtMidiOut", 3, JS_CFUNC_constructor, 0);
+    JSValue jRtMidiOut_ctor = JS_NewCFunction2(ctx, js_RtMidiOut_ctor, "Out", 3, JS_CFUNC_constructor, 0);
     JS_NewClassID(&js_RtMidiOut_class_id);
     JS_NewClass(rt, js_RtMidiOut_class_id, &js_RtMidiOut_class);
-    JS_SetPropertyFunctionList(ctx, RtMidiOut_proto, js_RtMidiOut_proto_funcs, FF_ARRAY_ELEMS(js_RtMidiOut_proto_funcs));
+    JS_SetPropertyFunctionList(ctx, RtMidiOut_proto, js_RtMidiOut_proto_funcs, countof(js_RtMidiOut_proto_funcs));
     JS_SetConstructor(ctx, jRtMidiOut_ctor, RtMidiOut_proto);
     JS_SetClassProto(ctx, js_RtMidiOut_class_id, RtMidiOut_proto);
-    JS_SetPropertyStr(ctx, global_object, "RtMidiOut", jRtMidiOut_ctor);
+    JS_SetModuleExport(ctx, m, "Out", jRtMidiOut_ctor);
+    return 0;
 }
 
-/*********************************************************************/
-extern "C"
-void ff_quickjs_rtmidi_init(JSContext *ctx, JSValueConst global_object)
+static int js_rtmidi_init(JSContext *ctx, JSModuleDef *m)
 {
-    init_RtMidi(ctx, global_object);
-    init_RtMidiIn(ctx, global_object);
-    init_RtMidiOut(ctx, global_object);
+    JS_SetModuleExportList(ctx, m, js_RtMidi_funcs, countof(js_RtMidi_funcs));
+    js_RtMidiIn_init(ctx, m);
+    js_RtMidiOut_init(ctx, m);
+    return 0;
+}
+
+extern "C"
+JSModuleDef *js_init_module_rtmidi(JSContext *ctx, const char *module_name)
+{
+    JSModuleDef *m = JS_NewCModule(ctx, module_name, js_rtmidi_init);
+    if ( m == NULL )
+        return NULL;
+    JS_AddModuleExportList(ctx, m, js_RtMidi_funcs, countof(js_RtMidi_funcs));
+    JS_AddModuleExport(ctx, m, "In");
+    JS_AddModuleExport(ctx, m, "Out");
+    return m;
 }

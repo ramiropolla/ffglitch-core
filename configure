@@ -3993,7 +3993,7 @@ qsv_transcode_example_deps="avcodec avformat avutil h264_qsv_encoder"
 # EXTRALIBS_LIST
 cpu_init_extralibs="pthreads_extralibs"
 cws2fws_extralibs="zlib_extralibs"
-qjs_extralibs="libzmq_extralibs"
+qjs_extralibs="libzmq_extralibs rtmidi_extralibs"
 
 # libraries, in any order
 avcodec_deps="avutil"

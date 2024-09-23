@@ -196,6 +196,7 @@ libavutil/quickjs/list.h
 libavutil/quickjs/quickjs-atom.h
 libavutil/quickjs/quickjs-libc.h
 libavutil/quickjs/quickjs-opcode.h
+libavutil/quickjs/quickjs-rtmidi.h
 libavutil/quickjs/quickjs-zmq.h
 libavutil/quickjs/quickjs.h
 libavutil/quickjs/unicode_gen_def.h

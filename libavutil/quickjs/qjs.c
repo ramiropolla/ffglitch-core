@@ -43,6 +43,9 @@
 #ifdef CONFIG_LIBZMQ
 #include "quickjs-zmq.h"
 #endif
+#ifdef CONFIG_RTMIDI
+#include "quickjs-rtmidi.h"
+#endif
 
 extern const uint8_t qjsc_repl[];
 extern const uint32_t qjsc_repl_size;
@@ -125,6 +128,9 @@ static JSContext *JS_NewCustomContext(JSRuntime *rt)
     js_init_module_os(ctx, "os");
 #ifdef CONFIG_LIBZMQ
     js_init_module_zmq(ctx, "zmq");
+#endif
+#ifdef CONFIG_RTMIDI
+    js_init_module_rtmidi(ctx, "rtmidi");
 #endif
     return ctx;
 }

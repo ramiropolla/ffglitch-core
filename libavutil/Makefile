@@ -360,19 +360,23 @@ QUICKJS_OBJS += quickjs/libunicode.o
 QUICKJS_OBJS += quickjs/quickjs-libc.o
 QUICKJS_OBJS += quickjs/quickjs.o
 QUICKJS_OBJS-$(CONFIG_LIBZMQ) += quickjs/quickjs-zmq.o
+QUICKJS_OBJS-$(CONFIG_RTMIDI) += quickjs/quickjs-rtmidi.o
 QUICKJS_OBJS += $(QUICKJS_OBJS-yes)
 
 $(addprefix $(SUBDIR), quickjs/quickjs-zmq.o): CFLAGS += -I$(SRC_PATH)/libavutil/zeromq/include
+$(addprefix $(SUBDIR), quickjs/quickjs-rtmidi.o): CFLAGS += -I$(SRC_PATH)/libavutil/rtmidi
 
 QUICKJS_QJS_OBJS += quickjs/qjs.o
 QUICKJS_QJS_OBJS += quickjs/qjscalc.o
 QUICKJS_QJS_OBJS += quickjs/repl.o
 QUICKJS_QJS_OBJS-$(CONFIG_LIBZMQ) += $(ZEROMQ_OBJS)
+QUICKJS_QJS_OBJS-$(CONFIG_RTMIDI) += $(RTMIDI_OBJS)
 QUICKJS_QJS_OBJS += $(QUICKJS_QJS_OBJS-yes)
 
 QUICKJS_CONFIG_VERSION := $(shell cat $(SRC_PATH)/libavutil/quickjs/VERSION)
 
 QUICKJS_EXTRA_CFLAGS-$(CONFIG_LIBZMQ) += -DCONFIG_LIBZMQ
+QUICKJS_EXTRA_CFLAGS-$(CONFIG_RTMIDI) += -DCONFIG_RTMIDI
 QUICKJS_EXTRA_CFLAGS += $(QUICKJS_EXTRA_CFLAGS-yes)
 $(addprefix $(SUBDIR), $(QUICKJS_OBJS) $(QUICKJS_QJS_OBJS)): CFLAGS += -D_GNU_SOURCE -DCONFIG_VERSION=\"$(QUICKJS_CONFIG_VERSION)\" -DCONFIG_BIGNUM $(QUICKJS_EXTRA_CFLAGS)
 
