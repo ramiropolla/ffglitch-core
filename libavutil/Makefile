@@ -344,6 +344,14 @@ $(addprefix $(SUBDIR), $(ZEROMQ_OBJS)): CFLAGS += -I$(SUBDIR)zeromq/src
 
 OBJS-$(CONFIG_LIBZMQ) += $(ZEROMQ_OBJS)
 
+# rtmidi
+RTMIDI_OBJS += rtmidi/RtMidi.o
+
+$(SUBDIR)rtmidi/RtMidi.o: CXXFLAGS += -DRTMIDI_EXPORT $(RTMIDI_API)
+
+OBJS-$(CONFIG_RTMIDI) += $(RTMIDI_OBJS)
+OBJS-$(CONFIG_RTMIDI) += quickjs-rtmidi.o
+
 # quickjs
 QUICKJS_OBJS += quickjs/cutils.o
 QUICKJS_OBJS += quickjs/libbf.o
@@ -377,14 +385,6 @@ qjs$(EXESUF): $(addprefix $(SUBDIR), $(QUICKJS_OBJS) $(QUICKJS_QJS_OBJS))
 	$(CXX) -o $@ $^ $(QUICKJS_LIBS) $(EXTRALIBS-qjs)
 
 OBJS += $(QUICKJS_OBJS)
-
-# rtmidi
-RTMIDI_OBJS += rtmidi/RtMidi.o
-
-$(SUBDIR)rtmidi/RtMidi.o: CXXFLAGS += -DRTMIDI_EXPORT $(RTMIDI_API)
-
-OBJS-$(CONFIG_RTMIDI) += $(RTMIDI_OBJS)
-OBJS-$(CONFIG_RTMIDI) += quickjs-rtmidi.o
 
 # sdl2
 OBJS-$(CONFIG_SDL2) += quickjs-sdl.o
