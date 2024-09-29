@@ -386,6 +386,7 @@ $(SUBDIR)rtmidi/RtMidi.o: CXXFLAGS += -DRTMIDI_EXPORT $(RTMIDI_API)
 OBJS-$(CONFIG_RTMIDI) += $(RTMIDI_OBJS)
 OBJS-$(CONFIG_RTMIDI) += quickjs-rtmidi.o
 
+# sdl2
 OBJS-$(CONFIG_SDL2) += quickjs-sdl.o
 
 # Windows resource file
