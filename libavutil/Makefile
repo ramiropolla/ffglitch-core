@@ -385,7 +385,7 @@ ifneq ($(EXESUF),.exe)
 QUICKJS_LIBS+=-ldl
 endif
 
-qjs$(EXESUF): $(addprefix $(SUBDIR), $(QUICKJS_OBJS) $(QUICKJS_QJS_OBJS))
+qjs$(PROGSSUF)$(EXESUF)_g: $(addprefix $(SUBDIR), $(QUICKJS_OBJS) $(QUICKJS_QJS_OBJS))
 	$(CXX) -o $@ $^ $(QUICKJS_LIBS) $(EXTRALIBS-qjs)
 
 OBJS += $(QUICKJS_OBJS)
