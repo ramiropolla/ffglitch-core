@@ -8266,6 +8266,7 @@ EOF
     enabled posix_memalign                                                                      && append_tmph HAVE_POSIX_MEMALIGN
     test_func accept4                                                                           && append_tmph HAVE_ACCEPT4
     test_func mkdtemp                                                                           && append_tmph HAVE_MKDTEMP
+    test_func strlcpy                                                                           && append_tmph ZMQ_HAVE_STRLCPY
     check_cflags_cc -D_GNU_SOURCE sys/socket.h "defined LOCAL_PEERCRED"                         && append_tmph ZMQ_HAVE_LOCAL_PEERCRED
     check_cflags_cc -D_GNU_SOURCE sys/socket.h "defined SO_PEERCRED"                            && append_tmph ZMQ_HAVE_SO_PEERCRED
     true                                                                                        && append_tmph ZMQ_HAVE_ATOMIC_INTRINSICS
