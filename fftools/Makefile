@@ -73,4 +73,4 @@ uninstall-progs:
 	$(RM) $(addprefix "$(BINDIR)/", $(ALLAVPROGS))
 
 clean::
-	$(RM) $(ALLAVPROGS) ffgac$(PROGSSUF)$(EXESUF) fflive$(PROGSSUF)$(EXESUF) $(ALLAVPROGS_G) ffgac$(PROGSSUF)_g$(EXESUF) fflive$(PROGSSUF)_g$(EXESUF) $(CLEANSUFFIXES:%=fftools/%)
+	$(RM) $(ALLAVPROGS) ffgac$(PROGSSUF)$(EXESUF) fflive$(PROGSSUF)$(EXESUF) qjs$(PROGSSUF)$(EXESUF) $(ALLAVPROGS_G) ffgac$(PROGSSUF)_g$(EXESUF) fflive$(PROGSSUF)_g$(EXESUF) qjs$(PROGSSUF)_g$(EXESUF) $(CLEANSUFFIXES:%=fftools/%)
