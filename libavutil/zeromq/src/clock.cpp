@@ -32,7 +32,8 @@
 #include "timers.h"
 #endif
 
-#if defined ZMQ_HAVE_OSX
+#if defined ZMQ_HAVE_OSX                                                       \
+  && __MAC_OS_X_VERSION_MIN_REQUIRED < 101200 // less than macOS 10.12
 int alt_clock_gettime (int clock_id, timespec *ts)
 {
     clock_serv_t cclock;
