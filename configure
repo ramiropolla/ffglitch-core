@@ -5784,7 +5784,7 @@ case $target_os in
             test ${clang_version%%.*} -eq 11 && add_cflags -fno-stack-check
         fi
         RTMIDI_API=-D__MACOSX_CORE__
-        rtmidi_extralibs="-framework CoreAudio -framework CoreMIDI"
+        rtmidi_extralibs="-framework CoreAudio -framework CoreMIDI -framework CoreFoundation"
         ;;
     msys*)
         die "Native MSYS builds are discouraged, please use the MINGW environment."
