@@ -388,6 +388,15 @@ endif
 qjs$(PROGSSUF)$(EXESUF)_g: $(addprefix $(SUBDIR), $(QUICKJS_OBJS) $(QUICKJS_QJS_OBJS))
 	$(CXX) -o $@ $^ $(QUICKJS_LIBS) $(EXTRALIBS-qjs)
 
+qjs$(PROGSSUF)$(EXESUF): qjs$(PROGSSUF)$(EXESUF)_g
+ifeq ($(STRIPTYPE),direct)
+	$(STRIP) -o $@ $<
+else
+	$(RM) $@
+	$(CP) $< $@
+	$(STRIP) $@
+endif
+
 OBJS += $(QUICKJS_OBJS)
 
 # sdl2
