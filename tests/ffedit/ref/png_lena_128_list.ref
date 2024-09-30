@@ -1,3 +1,4 @@
 
 FFEdit support for codec 'PNG (Portable Network Graphics) image':
 	[headers     ]: headers
+	[idat        ]: image data
