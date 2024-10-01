@@ -460,53 +460,80 @@ ffe_mjpeg_export_dqt_cleanup(MJpegDecodeContext *s, AVFrame *f)
 typedef struct {
     PutBitContext *saved;
     json_t *jtables;
-    int table_count;
+    json_t *jsegment;
+    int cur_segment;
+    int cur_table;
 } ffe_dht_ctx_t;
 
 /* init */
 
 //---------------------------------------------------------------------
 static void
-ffe_mjpeg_dht_init(MJpegDecodeContext *s, ffe_dht_ctx_t *dctx)
+ffe_mjpeg_export_dht_init(MJpegDecodeContext *s, AVFrame *f)
 {
-    dctx->saved = NULL;
-    dctx->jtables = NULL;
-    dctx->table_count = 0;
+    // {
+    //  "tables": [
+    //   [
+    //    {
+    //     "class": int,
+    //     "index": int,
+    //     "bits" : [
+    //      [ ][16], # values for 1 to 16 bits
+    //     ]
+    //    },
+    //    [...]
+    //   ],
+    //   [...]
+    //  ]
+    // }
+    json_t *jtables = json_dynamic_array_new(s->jctx);
+    json_kvp_t kvps[] = {
+        { "tables", jtables },
+        { NULL }
+    };
+    json_t *jframe = json_const_object_from(s->jctx, kvps);
+    ffe_dht_ctx_t *dctx = json_allocator_get0(s->jctx, sizeof(ffe_dht_ctx_t));
+    dctx->jtables = jtables;
+    json_object_userdata_set(jframe, dctx);
+    f->ffedit_sd[FFEDIT_FEAT_DHT] = jframe;
+}
 
-    if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_DHT)) != 0 )
-    {
-        // {
-        //  "tables": [
-        //   {
-        //    "class": int,
-        //    "index": int,
-        //    "bits" : [
-        //     [ ][16], # values for 1 to 16 bits
-        //    ]
-        //   },
-        //   [...]
-        //  ]
-        // }
-        AVFrame *f = s->picture_ptr;
-        json_t *jtables = json_dynamic_array_new(s->jctx);
-        json_kvp_t kvps[] = {
-            { "tables", jtables },
-            { NULL }
-        };
-        json_t *jframe = json_const_object_from(s->jctx, kvps);
-        dctx->jtables = jtables;
-        f->ffedit_sd[FFEDIT_FEAT_DHT] = jframe;
-    }
-    else if ( (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_DHT)) != 0 )
+//---------------------------------------------------------------------
+static void
+ffe_mjpeg_import_dht_init(MJpegDecodeContext *s, AVFrame *f)
+{
+    json_t *jframe = f->ffedit_sd[FFEDIT_FEAT_DHT];
+    ffe_dht_ctx_t *dctx = json_allocator_get0(s->jctx, sizeof(ffe_dht_ctx_t));
+    json_object_userdata_set(jframe, dctx);
+    dctx->jtables = json_object_get(jframe, "tables");
+}
+
+//---------------------------------------------------------------------
+static ffe_dht_ctx_t *
+ffe_mjpeg_dht_init(MJpegDecodeContext *s)
+{
+    ffe_dht_ctx_t *dctx = NULL;
+    if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_DHT)) != 0
+      || (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_DHT)) != 0
+      || (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_DHT)) != 0 )
     {
         AVFrame *f = s->picture_ptr;
         json_t *jframe = f->ffedit_sd[FFEDIT_FEAT_DHT];
-        dctx->jtables = json_object_get(jframe, "tables");
-        dctx->table_count = json_array_length(dctx->jtables);
+        dctx = json_object_userdata_get(jframe);
+        if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_DHT)) != 0 )
+        {
+            dctx->jsegment = json_dynamic_array_new(s->jctx);
+            json_dynamic_array_add(dctx->jtables, dctx->jsegment);
+        }
+        else if ( (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_DHT)) != 0 )
+        {
+            dctx->jsegment = json_array_get(dctx->jtables, dctx->cur_segment++);
+            dctx->cur_table = 0;
+        }
+        if ( (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_DHT)) != 0 )
+            dctx->saved = ffe_transplicate_bits_save(&s->ffe_xp);
     }
-
-    if ( (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_DHT)) != 0 )
-        dctx->saved = ffe_transplicate_bits_save(&s->ffe_xp);
+    return dctx;
 }
 
 /* export */
@@ -519,10 +546,11 @@ ffe_mjpeg_dht_len(MJpegDecodeContext *s, ffe_dht_ctx_t *dctx)
 
     if ( (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_DHT)) != 0 )
     {
+        size_t nb_tables = json_array_length(dctx->jsegment);
         len = 0;
-        for ( size_t i = 0; i < dctx->table_count; i++ )
+        for ( size_t i = 0; i < nb_tables; i++ )
         {
-            json_t *jtable = json_array_get(dctx->jtables, i);
+            json_t *jtable = json_array_get(dctx->jsegment, i);
             json_t *jbits;
 
             jbits = json_object_get(jtable, "bits");
@@ -533,7 +561,6 @@ ffe_mjpeg_dht_len(MJpegDecodeContext *s, ffe_dht_ctx_t *dctx)
             }
             len += 17;
         }
-        dctx->table_count = 0;
     }
     if ( (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_DHT)) != 0 )
         put_bits(dctx->saved, 16, len + 2);
@@ -553,7 +580,7 @@ ffe_mjpeg_dht_table(
 {
     if ( (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_DHT)) != 0 )
     {
-        json_t *jtable = json_array_get(dctx->jtables, dctx->table_count++);
+        json_t *jtable = json_array_get(dctx->jsegment, dctx->cur_table++);
         json_t *jclass = json_object_get(jtable, "class");
         json_t *jindex = json_object_get(jtable, "index");
         json_t *jbits = json_object_get(jtable, "bits");
@@ -635,8 +662,7 @@ ffe_mjpeg_dht_export(
         json_t *jtable = json_const_object_from(s->jctx, kvps);
         int val_idx = 0;
 
-        json_dynamic_array_add(dctx->jtables, jtable);
-        dctx->table_count++;
+        json_dynamic_array_add(dctx->jsegment, jtable);
 
         for ( size_t i = 0; i < 16; i++ )
         {
@@ -659,9 +685,21 @@ ffe_mjpeg_dht_term(
         ffe_dht_ctx_t *dctx)
 {
     if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_DHT)) != 0 )
-        json_dynamic_array_done(s->jctx, dctx->jtables);
+        json_dynamic_array_done(s->jctx, dctx->jsegment);
     if ( (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_DHT)) != 0 )
         ffe_transplicate_bits_restore(&s->ffe_xp, dctx->saved);
+}
+
+//---------------------------------------------------------------------
+static void
+ffe_mjpeg_export_dht_cleanup(MJpegDecodeContext *s, AVFrame *f)
+{
+    if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_DHT)) != 0 )
+    {
+        json_t *jframe = f->ffedit_sd[FFEDIT_FEAT_DHT];
+        ffe_dht_ctx_t *dctx = json_object_userdata_get(jframe);
+        json_dynamic_array_done(s->jctx, dctx->jtables);
+    }
 }
 
 /*-------------------------------------------------------------------*/
@@ -733,6 +771,11 @@ ffe_mjpeg_init(MJpegDecodeContext *s)
         ffe_mjpeg_export_dqt_init(s, f);
     else if ( (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_DQT)) != 0 )
         ffe_mjpeg_import_dqt_init(s, f);
+
+    if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_DHT)) != 0 )
+        ffe_mjpeg_export_dht_init(s, f);
+    else if ( (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_DHT)) != 0 )
+        ffe_mjpeg_import_dht_init(s, f);
 }
 
 //---------------------------------------------------------------------
@@ -743,6 +786,9 @@ ffe_mjpeg_export_cleanup(MJpegDecodeContext *s)
 
     if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_DQT)) != 0 )
         ffe_mjpeg_export_dqt_cleanup(s, f);
+
+    if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_DHT)) != 0 )
+        ffe_mjpeg_export_dht_cleanup(s, f);
 }
 
 //---------------------------------------------------------------------
