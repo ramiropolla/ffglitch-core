@@ -330,42 +330,62 @@ typedef struct {
 
 //---------------------------------------------------------------------
 static void
-ffe_mjpeg_dqt_init(MJpegDecodeContext *s, ffe_dqt_ctx_t *dctx)
+ffe_mjpeg_export_dqt_init(MJpegDecodeContext *s, AVFrame *f)
 {
-    dctx->saved = NULL;
-    dctx->jdata = NULL;
-    dctx->jcur = NULL;
+    // {
+    //  "tables": [ ] # plane
+    //            [ ] # dqt
+    // }
+    json_t *jdata = json_array_new(s->jctx, 4);
+    json_kvp_t kvps[] = {
+        { "tables", jdata },
+        { NULL }
+    };
+    json_t *jframe = json_const_object_from(s->jctx, kvps);
+    ffe_dqt_ctx_t *dctx = json_allocator_get0(s->jctx, sizeof(ffe_dqt_ctx_t));
+    dctx->jdata = jdata;
     dctx->max_index = -1;
+    json_object_userdata_set(jframe, dctx);
+    f->ffedit_sd[FFEDIT_FEAT_DQT] = jframe;
+}
 
-    if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_DQT)) != 0 )
-    {
-        // {
-        //  "tables": [ ] # plane
-        //            [ ] # dqt
-        // }
-        AVFrame *f = s->picture_ptr;
-        json_t *jdata = json_array_new(s->jctx, 4);
-        json_kvp_t kvps[] = {
-            { "tables", jdata },
-            { NULL }
-        };
-        json_t *jframe = json_const_object_from(s->jctx, kvps);
-        dctx->jdata = jdata;
-        f->ffedit_sd[FFEDIT_FEAT_DQT] = jframe;
-    }
-    else if ( (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_DQT)) != 0 )
+//---------------------------------------------------------------------
+static void
+ffe_mjpeg_import_dqt_init(MJpegDecodeContext *s, AVFrame *f)
+{
+    json_t *jframe = f->ffedit_sd[FFEDIT_FEAT_DQT];
+    ffe_dqt_ctx_t *dctx = json_allocator_get0(s->jctx, sizeof(ffe_dqt_ctx_t));
+    json_object_userdata_set(jframe, dctx);
+    dctx->jdata = json_object_get(jframe, "tables");
+}
+
+//---------------------------------------------------------------------
+static ffe_dqt_ctx_t *
+ffe_mjpeg_dqt_init(MJpegDecodeContext *s)
+{
+    ffe_dqt_ctx_t *dctx = NULL;
+    if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_DQT)) != 0
+      || (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_DQT)) != 0
+      || (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_DQT)) != 0 )
     {
         AVFrame *f = s->picture_ptr;
         json_t *jframe = f->ffedit_sd[FFEDIT_FEAT_DQT];
-        dctx->jdata = json_object_get(jframe, "tables");
+        dctx = json_object_userdata_get(jframe);
+        if ( (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_DQT)) != 0 )
+            dctx->saved = ffe_transplicate_bits_save(&s->ffe_xp);
     }
+    return dctx;
 }
 
 /* export */
 
 //---------------------------------------------------------------------
 static void
-ffe_mjpeg_dqt_table(MJpegDecodeContext *s, ffe_dqt_ctx_t *dctx, int index)
+ffe_mjpeg_dqt_table(
+        MJpegDecodeContext *s,
+        ffe_dqt_ctx_t *dctx,
+        int precision,
+        int index)
 {
     if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_DQT)) != 0 )
     {
@@ -382,7 +402,10 @@ ffe_mjpeg_dqt_table(MJpegDecodeContext *s, ffe_dqt_ctx_t *dctx, int index)
     }
 
     if ( (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_DQT)) != 0 )
-        dctx->saved = ffe_transplicate_bits_save(&s->ffe_xp);
+    {
+        put_bits(dctx->saved, 4, precision);
+        put_bits(dctx->saved, 4, index);
+    }
 }
 
 //---------------------------------------------------------------------
@@ -416,8 +439,18 @@ ffe_mjpeg_dqt_term(
 {
     if ( (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_DQT)) != 0 )
         ffe_transplicate_bits_restore(&s->ffe_xp, dctx->saved);
-    if ( dctx->max_index >= 0 )
+}
+
+//---------------------------------------------------------------------
+static void
+ffe_mjpeg_export_dqt_cleanup(MJpegDecodeContext *s, AVFrame *f)
+{
+    if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_DQT)) != 0 )
+    {
+        json_t *jframe = f->ffedit_sd[FFEDIT_FEAT_DQT];
+        ffe_dqt_ctx_t *dctx = json_object_userdata_get(jframe);
         json_set_len(dctx->jdata, dctx->max_index+1);
+    }
 }
 
 //---------------------------------------------------------------------
@@ -691,8 +724,25 @@ ffe_mjpeg_frame_unref(AVFrame *f)
 static void
 ffe_mjpeg_init(MJpegDecodeContext *s)
 {
+    AVFrame *f = s->picture_ptr;
+
     if ( s->avctx->ffedit_import != 0 )
-        memcpy(s->picture_ptr->ffedit_sd, s->ffedit_sd, sizeof(json_t *)*FFEDIT_FEAT_LAST);
+        memcpy(f->ffedit_sd, s->ffedit_sd, sizeof(json_t *)*FFEDIT_FEAT_LAST);
+
+    if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_DQT)) != 0 )
+        ffe_mjpeg_export_dqt_init(s, f);
+    else if ( (s->avctx->ffedit_import & (1 << FFEDIT_FEAT_DQT)) != 0 )
+        ffe_mjpeg_import_dqt_init(s, f);
+}
+
+//---------------------------------------------------------------------
+static void
+ffe_mjpeg_export_cleanup(MJpegDecodeContext *s)
+{
+    AVFrame *f = s->picture_ptr;
+
+    if ( (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_DQT)) != 0 )
+        ffe_mjpeg_export_dqt_cleanup(s, f);
 }
 
 //---------------------------------------------------------------------

@@ -202,7 +202,7 @@ av_cold int ff_mjpeg_decode_init(AVCodecContext *avctx)
 int ff_mjpeg_decode_dqt(MJpegDecodeContext *s)
 {
     int len, index, i;
-    ffe_dqt_ctx_t dctx;
+    ffe_dqt_ctx_t *dctx;
 
     len = get_bits(&s->gb, 16) - 2;
 
@@ -211,7 +211,7 @@ int ff_mjpeg_decode_dqt(MJpegDecodeContext *s)
         return AVERROR_INVALIDDATA;
     }
 
-    ffe_mjpeg_dqt_init(s, &dctx);
+    dctx = ffe_mjpeg_dqt_init(s);
 
     while (len >= 65) {
         int pr = get_bits(&s->gb, 4);
@@ -224,11 +224,11 @@ int ff_mjpeg_decode_dqt(MJpegDecodeContext *s)
             return -1;
         av_log(s->avctx, AV_LOG_DEBUG, "index=%d\n", index);
 
-        ffe_mjpeg_dqt_table(s, &dctx, index);
+        ffe_mjpeg_dqt_table(s, dctx, pr, index);
 
         /* read quant table */
         for (i = 0; i < 64; i++) {
-            s->quant_matrixes[index][i] = ffe_mjpeg_dqt_val(s, &dctx, pr ? 16 : 8, i);
+            s->quant_matrixes[index][i] = ffe_mjpeg_dqt_val(s, dctx, pr ? 16 : 8, i);
             if (s->quant_matrixes[index][i] == 0) {
                 int log_level = s->avctx->err_recognition & AV_EF_EXPLODE ? AV_LOG_ERROR : AV_LOG_WARNING;
                 av_log(s->avctx, log_level, "dqt: 0 quant value\n");
@@ -245,7 +245,7 @@ int ff_mjpeg_decode_dqt(MJpegDecodeContext *s)
         len -= 1 + 64 * (1+pr);
     }
 
-    ffe_mjpeg_dqt_term(s, &dctx);
+    ffe_mjpeg_dqt_term(s, dctx);
 
     return 0;
 }
@@ -2683,6 +2683,9 @@ fail:
     s->got_picture = 0;
     return ret;
 the_end:
+
+    if ( *got_frame )
+        ffe_mjpeg_export_cleanup(s);
 
     if ( (avctx->ffedit_apply & (1 << FFEDIT_FEAT_LAST)) != 0 )
         ffe_transplicate_bits_flush(avctx, &s->ffe_xp, avpkt);
