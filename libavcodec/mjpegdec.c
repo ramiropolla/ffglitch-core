@@ -1895,20 +1895,19 @@ static int mjpeg_decode_app(MJpegDecodeContext *s)
     int len, id, i;
 
     len = get_bits(&s->gb, 16);
-    if (len < 6) {
-        if (s->bayer) {
-            // Pentax K-1 (digital camera) JPEG images embedded in DNG images contain unknown APP0 markers
-            av_log(s->avctx, AV_LOG_WARNING, "skipping APPx (len=%"PRId32") for bayer-encoded image\n", len);
-            skip_bits(&s->gb, len);
-            return 0;
-        } else
-            return AVERROR_INVALIDDATA;
-    }
+    if (len < 2)
+        return AVERROR_INVALIDDATA;
+    len -= 2;
+
+    /* Silently ignore APPx stubs */
+    if (len < 4)
+        goto out;
+
     if (8 * len > get_bits_left(&s->gb))
         return AVERROR_INVALIDDATA;
 
     id   = get_bits_long(&s->gb, 32);
-    len -= 6;
+    len -= 4;
 
     if (s->avctx->debug & FF_DEBUG_STARTCODE)
         av_log(s->avctx, AV_LOG_DEBUG, "APPx (%s / %8X) len=%d\n",
