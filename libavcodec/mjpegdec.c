@@ -1089,8 +1089,7 @@ static int handle_rstn(MJpegDecodeContext *s, int nb_components)
                || show_bits(&s->gb, i) == 0xFF) {
                 GetBitContext marker_gb = s->gb;
                 align_get_bits(&marker_gb);
-                while (get_bits_left(&marker_gb) >= 8 && show_bits(&marker_gb, 8) == 0xFF)
-                    skip_bits(&marker_gb, 8);
+                skip_bits(&marker_gb, 8);
                 if (get_bits_left(&marker_gb) >= 8 && (get_bits(&marker_gb, 8) & 0xF8) == 0xD0) {
                     for (i = 0; i < nb_components; i++) /* reset dc */
                         s->last_q_dc[i] = 0;
