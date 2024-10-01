@@ -556,7 +556,8 @@ static int check_seekability(
         FFEditOutputContext **pffo_fmt,
         FFEditOutputContext *ffo_codec)
 {
-    int raw_input_stream = ((fctx->iformat->flags & AVFMT_FFEDIT_RAWSTREAM) != 0);
+    int raw_input_stream = (fctx->iformat->flags & AVFMT_FFEDIT_RAWSTREAM) != 0
+                        || (fctx->iformat->flags & AVFMT_NOFILE) != 0;
     int nonseekable_input = (fctx->pb != NULL) && ((fctx->pb->seekable & AVIO_SEEKABLE_NORMAL) == 0);
     int nonseekable_output = ((ffo_codec->o_pb->seekable & AVIO_SEEKABLE_NORMAL) == 0);
     av_log(ffe_class, AV_LOG_DEBUG, "raw_input_stream %d\n", raw_input_stream);
