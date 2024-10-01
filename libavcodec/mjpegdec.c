@@ -1088,13 +1088,39 @@ static int handle_rstn(MJpegDecodeContext *s, int nb_components)
             if(   show_bits(&s->gb, i) == (1 << i) - 1
                || show_bits(&s->gb, i) == 0xFF) {
                 GetBitContext marker_gb = s->gb;
+                PutBitContext *opb;
+                PutBitContext *saved;
                 align_get_bits(&marker_gb);
+                if ( (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_LAST)) != 0 )
+                {
+                    /* Escape SOS buffer up to here and update s->start_escape.
+                     * This is safe even if we don't skip RSTn. */
+                    opb = ffe_transplicate_bits_pb(&s->ffe_xp);
+                    ff_mjpeg_escape_FF(opb, s->start_escape);
+                    s->start_escape = opb->buf_ptr - opb->buf;
+                    /* Save a copy of the PutBitContext in case RSTn is not found
+                     * and we need rollback. */
+                    saved = ffe_transplicate_bits_save(&s->ffe_xp);
+                }
                 skip_bits(&marker_gb, 8);
                 if (get_bits_left(&marker_gb) >= 8 && (get_bits(&marker_gb, 8) & 0xF8) == 0xD0) {
                     for (i = 0; i < nb_components; i++) /* reset dc */
                         s->last_q_dc[i] = 0;
                     reset = 1;
                     s->gb = marker_gb;
+                }
+                if ( (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_LAST)) != 0 )
+                {
+                    if ( reset )
+                    {
+                        flush_put_bits(opb);
+                        s->start_escape = opb->buf_ptr - opb->buf;
+                    }
+                    else
+                    {
+                        /* RSTn not found: restore saved PutBitContext */
+                        ffe_transplicate_bits_restore(&s->ffe_xp, saved);
+                    }
                 }
             }
         }
@@ -2419,8 +2445,6 @@ redo_for_pal8:
     buf_ptr = buf;
     buf_end = buf + buf_size;
     while (buf_ptr < buf_end) {
-        int start_escape;
-
         /* find start next marker */
         start_code = ff_mjpeg_find_marker(s, &buf_ptr, buf_end,
                                           &unescaped_buf_ptr,
@@ -2451,7 +2475,7 @@ redo_for_pal8:
             put_bits(opb, 8, 0xff);
             put_bits(opb, 8, start_code);
             flush_put_bits(opb);
-            start_escape = opb->buf_ptr - opb->buf;
+            s->start_escape = opb->buf_ptr - opb->buf;
             s->gb.pb = opb;
         }
 
@@ -2642,7 +2666,7 @@ skip:
           && (avctx->ffedit_apply & (1 << FFEDIT_FEAT_LAST)) != 0 )
         {
             PutBitContext *opb = ffe_transplicate_bits_pb(&s->ffe_xp);
-            ff_mjpeg_escape_FF(opb, start_escape);
+            ff_mjpeg_escape_FF(opb, s->start_escape);
         }
         /* eof process start code */
         buf_ptr += (get_bits_count(&s->gb) + 7) / 8;

@@ -179,6 +179,7 @@ typedef struct MJpegDecodeContext {
 
     /* ffedit bitstream */
     FFEditTransplicateBitsContext ffe_xp;
+    int start_escape;
 
     /* ffedit JSON context */
     void *jctx; // json_ctx_t *
