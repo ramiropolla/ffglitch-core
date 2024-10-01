@@ -1970,7 +1970,7 @@ static int mjpeg_decode_app(MJpegDecodeContext *s)
     }
 
     if (   id == AV_RB32("Adob")
-        && len >= 7
+        && len >= 8
         && show_bits(&s->gb, 8) == 'e'
         && show_bits_long(&s->gb, 32) != AV_RB32("e_CM")) {
         skip_bits(&s->gb,  8); /* 'e' */
@@ -1980,7 +1980,7 @@ static int mjpeg_decode_app(MJpegDecodeContext *s)
         s->adobe_transform = get_bits(&s->gb,  8);
         if (s->avctx->debug & FF_DEBUG_PICT_INFO)
             av_log(s->avctx, AV_LOG_INFO, "mjpeg: Adobe header found, transform=%d\n", s->adobe_transform);
-        len -= 7;
+        len -= 8;
         goto out;
     }
 
@@ -2201,7 +2201,7 @@ out:
     if (len < 0)
         av_log(s->avctx, AV_LOG_ERROR,
                "mjpeg: error, decode_app parser read over the end\n");
-    while (--len > 0)
+    while (len-- > 0)
         skip_bits(&s->gb, 8);
 
     return 0;
