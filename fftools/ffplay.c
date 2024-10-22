@@ -3991,6 +3991,7 @@ static const OptionDef options[] = {
     { "hwaccel",            OPT_TYPE_STRING, OPT_EXPERT, { &hwaccel }, "use HW accelerated decoding" },
     { "s",                  OPT_TYPE_STRING,          0, { &script_fname }, "ffglitch script", "javascript or python3 file" },
     { "sp",                 OPT_TYPE_STRING,          0, { &script_params }, "ffglitch script setup() parameters", "JSON string" },
+    { "o",                  OPT_TYPE_STRING,          0, { &output_fname }, "ffglitch output file", "file" },
     { NULL, },
 };
 
