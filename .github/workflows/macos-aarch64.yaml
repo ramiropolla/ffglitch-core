@@ -1,0 +1,74 @@
+name: macos-aarch64 build
+
+on:
+  push:
+    branches:
+      - ffedit-0.10-gha
+
+jobs:
+  build:
+    runs-on: macos-14
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v3
+
+      - name: Set up dependencies
+        run: |
+          brew update
+          brew install sdl2
+          rm "$(brew --prefix)/lib/libSDL2.dylib"
+          sed -i '' -e 's/--libs)/--temp-libs)/' -e 's/--static-libs)/--libs)/' -e 's/--temp-libs)/--static-libs)/' "$(realpath $(brew --prefix)/bin/sdl2-config)"
+
+      - name: Build static zlib-ng
+        env:
+          CFLAGS: -arch arm64
+          LDFLAGS: -arch arm64
+        run: |
+          ZLIB_NG_VERSION="2.2.2"
+          curl -L "https://github.com/zlib-ng/zlib-ng/archive/refs/tags/${ZLIB_NG_VERSION}.tar.gz" -o zlib-ng.tar.gz
+          tar xf zlib-ng.tar.gz
+          cd zlib-ng-${ZLIB_NG_VERSION}
+          mkdir build
+          cd build
+          cmake .. -DZLIB_COMPAT=ON -DWITH_GTEST=OFF -DBUILD_SHARED_LIBS=OFF -DZLIB_ENABLE_TESTS=OFF
+          make -j$(sysctl -n hw.ncpu)
+          sudo make install
+
+      - name: Build project
+        env:
+          CFLAGS: -arch arm64
+          LDFLAGS: -arch arm64
+        run: |
+          mkdir build
+          cd build
+          ../configure --disable-doc --enable-gpl --enable-static --disable-shared --disable-autodetect --disable-iconv --enable-zlib --enable-rtmidi --enable-libzmq --enable-sdl2 --enable-avfoundation
+          make -j$(sysctl -n hw.ncpu)
+          make -j$(sysctl -n hw.ncpu) qjs
+
+      - name: Package binaries
+        run: |
+          VERSION=$(cat FFGLITCH_VERSION)
+          VERSION_NUMBERS=$(echo "${VERSION}" | sed 's/^[^-]*-//')
+          FULL_NAME="${VERSION}-macos-aarch64"
+          OUTPUT_FILE="${FULL_NAME}.zip"
+          ZLIB_NG_VERSION="2.2.2"
+          SDL2_VERSION="$($(brew --prefix)/bin/sdl2-config --version)"
+          sed -i '' s/FFGLITCH_VERSION/"${VERSION_NUMBERS}"/g ffglitch_readme.txt
+          sed -i '' s/PLATFORM/macOS/g                        ffglitch_readme.txt
+          sed -i '' s/ARCH/aarch64/g                          ffglitch_readme.txt
+          sed -i '' s/ZLIB_NG_VERSION/"${ZLIB_NG_VERSION}"/g  ffglitch_readme.txt
+          sed -i '' s/SDL2_VERSION/"${SDL2_VERSION}"/g        ffglitch_readme.txt
+          sed -i '' '/Xvid/d'                                 ffglitch_readme.txt
+          cd build
+          mkdir "${FULL_NAME}"
+          cp ffedit ffgac fflive qjs "${FULL_NAME}"
+          cp ../ffglitch_readme.txt "${FULL_NAME}"/readme.txt
+          zip -9 -r "../${OUTPUT_FILE}" "${FULL_NAME}"
+        shell: bash
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: "${{ github.workspace }}/ffglitch-*-macos-aarch64.zip"
