@@ -1,4 +1,4 @@
-name: macos-aarch64 build
+name: macos12-aarch64 build
 
 on:
   push:
@@ -22,7 +22,7 @@ jobs:
 
       - name: Build static zlib-ng
         env:
-          MACOSX_DEPLOYMENT_TARGET: 13.0
+          MACOSX_DEPLOYMENT_TARGET: 12.0
           CFLAGS: -arch arm64
           CXXFLAGS: -arch arm64
           LDFLAGS: -arch arm64
@@ -39,7 +39,7 @@ jobs:
 
       - name: Build project
         env:
-          MACOSX_DEPLOYMENT_TARGET: 13.0
+          MACOSX_DEPLOYMENT_TARGET: 12.0
           CFLAGS: -arch arm64
           CXXFLAGS: -arch arm64
           LDFLAGS: -arch arm64
@@ -54,7 +54,7 @@ jobs:
         run: |
           VERSION=$(cat FFGLITCH_VERSION)
           VERSION_NUMBERS=$(echo "${VERSION}" | sed 's/^[^-]*-//')
-          FULL_NAME="${VERSION}-macos-aarch64"
+          FULL_NAME="${VERSION}-macos12-aarch64"
           OUTPUT_FILE="${FULL_NAME}.zip"
           ZLIB_NG_VERSION="2.2.2"
           SDL2_VERSION="$($(brew --prefix)/bin/sdl2-config --version)"
@@ -75,4 +75,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: build-artifacts
-          path: "${{ github.workspace }}/ffglitch-*-macos-aarch64.zip"
+          path: "${{ github.workspace }}/ffglitch-*-macos12-aarch64.zip"
