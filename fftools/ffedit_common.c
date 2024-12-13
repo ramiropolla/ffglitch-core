@@ -368,7 +368,7 @@ static void ffedit_common_setup(
     /* convert args back to json */
     args = ff_script_to_json(&jctx, script, frame);
 
-    /* check returned pix_fmt */
+    /* check returned output filename */
     o_fname = json_object_get(args, "output");
     if ( o_fname != NULL )
     {
