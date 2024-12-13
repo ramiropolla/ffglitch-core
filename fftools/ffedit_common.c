@@ -311,7 +311,7 @@ static void ffedit_common_setup(
     int ret;
 
     /* prepare args */
-    json_ctx_start(&jctx, 1);
+    json_ctx_start(&jctx, 0);
     features = json_dynamic_array_new(&jctx);
     args = json_object_new(&jctx);
     for ( size_t i = 0; i < FFEDIT_FEAT_LAST; i++ )
