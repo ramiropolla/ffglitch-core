@@ -46,6 +46,13 @@ typedef struct {
 } FFEditScriptFuncContext;
 
 /*********************************************************************/
+static void reset_features(void)
+{
+    memset(selected_features, 0x00, sizeof(selected_features));
+    memset(selected_features_idx, 0x00, sizeof(selected_features_idx));
+    features_selected = 0;
+}
+
 static int parse_idx(char *str)
 {
     ssize_t idx = -1;
@@ -390,6 +397,7 @@ static void ffedit_common_setup(
     }
 
     /* parse returned features */
+    reset_features();
     features = json_object_get(args, "features");
     if ( features == NULL || JSON_TYPE(features->flags) != JSON_TYPE_ARRAY )
     {
