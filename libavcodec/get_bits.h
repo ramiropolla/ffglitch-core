@@ -617,7 +617,7 @@ static inline const uint8_t *align_get_bits(GetBitContext *s)
                 n     = table[index].len;                       \
             }                                                   \
             if ( (gb)->pb != NULL )                             \
-                put_bits((gb)->pb, n, index2 >> (nb_bits -n));  \
+                put_bits((gb)->pb, n, index2 >> (nb_bits - n)); \
         }                                                       \
         else if ( (gb)->pb != NULL )                            \
         {                                                       \
