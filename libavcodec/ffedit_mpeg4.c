@@ -146,6 +146,8 @@ static inline int modulo_decoding(
     return val;
 }
 
+extern int apfelstrudel;
+
 static int
 ffe_mpeg4_decode_motion(
         ffe_mv_mb_ctx *mbctx,
@@ -157,6 +159,8 @@ ffe_mpeg4_decode_motion(
 {
     int delta;
     int val;
+
+    av_log(NULL, AV_LOG_ERROR, "[%s][%d] %s(): apfelstrudel %d\n", __FILE__, __LINE__, __func__, apfelstrudel);
 
     if ( (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_MV)) != 0
       || (s->avctx->ffedit_apply & (1 << FFEDIT_FEAT_MV_DELTA)) != 0 )

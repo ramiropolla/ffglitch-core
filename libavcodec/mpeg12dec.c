@@ -460,6 +460,9 @@ static inline int get_dmv(MpegEncContext *s)
 #define MT_16X8  2
 #define MT_DMV   3
 
+int apfelstrudel = 0;
+extern unsigned int ffe_xp_debug;
+
 static int mpeg_decode_mb(MpegEncContext *s, int16_t block[12][64])
 {
     int i, j, k, cbp, val, mb_type, motion_type;
@@ -468,6 +471,8 @@ static int mpeg_decode_mb(MpegEncContext *s, int16_t block[12][64])
     ffe_mv_mb_ctx mbctx_delta;
     int ffe_mb_type = 0;
     int ret;
+
+    ffe_xp_debug = (apfelstrudel++ == 1361);
 
     ff_tlog(s->avctx, "decode_mb: x=%d y=%d\n", s->mb_x, s->mb_y);
 

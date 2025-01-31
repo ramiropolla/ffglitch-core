@@ -1744,6 +1744,9 @@ static int mpeg4_decode_partitioned_mb_slice_check(MpegEncContext *s)
     }
 }
 
+extern int apfelstrudel;
+extern unsigned int ffe_xp_debug;
+
 static int mpeg4_decode_mb(MpegEncContext *s, int16_t block[6][64])
 {
     Mpeg4DecContext *ctx = s->avctx->priv_data;
@@ -1758,6 +1761,9 @@ static int mpeg4_decode_mb(MpegEncContext *s, int16_t block[6][64])
 
     av_assert2(s ==  (void*)ctx);
     av_assert2(s->h263_pred);
+
+    ffe_xp_debug = (apfelstrudel++ >= 1350);
+    // av_log(NULL, AV_LOG_ERROR, "[%s][%d] %s(): apfelstrudel %d\n", __FILE__, __LINE__, __func__, apfelstrudel);
 
     if (s->pict_type == AV_PICTURE_TYPE_P ||
         s->pict_type == AV_PICTURE_TYPE_S) {
