@@ -742,4 +742,339 @@ static inline int skip_1stop_8data_bits(GetBitContext *gb)
     return 0;
 }
 
+#if CONFIG_FFEDIT_XP_DEBUG
+
+extern unsigned int ffe_xp_debug;
+
+static inline void ffe_xp_debug_d(const char *file, int line, const char *func, int ret)
+{
+    if ( ffe_xp_debug > 0 )
+        av_log(NULL, AV_LOG_ERROR, "[%s][%d] %s(): %d\n", file, line, func, ret);
+}
+
+static inline void ffe_xp_debug_u(const char *file, int line, const char *func, unsigned int ret)
+{
+    if ( ffe_xp_debug > 0 )
+        av_log(NULL, AV_LOG_ERROR, "[%s][%d] %s(): %u\n", file, line, func, ret);
+}
+
+static inline void ffe_xp_debug_nd(const char *file, int line, const char *func, int n, int ret)
+{
+    if ( ffe_xp_debug > 0 )
+        av_log(NULL, AV_LOG_ERROR, "[%s][%d] %s(%d): %d\n", file, line, func, n, ret);
+}
+
+static inline void ffe_xp_debug_nu(const char *file, int line, const char *func, int n, unsigned int ret)
+{
+    if ( ffe_xp_debug > 0 )
+        av_log(NULL, AV_LOG_ERROR, "[%s][%d] %s(%d): %u\n", file, line, func, n, ret);
+}
+
+static inline void ffe_xp_debug_nd64(const char *file, int line, const char *func, int n, int64_t ret)
+{
+    if ( ffe_xp_debug > 0 )
+        av_log(NULL, AV_LOG_ERROR, "[%s][%d] %s(%d): %" PRId64 "\n", file, line, func, n, ret);
+}
+
+static inline void ffe_xp_debug_nu64(const char *file, int line, const char *func, int n, uint64_t ret)
+{
+    if ( ffe_xp_debug > 0 )
+        av_log(NULL, AV_LOG_ERROR, "[%s][%d] %s(%d): %" PRIu64 "\n", file, line, func, n, ret);
+}
+
+static inline void ffe_xp_debug_ndd(const char *file, int line, const char *func, int n, int a, int b)
+{
+    if ( ffe_xp_debug > 0 )
+        av_log(NULL, AV_LOG_ERROR, "[%s][%d] %s(%d): %d %d\n", file, line, func, n, a, b);
+}
+
+
+static inline int dbg_get_bits_count(const GetBitContext *s, const char *file, int line)
+{
+    int ret = get_bits_count(s);
+    ffe_xp_debug_d(file, line, __func__, ret);
+    return ret;
+}
+#define get_bits_count(s) dbg_get_bits_count(s, __FILE__, __LINE__)
+
+static inline void dbg_skip_bits_long(GetBitContext *s, int n, const char *file, int line)
+{
+    unsigned int ret = get_bits_long(s, n);
+    ffe_xp_debug_nu(file, line, __func__, n, ret);
+}
+#define skip_bits_long(s, n) dbg_skip_bits_long(s, n, __FILE__, __LINE__)
+
+static inline int dbg_get_xbits(GetBitContext *s, int n, const char *file, int line)
+{
+    int ret = get_xbits(s, n);
+    ffe_xp_debug_nd(file, line, __func__, n, ret);
+    return ret;
+}
+#define get_xbits(s, n) dbg_get_xbits(s, n, __FILE__, __LINE__)
+
+static inline int dbg_get_xbits_le(GetBitContext *s, int n, const char *file, int line)
+{
+    int ret = get_xbits_le(s, n);
+    ffe_xp_debug_nd(file, line, __func__, n, ret);
+    return ret;
+}
+#define get_xbits_le(s, n) dbg_get_xbits_le(s, n, __FILE__, __LINE__)
+
+static inline int dbg_get_sbits(GetBitContext *s, int n, const char *file, int line)
+{
+    int ret = get_sbits(s, n);
+    ffe_xp_debug_nd(file, line, __func__, n, ret);
+    return ret;
+}
+#define get_sbits(s, n) dbg_get_sbits(s, n, __FILE__, __LINE__)
+
+static av_always_inline int dbg_get_bitsz(GetBitContext *s, int n, const char *file, int line)
+{
+    int ret = get_bitsz(s, n);
+    ffe_xp_debug_nd(file, line, __func__, n, ret);
+    return ret;
+}
+#define get_bitsz(s, n) dbg_get_bitsz(s, n, __FILE__, __LINE__)
+
+static inline unsigned int dbg_show_bits_le(GetBitContext *s, int n, const char *file, int line)
+{
+    unsigned int ret = show_bits_le(s, n);
+    ffe_xp_debug_nu(file, line, __func__, n, ret);
+    return ret;
+}
+#define show_bits_le(s, n) dbg_show_bits_le(s, n, __FILE__, __LINE__)
+
+static inline unsigned int dbg_get_bits_le(GetBitContext *s, int n, const char *file, int line)
+{
+    unsigned int ret = get_bits_le(s, n);
+    ffe_xp_debug_nu(file, line, __func__, n, ret);
+    return ret;
+}
+#define get_bits_le(s, n) dbg_get_bits_le(s, n, __FILE__, __LINE__)
+
+static inline unsigned int dbg_show_bits(GetBitContext *s, int n, const char *file, int line)
+{
+    unsigned int ret = show_bits(s, n);
+    ffe_xp_debug_nu(file, line, __func__, n, ret);
+    return ret;
+}
+#define show_bits(s, n) dbg_show_bits(s, n, __FILE__, __LINE__)
+
+static inline void dbg_skip_bits(GetBitContext *s, int n, const char *file, int line)
+{
+    unsigned int ret = get_bits(s, n);
+    ffe_xp_debug_nu(file, line, __func__, n, ret);
+}
+#define skip_bits(s, n) dbg_skip_bits(s, n, __FILE__, __LINE__)
+
+static inline unsigned int dbg_get_bits(GetBitContext *s, int n, const char *file, int line)
+{
+    unsigned int ret = get_bits(s, n);
+    ffe_xp_debug_nu(file, line, __func__, n, ret);
+    return ret;
+}
+#define get_bits(s, n) dbg_get_bits(s, n, __FILE__, __LINE__)
+
+static inline unsigned int dbg_get_bits1(GetBitContext *s, const char *file, int line)
+{
+    unsigned int ret = get_bits1(s);
+    ffe_xp_debug_u(file, line, __func__, ret);
+    return ret;
+}
+#define get_bits1(s) dbg_get_bits1(s, __FILE__, __LINE__)
+
+static inline unsigned int dbg_show_bits1(GetBitContext *s, const char *file, int line)
+{
+    unsigned int ret = show_bits1(s);
+    ffe_xp_debug_u(file, line, __func__, ret);
+    return ret;
+}
+#define show_bits1(s) dbg_show_bits1(s, __FILE__, __LINE__)
+
+static inline void dbg_skip_bits1(GetBitContext *s, const char *file, int line)
+{
+    unsigned int ret = get_bits1(s);
+    ffe_xp_debug_u(file, line, __func__, ret);
+}
+#define skip_bits1(s) dbg_skip_bits1(s, __FILE__, __LINE__)
+
+static inline unsigned int dbg_get_bits_long(GetBitContext *s, int n, const char *file, int line)
+{
+    unsigned int ret = get_bits_long(s, n);
+    ffe_xp_debug_nu(file, line, __func__, n, ret);
+    return ret;
+}
+#define get_bits_long(s, n) dbg_get_bits_long(s, n, __FILE__, __LINE__)
+
+static inline uint64_t dbg_get_bits64(GetBitContext *s, int n, const char *file, int line)
+{
+    uint64_t ret = get_bits64(s, n);
+    ffe_xp_debug_nu64(file, line, __func__, n, ret);
+    return ret;
+}
+#define get_bits64(s, n) dbg_get_bits64(s, n, __FILE__, __LINE__)
+
+static inline int dbg_get_sbits_long(GetBitContext *s, int n, const char *file, int line)
+{
+    int ret = get_sbits_long(s, n);
+    ffe_xp_debug_nd(file, line, __func__, n, ret);
+    return ret;
+}
+#define get_sbits_long(s, n) dbg_get_sbits_long(s, n, __FILE__, __LINE__)
+
+static inline int64_t dbg_get_sbits64(GetBitContext *s, int n, const char *file, int line)
+{
+    int64_t ret = get_sbits64(s, n);
+    ffe_xp_debug_nd64(file, line, __func__, n, ret);
+    return ret;
+}
+#define get_sbits64(s, n) dbg_get_sbits64(s, n, __FILE__, __LINE__)
+
+static inline int dbg_init_get_bits(GetBitContext *s, const uint8_t *buffer, int bit_size, const char *file, int line)
+{
+    int ret = init_get_bits(s, buffer, bit_size);
+    ffe_xp_debug_d(file, line, __func__, ret);
+    return ret;
+}
+#define init_get_bits(s, buffer, bit_size) dbg_init_get_bits(s, buffer, bit_size, __FILE__, __LINE__)
+
+static inline int dbg_init_get_bits8(GetBitContext *s, const uint8_t *buffer, int byte_size, const char *file, int line)
+{
+    int ret = init_get_bits8(s, buffer, byte_size);
+    ffe_xp_debug_d(file, line, __func__, ret);
+    return ret;
+}
+#define init_get_bits8(s, buffer, byte_size) dbg_init_get_bits8(s, buffer, byte_size, __FILE__, __LINE__)
+
+static inline int dbg_init_get_bits8_le(GetBitContext *s, const uint8_t *buffer, int byte_size, const char *file, int line)
+{
+    int ret = init_get_bits8_le(s, buffer, byte_size);
+    ffe_xp_debug_d(file, line, __func__, ret);
+    return ret;
+}
+#define init_get_bits8_le(s, buffer, byte_size) dbg_init_get_bits8_le(s, buffer, byte_size, __FILE__, __LINE__)
+
+static inline const uint8_t *dbg_align_get_bits(GetBitContext *s, const char *file, int line)
+{
+    GetBitContext gb = {
+        s->buffer,
+        s->buffer_end,
+        s->index,
+        s->size_in_bits,
+        s->size_in_bits_plus8,
+        NULL,
+    };
+    const uint8_t *ret = align_get_bits(s);
+    int n = get_bits_left(&gb) - get_bits_left(s);
+    ffe_xp_debug_d(file, line, __func__, n);
+    return ret;
+}
+#define align_get_bits(s) dbg_align_get_bits(s, __FILE__, __LINE__)
+
+static av_always_inline int dbg_get_vlc2(GetBitContext *s, const VLCElem *table, int bits, int max_depth, const char *file, int line)
+{
+    GetBitContext gb = {
+        s->buffer,
+        s->buffer_end,
+        s->index,
+        s->size_in_bits,
+        s->size_in_bits_plus8,
+        NULL,
+    };
+    int ret = get_vlc2(s, table, bits, max_depth);
+    int n = get_bits_left(&gb) - get_bits_left(s);
+    unsigned int val = show_bits_long(s, n);
+    ffe_xp_debug_nu(file, line, __func__, n, val);
+    return ret;
+}
+#define get_vlc2(s, table, bits, max_depth) dbg_get_vlc2(s, table, bits, max_depth, __FILE__, __LINE__)
+
+static inline int dbg_get_vlc_multi(GetBitContext *s, uint8_t *dst, const VLC_MULTI_ELEM *const Jtable, const VLCElem *const table, const int bits, const int max_depth, const int symbols_size, const char *file, int line)
+{
+    GetBitContext gb = {
+        s->buffer,
+        s->buffer_end,
+        s->index,
+        s->size_in_bits,
+        s->size_in_bits_plus8,
+        NULL,
+    };
+    int ret = get_vlc_multi(s, dst, Jtable, table, bits, max_depth, symbols_size);
+    int n = get_bits_left(&gb) - get_bits_left(s);
+    unsigned int val = show_bits_long(s, n);
+    ffe_xp_debug_nu(file, line, __func__, n, val);
+    return ret;
+}
+#define get_vlc_multi(s, dst, Jtable, table, bits, max_depth, symbols_size) dbg_get_vlc_multi(s, dst, Jtable, table, bits, max_depth, symbols_size, __FILE__, __LINE__)
+
+static av_always_inline void dbg_get_rl_vlc2(int *plevel, int *prun, GetBitContext *s, const RL_VLC_ELEM *table, int bits, int max_depth, int need_update, const char *file, int line)
+{
+    GetBitContext gb = {
+        s->buffer,
+        s->buffer_end,
+        s->index,
+        s->size_in_bits,
+        s->size_in_bits_plus8,
+        NULL,
+    };
+    int n;
+    get_rl_vlc2(plevel, prun, s, table, bits, max_depth, need_update);
+    n = get_bits_left(&gb) - get_bits_left(s);
+    /* TODO */
+    // unsigned int val = show_bits_long(s, n);
+    ffe_xp_debug_ndd(file, line, __func__, n, *prun, *plevel);
+}
+#define get_rl_vlc2(plevel, prun, s, table, bits, max_depth, need_update) dbg_get_rl_vlc2(plevel, prun, s, table, bits, max_depth, need_update, __FILE__, __LINE__)
+
+static inline unsigned int dbg_show_bits_long(GetBitContext *s, int n, const char *file, int line)
+{
+    unsigned int ret = show_bits_long(s, n);
+    ffe_xp_debug_nu(file, line, __func__, n, ret);
+    return ret;
+}
+#define show_bits_long(s, n) dbg_show_bits_long(s, n, __FILE__, __LINE__)
+
+static av_always_inline void dbg_get_cfhd_rl_vlc(int *plevel, int *prun, GetBitContext *s, const CFHD_RL_VLC_ELEM *table, int bits, int max_depth, int need_update, const char *file, int line)
+{
+    /* TODO */
+    get_cfhd_rl_vlc(plevel, prun, s, table, bits, max_depth, need_update);
+    av_log(NULL, AV_LOG_ERROR, "[%s][%d] %s()\n", file, line, __func__);
+}
+#define get_cfhd_rl_vlc(plevel, prun, s, table, bits, max_depth, need_update) dbg_get_cfhd_rl_vlc(plevel, prun, s, table, bits, max_depth, need_update, __FILE__, __LINE__)
+
+static inline int dbg_decode012(GetBitContext *gb, const char *file, int line)
+{
+    int ret = decode012(gb);
+    ffe_xp_debug_d(file, line, __func__, ret);
+    return ret;
+}
+#define decode012(gb) dbg_decode012(gb, __FILE__, __LINE__)
+
+static inline int dbg_decode210(GetBitContext *gb, const char *file, int line)
+{
+    int ret = decode210(gb);
+    ffe_xp_debug_d(file, line, __func__, ret);
+    return ret;
+}
+#define decode210(gb) dbg_decode210(gb, __FILE__, __LINE__)
+
+static inline int dbg_get_bits_left(GetBitContext *gb, const char *file, int line)
+{
+    int ret = get_bits_left(gb);
+    ffe_xp_debug_d(file, line, __func__, ret);
+    return ret;
+}
+#define get_bits_left(gb) dbg_get_bits_left(gb, __FILE__, __LINE__)
+
+static inline int dbg_skip_1stop_8data_bits(GetBitContext *gb, const char *file, int line)
+{
+    /* TODO */
+    int ret = skip_1stop_8data_bits(gb);
+    ffe_xp_debug_d(file, line, __func__, ret);
+    return ret;
+}
+#define skip_1stop_8data_bits(gb) dbg_skip_1stop_8data_bits(gb, __FILE__, __LINE__)
+
+#endif /* CONFIG_FFEDIT_XP_DEBUG */
+
 #endif /* AVCODEC_GET_BITS_H */

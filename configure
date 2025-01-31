@@ -514,6 +514,7 @@ Developer options (useful when working on FFmpeg itself):
   --disable-large-tests    disable tests that use a large amount of memory
   --disable-ptx-compression don't compress CUDA PTX code even when possible
   --disable-version-tracking don't include the git/release version in the build
+  --enable-ffedit-xp-debug enable extra debugging for ffedit transplication
 
 NOTE: Object files are built at the place where configure is launched.
 EOF
@@ -2099,6 +2100,7 @@ CONFIG_LIST="
     $PROGRAM_LIST
     $SUBSYSTEM_LIST
     autodetect
+    ffedit_xp_debug
     fontconfig
     large_tests
     linux_perf

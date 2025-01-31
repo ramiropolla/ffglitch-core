@@ -137,3 +137,8 @@ void ffe_transplicate_bits_restore(
 {
     *(xp->pb) = *saved;
 }
+
+#if CONFIG_FFEDIT_XP_DEBUG
+/* TODO find a better file for this */
+unsigned int ffe_xp_debug;
+#endif /* CONFIG_FFEDIT_XP_DEBUG */
