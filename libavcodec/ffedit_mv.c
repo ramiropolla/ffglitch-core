@@ -346,16 +346,16 @@ int mv_overflow_internal(
         switch ( mbctx->overflow_action )
         {
             case MV_OVERFLOW_ASSERT:
-                av_log(ffe_class, AV_LOG_ERROR, "motion vector%s value overflow\n", delta);
-                av_log(ffe_class, AV_LOG_ERROR, "value of %d is outside of range [ %d, %d ] (fcode %d shift %d)\n",
+                av_log(NULL, AV_LOG_ERROR, "motion vector%s value overflow\n", delta);
+                av_log(NULL, AV_LOG_ERROR, "value of %d is outside of range [ %d, %d ] (fcode %d shift %d)\n",
                        val, min_val, max_val, fcode, shift);
-                av_log(ffe_class, AV_LOG_ERROR, "either reencode the input file with a higher -fcode or set the\n");
-                av_log(ffe_class, AV_LOG_ERROR, "\"overflow\" field in \"mv%s\" to \"truncate\", \"ignore\", or \"warn\" instead of \"assert\".\n",
+                av_log(NULL, AV_LOG_ERROR, "either reencode the input file with a higher -fcode or set the\n");
+                av_log(NULL, AV_LOG_ERROR, "\"overflow\" field in \"mv%s\" to \"truncate\", \"ignore\", or \"warn\" instead of \"assert\".\n",
                        _delta);
                 exit(1);
                 break;
             case MV_OVERFLOW_TRUNCATE:
-                av_log(ffe_class, AV_LOG_VERBOSE, "motion vector%s value truncated from %d to %d (fcode %d shift %d)\n",
+                av_log(NULL, AV_LOG_VERBOSE, "motion vector%s value truncated from %d to %d (fcode %d shift %d)\n",
                        delta, val, new_val, fcode, shift);
                 val = new_val;
                 break;
@@ -363,13 +363,13 @@ int mv_overflow_internal(
                 /* do nothing */
                 break;
             case MV_OVERFLOW_WARN:
-                av_log(ffe_class, AV_LOG_WARNING, "motion vector%s value %d is outside of range [ %d, %d ] (fcode %d shift %d)\n",
+                av_log(NULL, AV_LOG_WARNING, "motion vector%s value %d is outside of range [ %d, %d ] (fcode %d shift %d)\n",
                        delta, val, min_val, max_val, fcode, shift);
                 if ( warned == 0 )
                 {
                     warned = 1;
-                    av_log(ffe_class, AV_LOG_WARNING, "either reencode the input file with a higher -fcode or set the\n");
-                    av_log(ffe_class, AV_LOG_WARNING, "\"overflow\" field in \"mv%s\" to \"assert\", \"truncate\", or \"ignore\" instead of \"warn\".\n",
+                    av_log(NULL, AV_LOG_WARNING, "either reencode the input file with a higher -fcode or set the\n");
+                    av_log(NULL, AV_LOG_WARNING, "\"overflow\" field in \"mv%s\" to \"assert\", \"truncate\", or \"ignore\" instead of \"warn\".\n",
                            _delta);
                 }
                 break;
@@ -579,8 +579,8 @@ void mv_import_init(
             }
             else
             {
-                av_log(ffe_class, AV_LOG_ERROR, "unexpected value \"%s\" for \"overflow\" field in \"mv\".\n", str);
-                av_log(ffe_class, AV_LOG_ERROR, "expected values are \"assert\", \"truncate\", \"ignore\", or \"warn\".\n");
+                av_log(NULL, AV_LOG_ERROR, "unexpected value \"%s\" for \"overflow\" field in \"mv\".\n", str);
+                av_log(NULL, AV_LOG_ERROR, "expected values are \"assert\", \"truncate\", \"ignore\", or \"warn\".\n");
                 exit(1);
             }
         }

@@ -554,7 +554,7 @@ static int mpeg4_decode_sprite_trajectory(Mpeg4DecContext *ctx, GetBitContext *g
             put_bits(saved, 1, 1);
         }
 #else
-        av_log(ffe_class, AV_LOG_FATAL, "GPL must be enabled to glitch GMC in MPEG-4\n");
+        av_log(s->avctx, AV_LOG_FATAL, "GPL must be enabled to glitch GMC in MPEG-4\n");
         exit(1);
 #endif
         ffe_transplicate_bits_restore(&s->ffe_xp, saved);

@@ -400,7 +400,7 @@ ffe_qscale_get_slice(MpegEncContext *s, int mb_y)
     jint = json_object_get(jmb_y, buf);
     if ( jint == NULL )
     {
-        av_log(ffe_class, AV_LOG_ERROR,
+        av_log(NULL, AV_LOG_ERROR,
                "qscale value for slice at line %d row %d not found!\n",
                mb_y, s->mb_x);
         av_assert0(0);

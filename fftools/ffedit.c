@@ -43,6 +43,8 @@
 const char program_name[] = "ffedit";
 const int program_birth_year = 2000; // FFmpeg, that is
 
+extern const void *ffe_class[1];
+
 #define THREAD_TYPE            pthread_t
 #define THREAD_RET_TYPE        void *
 #define THREAD_CREATE(thread, func, args) do { pthread_create(&thread, NULL, func, args); } while ( 0 )
@@ -1043,7 +1045,7 @@ static void print_report(
     if ( AV_LOG_INFO > av_log_get_level() )
         fprintf(stderr, "%s    %c", buf.str, end_char);
     else
-        av_log(NULL, AV_LOG_INFO, "%s    %c", buf.str, end_char);
+        av_log(ffe_class, AV_LOG_INFO, "%s    %c", buf.str, end_char);
     fflush(stderr);
 
     /* finalize buffer */
@@ -1613,3 +1615,10 @@ int main(int argc, char *argv[])
 
     return 0;
 }
+
+static const AVClass _ffe_class = {
+    .class_name = "FFEdit",
+    .item_name  = av_default_item_name,
+    .version    = LIBAVUTIL_VERSION_INT,
+};
+const void *ffe_class[1] = { &_ffe_class };

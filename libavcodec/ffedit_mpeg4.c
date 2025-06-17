@@ -212,7 +212,7 @@ ffe_mpeg4_mv_not_supported(MpegEncContext *s)
       || (s->avctx->ffedit_export & (1 << FFEDIT_FEAT_MV_DELTA)) != 0
       || (s->avctx->ffedit_apply  & (1 << FFEDIT_FEAT_MV_DELTA)) != 0 )
     {
-        av_log(ffe_class, AV_LOG_ERROR,
+        av_log(NULL, AV_LOG_ERROR,
                "FFedit doesn't support the motion vectors in this file.\n");
         av_assert0(0);
     }

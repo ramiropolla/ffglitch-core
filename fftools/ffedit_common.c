@@ -350,10 +350,10 @@ static void ffedit_common_setup(
             const char *fname = "<params>";
             json_error_ctx_t jectx;
             json_error_parse(&jectx, script_params);
-            av_log(ffe_class, AV_LOG_FATAL, "%s:%d:%d: %s\n",
+            av_log(NULL, AV_LOG_FATAL, "%s:%d:%d: %s\n",
                    fname, (int) jectx.line, (int) jectx.offset, jectx.str);
-            av_log(ffe_class, AV_LOG_FATAL, "%s:%d:%s\n", fname, (int) jectx.line, jectx.buf);
-            av_log(ffe_class, AV_LOG_FATAL, "%s:%d:%s\n", fname, (int) jectx.line, jectx.column);
+            av_log(NULL, AV_LOG_FATAL, "%s:%d:%s\n", fname, (int) jectx.line, jectx.buf);
+            av_log(NULL, AV_LOG_FATAL, "%s:%d:%s\n", fname, (int) jectx.line, jectx.column);
             json_error_free(&jectx);
             exit(1);
         }
@@ -595,13 +595,13 @@ static int check_seekability(
                         || (fctx->iformat->flags & AVFMT_NOFILE) != 0;
     int nonseekable_input = (fctx->pb != NULL) && ((fctx->pb->seekable & AVIO_SEEKABLE_NORMAL) == 0);
     int nonseekable_output = ((ffo_codec->o_pb->seekable & AVIO_SEEKABLE_NORMAL) == 0);
-    av_log(ffe_class, AV_LOG_DEBUG, "raw_input_stream %d\n", raw_input_stream);
-    av_log(ffe_class, AV_LOG_DEBUG, "nonseekable_input %d\n", nonseekable_input);
-    av_log(ffe_class, AV_LOG_DEBUG, "nonseekable_output %d\n", nonseekable_output);
+    av_log(NULL, AV_LOG_DEBUG, "raw_input_stream %d\n", raw_input_stream);
+    av_log(NULL, AV_LOG_DEBUG, "nonseekable_input %d\n", nonseekable_input);
+    av_log(NULL, AV_LOG_DEBUG, "nonseekable_output %d\n", nonseekable_output);
     if ( (nonseekable_input || nonseekable_output) && !raw_input_stream )
     {
-        av_log(ffe_class, AV_LOG_FATAL, "Input or output stream are non-seekable (probably a pipe),\n");
-        av_log(ffe_class, AV_LOG_FATAL, "but the input stream is not a raw format (%s)!\n", fctx->iformat->long_name);
+        av_log(NULL, AV_LOG_FATAL, "Input or output stream are non-seekable (probably a pipe),\n");
+        av_log(NULL, AV_LOG_FATAL, "but the input stream is not a raw format (%s)!\n", fctx->iformat->long_name);
         return -1;
     }
     if ( raw_input_stream )

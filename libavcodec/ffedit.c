@@ -132,10 +132,3 @@ int ffe_feat_excludes(enum FFEditFeature feat1, enum FFEditFeature feat2)
             return 1;
     return 0;
 }
-
-static const AVClass _ffe_class = {
-    .class_name = "FFEdit",
-    .item_name  = av_default_item_name,
-    .version    = LIBAVUTIL_VERSION_INT,
-};
-const void *ffe_class[1] = { &_ffe_class };
